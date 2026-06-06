@@ -1,0 +1,44 @@
+import React from 'react';
+
+export default function ProviderHeader({ provider, earnings }) {
+  return (
+    <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl mb-8 relative overflow-hidden text-left">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_right_top,#1e293b_10%,transparent_50%)] pointer-events-none" />
+      <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        
+        {/* Info */}
+        <div className="flex gap-4 items-center">
+          <img className="w-14 h-14 rounded-2xl object-cover border-2 border-white/10" src={provider.avatar} />
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-wide">
+                Active Specialist
+              </span>
+              <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase font-bold border border-indigo-500/20">
+                {provider.category} Sector
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold font-sans mt-1.5 tracking-tight">{provider.name}</h2>
+            <p className="text-slate-400 text-xs mt-1 font-medium">{provider.phone} • Hyderabad Node</p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-6 text-center bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0 text-slate-200">
+          <div>
+            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Rating</span>
+            <span className="text-base sm:text-lg font-bold text-amber-400 block">⭐ {provider.rating}</span>
+          </div>
+          <div className="border-x border-white/10 px-2 sm:px-4">
+            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Jobs Done</span>
+            <span className="text-base sm:text-lg font-bold text-slate-100 block">{provider.jobsCompleted}</span>
+          </div>
+          <div>
+            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Lifetime Net</span>
+            <span className="text-base sm:text-lg font-bold text-indigo-400 block">₹{earnings || provider.earnings}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

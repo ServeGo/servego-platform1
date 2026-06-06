@@ -1,0 +1,20 @@
+/* Cursor consistency for clickable elements */
+
+button,
+[role='button'],
+a,
+select,
+textarea,
+input[type='button'],
+input[type='submit'],
+input[type='reset'] {
+  cursor: pointer;
+}
+
+/* Only for truly disabled controls */
+button:disabled,
+[aria-disabled='true'],
+input:disabled {
+  cursor: not-allowed;
+}
+

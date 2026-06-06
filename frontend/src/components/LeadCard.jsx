@@ -1,0 +1,94 @@
+import React from 'react';
+import { MessageSquare } from 'lucide-react';
+import ChatPanel from './ChatPanel';
+
+export default function LeadCard({ 
+  lead, 
+  onAccept, 
+  onReject, 
+  onTravel, 
+  onStartWork, 
+  onFinishWork,
+  chatOpen,
+  onToggleChat,
+  chatInput,
+  setChatInput,
+  onSendMessage
+}) {
+  const netPayout = lead.totalAmount - lead.serviceFee - lead.tax;
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-indigo-100 overflow-hidden shadow-xs p-6 relative text-left">
+      <div className="absolute top-6 right-6 text-right">
+        <span className={`px-2.5 py-1 text-[9px] font-black uppercase rounded-full border ${lead.status === 'pending' ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-indigo-100 border-indigo-300 text-indigo-800'}`}>
+          {lead.status === 'pending' ? 'Offer Received' : 'Active Duty'}
+        </span>
+      </div>
+
+      <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded mb-3 inline-block">ID: {lead.id}</span>
+      <h4 className="text-base font-extrabold text-slate-900">{lead.serviceCategory} Request</h4>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 font-bold text-xs text-slate-500 my-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase block mb-1">Schedule</span>
+          <span className="text-slate-800">{lead.bookingDate} • {lead.bookingTimeSlot}</span>
+        </div>
+        
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase block mb-1">Client Address</span>
+          <span className="text-slate-800 leading-tight block">{lead.locationAddress}</span>
+        </div>
+
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase block mb-1">Net Payout</span>
+          <span className="text-indigo-600 font-black text-sm">₹{netPayout}</span>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Customer Requirements</span>
+        <p className="text-slate-700 text-xs font-semibold">
+          👤 {lead.customerName}: <span className="text-slate-400 italic font-medium">"{lead.instructions || 'No special notes.'}"</span>
+        </p>
+      </div>
+
+      <div className="flex gap-2 justify-end flex-wrap">
+        <button 
+          onClick={onToggleChat}
+          className="mr-auto px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all flex items-center gap-1.5 focus:outline-none"
+        >
+          <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+          <span>{chatOpen ? 'Hide Chat' : 'Chat with Client'}</span>
+        </button>
+
+        {lead.status === 'pending' && (
+          <>
+            <button onClick={() => onReject(lead.id)} className="bg-white border border-slate-300 hover:bg-rose-50 hover:text-rose-700 px-4 py-2 text-xs font-bold rounded-xl transition-all">Decline</button>
+            <button onClick={() => onAccept(lead.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 text-xs font-bold rounded-xl transition-all">Accept Job</button>
+          </>
+        )}
+
+        {lead.status === 'confirmed' && (
+          <button onClick={() => onTravel(lead.id)} className="bg-indigo-600 hover:bg-indigo-750 text-white px-6 py-2.5 text-xs font-bold rounded-xl transition-all">🚚 Mark En-Route</button>
+        )}
+
+        {lead.status === 'en_route' && (
+          <button onClick={() => onStartWork(lead.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 text-xs font-bold rounded-xl transition-all">🛠 Start Work</button>
+        )}
+
+        {lead.status === 'ongoing' && (
+          <button onClick={() => onFinishWork(lead.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 text-xs font-bold rounded-xl transition-all">✔ Mark Completed</button>
+        )}
+      </div>
+
+      {chatOpen && (
+        <ChatPanel 
+          booking={lead}
+          input={chatInput}
+          setInput={setChatInput}
+          onSend={onSendMessage}
+        />
+      )}
+    </div>
+  );
+}
