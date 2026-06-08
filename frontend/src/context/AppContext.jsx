@@ -85,16 +85,18 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/bookings`);
       const data = await res.json();
+      const bookingsArray = Array.isArray(data) ? data : [];
       // Filter for current user if not admin
       if (currentUser?.role === 'admin') {
-        setBookings(data);
+        setBookings(bookingsArray);
       } else if (currentUser?.role === 'provider') {
-        setBookings(data.filter(b => b.providerId === currentUser.id));
+        setBookings(bookingsArray.filter(b => b.providerId === currentUser.id));
       } else {
-        setBookings(data.filter(b => b.customerId === currentUser.id));
+        setBookings(bookingsArray.filter(b => b.customerId === currentUser.id));
       }
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
+      setBookings([]);
     }
   };
 
@@ -235,14 +237,23 @@ export const AppProvider = ({ children }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        const text = await res.text();
+        console.error('Signup response not JSON:', text);
+        return { success: false, error: `Unexpected server response: ${text}` };
+      }
+
       if (data.success) {
         setCurrentUser(data.user);
         return { success: true };
-      } else {
-        return { success: false, error: data.error || 'Registration failed' };
       }
+
+      return { success: false, error: data.error || 'Registration failed' };
     } catch (err) {
+      console.error('Signup network error:', err);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };
@@ -312,6 +323,7 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify({
           bookingId,
           providerId,
+          reviewerId: currentUser?.id,
           reviewerName: currentUser?.name || 'Anonymous',
           rating,
           comment

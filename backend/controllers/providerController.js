@@ -1,23 +1,17 @@
-import { ProviderModel } from '../models/providerModel.js';
-import { ReviewModel } from '../models/reviewModel.js';
+import prisma from '../prisma/client.js';
 
 export const ProviderController = {
   getAll: async (req, res) => {
     try {
-      const providers = await ProviderModel.getAll();
-      
-      // Inject dynamically loaded reviews into each provider object for the frontend
-      const hydratedProviders = await Promise.all(
-        providers.map(async (p) => {
-          const reviews = await ReviewModel.getForProvider(p.id);
-          return {
-            ...p,
-            reviews: reviews || []
-          };
-        })
-      );
-
-      res.json(hydratedProviders);
+      const providers = await prisma.provider.findMany({
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, phone: true, avatar: true }
+          },
+          reviews: true
+        }
+      });
+      res.json(providers);
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch service partners', details: err.message });
     }
@@ -26,14 +20,18 @@ export const ProviderController = {
   getById: async (req, res) => {
     try {
       const { id } = req.params;
-      const provider = await ProviderModel.getById(id);
+      const provider = await prisma.provider.findUnique({
+        where: { id },
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, phone: true, avatar: true }
+          },
+          reviews: true
+        }
+      });
       if (!provider) {
         return res.status(404).json({ error: 'Service provider not found' });
       }
-
-      const reviews = await ReviewModel.getForProvider(id);
-      provider.reviews = reviews || [];
-
       res.json(provider);
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve provider details', details: err.message });
@@ -45,14 +43,21 @@ export const ProviderController = {
       const { id } = req.params;
       const { bio, hourlyRate, specialties, serviceAreas } = req.body;
 
-      const provider = await ProviderModel.getById(id);
-      if (!provider) {
+      const existing = await prisma.provider.findUnique({ where: { id } });
+      if (!existing) {
         return res.status(404).json({ error: 'Service provider profile missing' });
       }
 
-      const updated = await ProviderModel.update(id, { bio, hourlyRate, specialties, serviceAreas });
-      const reviews = await ReviewModel.getForProvider(id);
-      updated.reviews = reviews || [];
+      const updated = await prisma.provider.update({
+        where: { id },
+        data: {
+          bio,
+          hourlyRate: hourlyRate !== undefined ? Number(hourlyRate) : existing.hourlyRate,
+          specialties: Array.isArray(specialties) ? specialties : existing.specialties,
+          serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas
+        },
+        include: { reviews: true }
+      });
 
       res.json(updated);
     } catch (err) {
@@ -65,7 +70,13 @@ export const ProviderController = {
       const { id } = req.params;
       const { availableDays, timeSlots } = req.body;
 
-      const updated = await ProviderModel.update(id, { availableDays, timeSlots });
+      const updated = await prisma.provider.update({
+        where: { id },
+        data: {
+          availableDays: Array.isArray(availableDays) ? availableDays : undefined,
+          timeSlots: Array.isArray(timeSlots) ? timeSlots : undefined
+        }
+      });
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: 'Failed to update calendar availability schedule', details: err.message });
@@ -77,7 +88,12 @@ export const ProviderController = {
       const { id } = req.params;
       const { isVerified } = req.body;
 
-      const updated = await ProviderModel.update(id, { isVerified: !!isVerified });
+      const updated = await prisma.provider.update({
+        where: { id },
+        data: {
+          isVerified: Boolean(isVerified)
+        }
+      });
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: 'Failed to verify provider credentials', details: err.message });

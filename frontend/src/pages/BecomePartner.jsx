@@ -174,7 +174,7 @@ export const BecomePartner = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Stated Hour pricing (₹) *</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Stated Day pricing (₹) *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-xs font-bold text-slate-500">₹</span>
                     <input 

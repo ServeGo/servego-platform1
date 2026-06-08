@@ -47,12 +47,29 @@ export function MainLayout() {
   const [providerActiveTabExternal, setProviderActiveTabExternal] = useState('leads');
   const [adminActiveTabExternal, setAdminActiveTabExternal] = useState('dashboard');
 
+  const restrictedRoutes = ['dashboard-customer', 'dashboard-provider', 'admin'];
+
+  const getDefaultDashboardForRole = (user) => {
+    if (!user) return 'login';
+    if (user.role === 'admin') return 'admin';
+    if (user.role === 'provider') return 'dashboard-provider';
+    return 'dashboard-customer';
+  };
+
+  const isAllowedForCurrentUser = (page, user) => {
+    if (!restrictedRoutes.includes(page)) return true;
+    if (!user) return false;
+    if (page === 'dashboard-customer') return user.role === 'customer';
+    if (page === 'dashboard-provider') return user.role === 'provider';
+    if (page === 'admin') return user.role === 'admin';
+    return false;
+  };
+
   useEffect(() => {
     const handleHash = () => {
       const rawHash = window.location.hash.replace('#', '');
       const hash = rawHash.split('?')[0];
 
-      // Ensure currentPage is set from hash even if SPA uses hash routes with query params.
       if (hash) {
         if (hash.startsWith('service-details/')) {
           const catId = hash.split('/')[1];
@@ -70,32 +87,42 @@ export function MainLayout() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser) {
-      if (['dashboard-customer', 'dashboard-provider', 'admin'].includes(currentPage)) {
-        setCurrentPage('login');
-        window.location.hash = 'login';
-      }
-    } else {
-      if (currentUser.role === 'customer') {
-        if (['dashboard-provider', 'admin'].includes(currentPage)) {
-          setCurrentPage('dashboard-customer');
-          window.location.hash = 'dashboard-customer';
-        }
-      } else if (currentUser.role === 'provider') {
-        if (currentPage !== 'dashboard-provider') {
-          setCurrentPage('dashboard-provider');
-          window.location.hash = 'dashboard-provider';
-        }
-      } else if (currentUser.role === 'admin') {
-        if (currentPage !== 'admin') {
-          setCurrentPage('admin');
-          window.location.hash = 'admin';
-        }
-      }
+    if (!currentUser && restrictedRoutes.includes(currentPage)) {
+      setCurrentPage('login');
+      window.location.hash = 'login';
+      return;
+    }
+
+    if (currentUser && !isAllowedForCurrentUser(currentPage, currentUser)) {
+      const redirectPage = getDefaultDashboardForRole(currentUser);
+      setCurrentPage(redirectPage);
+      window.location.hash = redirectPage;
+      return;
+    }
+
+    if (currentUser && currentPage === 'login') {
+      const redirectPage = getDefaultDashboardForRole(currentUser);
+      setCurrentPage(redirectPage);
+      window.location.hash = redirectPage;
     }
   }, [currentUser, currentPage]);
 
   const handlePageTransition = (page, categoryId) => {
+    if (restrictedRoutes.includes(page) && !currentUser) {
+      setCurrentPage('login');
+      window.location.hash = 'login';
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (restrictedRoutes.includes(page) && currentUser && !isAllowedForCurrentUser(page, currentUser)) {
+      const redirectPage = getDefaultDashboardForRole(currentUser);
+      setCurrentPage(redirectPage);
+      window.location.hash = redirectPage;
+      window.scrollTo(0, 0);
+      return;
+    }
+
     if (categoryId) {
       setSelectedCategoryDetail(categoryId);
       window.location.hash = `service-details/${categoryId}`;
@@ -112,6 +139,10 @@ export function MainLayout() {
   };
 
   const renderContent = () => {
+    if (!isAllowedForCurrentUser(currentPage, currentUser)) {
+      return <Login onNavigate={handlePageTransition} />;
+    }
+
     switch (currentPage) {
       case 'home':
         return <Home onNavigate={handlePageTransition} />;

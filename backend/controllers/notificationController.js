@@ -1,9 +1,11 @@
-import { NotificationModel } from '../models/notificationModel.js';
+import prisma from '../prisma/client.js';
 
 export const NotificationController = {
   getAll: async (req, res) => {
     try {
-      const notifications = await NotificationModel.getAll();
+      const notifications = await prisma.notification.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
       res.json(notifications);
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch user inbox feeds', details: err.message });
@@ -12,8 +14,20 @@ export const NotificationController = {
 
   create: async (req, res) => {
     try {
-      const { userId, role, title, message, type } = req.body;
-      const notif = await NotificationModel.create({ userId, role, title, message, type });
+      const { userId, title, message, type } = req.body;
+      if (!userId || !title || !message) {
+        return res.status(400).json({ error: 'Missing required notification fields.' });
+      }
+
+      const notif = await prisma.notification.create({
+        data: {
+          userId,
+          title,
+          message,
+          type: type || 'SYSTEM',
+          isRead: false
+        }
+      });
       res.status(201).json(notif);
     } catch (err) {
       res.status(500).json({ error: 'Failed to post system alert', details: err.message });
@@ -23,19 +37,22 @@ export const NotificationController = {
   read: async (req, res) => {
     try {
       const { id } = req.params;
-      const notif = await NotificationModel.markAsRead(id);
-      if (!notif) {
-        return res.status(404).json({ error: 'Notification reference missing' });
-      }
+      const notif = await prisma.notification.update({
+        where: { id },
+        data: { isRead: true }
+      });
       res.json(notif);
     } catch (err) {
+      if (err.code === 'P2025') {
+        return res.status(404).json({ error: 'Notification reference missing' });
+      }
       res.status(500).json({ error: 'Failed to update alert state', details: err.message });
     }
   },
 
   clearAll: async (req, res) => {
     try {
-      await NotificationModel.clearAll();
+      await prisma.notification.deleteMany({});
       res.json({ success: true, message: 'All notification history flushed.' });
     } catch (err) {
       res.status(500).json({ error: 'Failed to erase notifications', details: err.message });

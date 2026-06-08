@@ -3,7 +3,9 @@ import { ChevronRight } from 'lucide-react';
 import CategoryIcon from './CategoryIcon';
 
 export default function CategoryGrid({ categories, providers, onCategoryClick, onSeeAll }) {
+  const safeProviders = Array.isArray(providers) ? providers : [];
   return (
+
     <section className="py-12 px-4 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
         <div>

@@ -32,7 +32,11 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   // Form fields
   const [bookingDate, setBookingDate] = useState('');
-  const [bookingSlot, setBookingSlot] = useState('');
+  const [bookingType, setBookingType] = useState('contract');
+  const [bookingEndDate, setBookingEndDate] = useState('');
+  const [contractYears, setContractYears] = useState('0');
+  const [contractDays, setContractDays] = useState('1');
+  const [contractHours, setContractHours] = useState('0');
   const [address, setAddress] = useState('');
   const [instructions, setInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('UPI');
@@ -68,17 +72,23 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   // Billing
   const billMetrics = useMemo(() => {
-    if (!selectedProvider) return { base: 0, tax: 0, fee: 0, loyaltyDiscount: 0, referralDiscount: 0, total: 0 };
-    const base = selectedProvider.hourlyRate;
-    const fee = 20; 
+    if (!selectedProvider) return { base: 0, tax: 0, fee: 0, loyaltyDiscount: 0, referralDiscount: 0, total: 0, durationLabel: '1d 0h' };
+    const contractHoursTotal = Number(contractYears) * 8760 + Number(contractDays) * 24 + Number(contractHours);
+    const durationHours = Math.max(24, bookingType === 'contract' ? contractHoursTotal : 24);
+    const dayRate = selectedProvider.hourlyRate;
+    const hourlyEquivalent = dayRate / 24;
+    const rawBase = bookingType === 'contract' ? hourlyEquivalent * durationHours : hourlyEquivalent;
+    const base = Math.round(rawBase);
+    const fee = 20;
     const tax = Math.round(base * 0.18);
     const loyaltyDiscount = Math.round(base * (loyaltyTier.discountPercent / 100));
     const maxDiscountWithReferral = Math.max(0, base + fee + tax - loyaltyDiscount);
     const availableReferralBalance = currentUser?.referralDiscountBalance || 0;
     const referralDiscount = applyReferralCredit ? Math.min(availableReferralBalance, maxDiscountWithReferral) : 0;
-    const total = base + fee + tax - loyaltyDiscount - referralDiscount;
-    return { base, tax, fee, loyaltyDiscount, referralDiscount, total };
-  }, [selectedProvider, loyaltyTier, currentUser, applyReferralCredit]);
+    const total = Math.round(base + fee + tax - loyaltyDiscount - referralDiscount);
+    const durationLabel = bookingType === 'contract' ? `${contractYears}y ${contractDays}d ${contractHours}h` : '1d 0h';
+    return { base, tax, fee, loyaltyDiscount, referralDiscount, total, durationLabel };
+  }, [selectedProvider, loyaltyTier, currentUser, applyReferralCredit, bookingType, contractYears, contractDays, contractHours]);
 
   const handleStartBooking = (prov) => {
     if (!currentUser) {
@@ -90,17 +100,31 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    setBookingDate(tomorrow.toISOString().split('T')[0]);
-    setBookingSlot(prov.timeSlots[0] || '11:00 AM');
-    setAddress('Flat 504, Vasavi Signature Block, Gachibowli Main Rd, Hyderabad');
+    const defaultDate = tomorrow.toISOString().split('T')[0];
+    setBookingDate(defaultDate);
+    setBookingType('contract');
+    setBookingEndDate('');
+    setContractYears('0');
+    setContractDays('1');
+    setContractHours('0');
+    setPaymentMethod('UPI');
+    setAddress('');
     setErrorText('');
   };
 
   const handleCompleteCheckout = async (e) => {
     e.preventDefault();
-    if (!bookingDate || !bookingSlot || !address.trim()) {
+    if (!bookingDate || !address.trim()) {
       setErrorText('Please complete all required fields');
       return;
+    }
+
+    if (bookingType === 'contract') {
+      const durationTotal = Number(contractYears) * 8760 + Number(contractDays) * 24 + Number(contractHours);
+      if (!durationTotal) {
+        setErrorText('Please select a contract duration');
+        return;
+      }
     }
 
     setBookingStep(2); // Loading simulation
@@ -112,7 +136,10 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
         providerAvatar: selectedProvider.avatar,
         serviceCategory: categoryMeta.name,
         bookingDate,
-        bookingTimeSlot: bookingSlot,
+        bookingEndDate: null,
+        bookingTimeSlot: bookingType === 'permanent' ? 'Permanent' : 'Contract',
+        bookingDuration: bookingType === 'contract' ? `${contractYears}y ${contractDays}d ${contractHours}h` : 'Ongoing',
+        serviceDurationType: bookingType,
         locationAddress: address,
         city: 'Hyderabad',
         instructions,
@@ -121,7 +148,8 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
         serviceFee: billMetrics.fee,
         appliedReferralDiscount: billMetrics.referralDiscount,
         appliedLoyaltyDiscount: billMetrics.loyaltyDiscount,
-        paymentMethod
+        paymentMethod,
+        rateBasis: 'day'
       });
       setConfirmedBookingDetails(created);
       setBookingStep(3);
@@ -146,7 +174,11 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
             onClose={() => setBookingStep(0)}
             errorText={errorText}
             bookingDate={bookingDate} setBookingDate={setBookingDate}
-            bookingSlot={bookingSlot} setBookingSlot={setBookingSlot}
+            bookingType={bookingType} setBookingType={setBookingType}
+            bookingEndDate={bookingEndDate} setBookingEndDate={setBookingEndDate}
+            contractYears={contractYears} setContractYears={setContractYears}
+            contractDays={contractDays} setContractDays={setContractDays}
+            contractHours={contractHours} setContractHours={setContractHours}
             address={address} setAddress={setAddress}
             instructions={instructions} setInstructions={setInstructions}
             paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod}
@@ -172,7 +204,7 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
           <BookingSuccess 
             details={confirmedBookingDetails}
             onDashboard={() => onNavigate('dashboard-customer')}
-            onBrowse={() => setBookingStep(0)}
+            onBrowse={() => onNavigate('services')}
           />
         )}
 

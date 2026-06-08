@@ -1,10 +1,20 @@
-import { BookingModel } from '../models/bookingModel.js';
-import { NotificationModel } from '../models/notificationModel.js';
+import prisma from '../prisma/client.js';
 
 export const BookingController = {
   getAll: async (req, res) => {
     try {
-      const bookings = await BookingModel.getAll();
+      const bookings = await prisma.booking.findMany({
+        include: {
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          provider: {
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
+          },
+          service: true,
+          payment: true
+        }
+      });
       res.json(bookings);
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve active/historical bookings', details: err.message });
@@ -14,7 +24,19 @@ export const BookingController = {
   getById: async (req, res) => {
     try {
       const { id } = req.params;
-      const booking = await BookingModel.getById(id);
+      const booking = await prisma.booking.findUnique({
+        where: { id },
+        include: {
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          provider: {
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
+          },
+          service: true,
+          payment: true
+        }
+      });
       if (!booking) {
         return res.status(404).json({ error: 'Booking not found' });
       }
@@ -31,53 +53,47 @@ export const BookingController = {
         return res.status(400).json({ error: 'Missing critical booking components (customerId, providerId, serviceCategory)' });
       }
 
-      // Format custom fields and invoice ID
       const timestamp = new Date().toISOString();
-      const randomInvoiceId = `SG-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const invoiceNumber = `SG-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const booking = {
-        id: bookingId,
-        customerId: bookingData.customerId,
-        customerName: bookingData.customerName,
-        customerEmail: bookingData.customerEmail,
-        customerPhone: bookingData.customerPhone,
-        providerId: bookingData.providerId,
-        providerName: bookingData.providerName,
-        providerAvatar: bookingData.providerAvatar,
-        serviceCategory: bookingData.serviceCategory,
-        bookingDate: bookingData.bookingDate,
-        bookingTimeSlot: bookingData.bookingTimeSlot,
-        status: 'pending',
-        paymentStatus: bookingData.paymentStatus || 'unpaid',
-        paymentMethod: bookingData.paymentMethod || null,
-        locationAddress: bookingData.locationAddress,
-        city: bookingData.city || 'Hyderabad',
-        instructions: bookingData.instructions || '',
-        totalAmount: Number(bookingData.totalAmount),
-        tax: Number(bookingData.tax || Math.round(Number(bookingData.totalAmount) * 0.05)),
-        serviceFee: Number(bookingData.serviceFee || 30),
-        invoiceNumber: randomInvoiceId,
-        bookingTime: timestamp,
-        messages: [],
-        reviewed: 0,
-        statusHistory: [
-          { status: 'pending', timestamp, note: 'Booking created by customer' }
-        ]
-      };
-
-      const result = await BookingModel.create(booking);
-
-      // Add automated system notification for the provider!
-      await NotificationModel.create({
-        userId: booking.providerId,
-        role: 'provider',
-        title: 'New Service Job Request',
-        message: `You have received a new ${booking.serviceCategory} request from ${booking.customerName} on ${booking.bookingDate}.`,
-        type: 'booking'
+      const result = await prisma.booking.create({
+        data: {
+          id: bookingId,
+          customerId: bookingData.customerId,
+          providerId: bookingData.providerId,
+          serviceCategory: bookingData.serviceCategory,
+          bookingDate: bookingData.bookingDate,
+          bookingTimeSlot: bookingData.bookingTimeSlot,
+          status: 'PENDING',
+          paymentStatus: bookingData.paymentStatus?.toUpperCase() || 'UNPAID',
+          paymentMethod: bookingData.paymentMethod || null,
+          locationAddress: bookingData.locationAddress,
+          city: bookingData.city || 'Hyderabad',
+          instructions: bookingData.instructions || '',
+          totalAmount: Number(bookingData.totalAmount || 0),
+          tax: Number(bookingData.tax ?? Math.round(Number(bookingData.totalAmount || 0) * 0.05)),
+          serviceFee: Number(bookingData.serviceFee ?? 30),
+          invoiceNumber,
+          bookingTime: timestamp,
+          messages: [],
+          reviewed: false,
+          statusHistory: [
+            { status: 'PENDING', timestamp, note: 'Booking created by customer' }
+          ]
+        }
       });
 
-      // Global socket dispatch for real-time dashboards
+      await prisma.notification.create({
+        data: {
+          userId: bookingData.providerId,
+          title: 'New Service Job Request',
+          message: `You have received a new ${bookingData.serviceCategory} request from ${bookingData.customerName || 'a customer'} on ${bookingData.bookingDate}.`,
+          type: 'BOOKING',
+          isRead: false
+        }
+      });
+
       const io = req.app.get('socketio');
       if (io) {
         io.emit('newJobLead', result);
@@ -98,18 +114,36 @@ export const BookingController = {
         return res.status(400).json({ error: 'A valid service status string is required.' });
       }
 
-      const updated = await BookingModel.updateStatus(id, status, note);
+      const booking = await prisma.booking.findUnique({ where: { id } });
+      if (!booking) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
 
-      // Create a notification for the customer about status change
-      await NotificationModel.create({
-        userId: updated.customerId,
-        role: 'customer',
-        title: 'Booking Status Updated',
-        message: `Your booking for ${updated.serviceCategory} has been updated to "${status}".`,
-        type: 'booking'
+      const updatedStatus = status.toUpperCase();
+      const newHistory = [...(booking.statusHistory || []), {
+        status: updatedStatus,
+        timestamp: new Date().toISOString(),
+        note: note || `Status changed to ${updatedStatus}`
+      }];
+
+      const updated = await prisma.booking.update({
+        where: { id },
+        data: {
+          status: updatedStatus,
+          statusHistory: newHistory
+        }
       });
 
-      // Global socket push
+      await prisma.notification.create({
+        data: {
+          userId: booking.customerId,
+          title: 'Booking Status Updated',
+          message: `Your booking for ${booking.serviceCategory} has been updated to "${updatedStatus}".`,
+          type: 'BOOKING',
+          isRead: false
+        }
+      });
+
       const io = req.app.get('socketio');
       if (io) {
         io.emit('bookingUpdated', updated);
@@ -130,6 +164,11 @@ export const BookingController = {
         return res.status(400).json({ error: 'Sender details and message contents are required.' });
       }
 
+      const booking = await prisma.booking.findUnique({ where: { id } });
+      if (!booking) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
+
       const messageObj = {
         id: `msg_${Math.random().toString(36).substring(2, 9)}`,
         senderId,
@@ -139,9 +178,13 @@ export const BookingController = {
         timestamp: new Date().toISOString()
       };
 
-      const booking = await BookingModel.addMessage(id, messageObj);
+      const updated = await prisma.booking.update({
+        where: { id },
+        data: {
+          messages: [ ...(booking.messages || []), messageObj ]
+        }
+      });
 
-      // Global socket dispatch
       const io = req.app.get('socketio');
       if (io) {
         io.emit('chatMessageReceived', { bookingId: id, message: messageObj });
