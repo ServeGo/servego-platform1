@@ -6,7 +6,11 @@ export default function BookingModal({
   onClose, 
   errorText, 
   bookingDate, setBookingDate, 
-  bookingSlot, setBookingSlot, 
+  bookingType, setBookingType,
+  bookingEndDate, setBookingEndDate,
+  contractYears, setContractYears,
+  contractDays, setContractDays,
+  contractHours, setContractHours,
   address, setAddress, 
   instructions, setInstructions, 
   paymentMethod, setPaymentMethod,
@@ -17,8 +21,8 @@ export default function BookingModal({
   onSubmit
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-2xl w-full relative shadow-2xl animate-fade-in my-8 text-left">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-2xl w-full relative shadow-2xl animate-fade-in mt-6 mb-6 text-left max-h-[calc(100vh-4rem)] overflow-y-auto hide-scrollbar">
         
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
           <div>
@@ -27,7 +31,7 @@ export default function BookingModal({
           </div>
           <button 
             onClick={onClose}
-            className="p-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold"
+            className="cursor-pointer p-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold"
           >
             Exit
           </button>
@@ -44,42 +48,76 @@ export default function BookingModal({
           {/* Form area */}
           <div className="md:col-span-7 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Select Date</label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <input 
-                  type="date"
-                  value={bookingDate}
-                  onChange={(e) => setBookingDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-800 outline-none"
-                  required
-                />
+              <span className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Service Duration</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingType('contract');
+                    setBookingEndDate('');
+                    setContractDays('1');
+                    setContractHours('0');
+                  }}
+                  className={`cursor-pointer py-2 px-4 text-xs font-bold rounded-full border transition-all ${
+                    bookingType === 'contract'
+                      ? 'bg-indigo-600 border-indigo-650 text-white shadow-sm'
+                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Contract
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingType('permanent');
+                    setBookingEndDate('');
+                  }}
+                  className={`cursor-pointer py-2 px-4 text-xs font-bold rounded-full border transition-all ${
+                    bookingType === 'permanent'
+                      ? 'bg-indigo-600 border-indigo-650 text-white shadow-sm'
+                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Permanent
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
+                  Start Date <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-800 outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className={bookingType === 'contract' ? 'sm:col-span-2' : 'hidden'}>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
+                  Contract Length <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <DurationSelect label="Years" value={contractYears} onChange={setContractYears} options={[0, 1, 2, 3, 4, 5]} />
+                  <DurationSelect label="Days" value={contractDays} onChange={setContractDays} options={[0, 1, 2, 3, 4, 5, 6, 7, 14, 21, 30]} />
+                  <DurationSelect label="Hours" value={contractHours} onChange={setContractHours} options={[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 16, 24]} />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Choose the contract duration that fits your service requirement. At least one of years, days, or hours must be selected.</p>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5 font-sans">Available Dispatch Shifts</label>
-              <div className="grid grid-cols-2 gap-2">
-                {provider.timeSlots.map((slot) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => setBookingSlot(slot)}
-                    className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all text-center ${
-                      bookingSlot === slot 
-                        ? 'bg-indigo-600 border-indigo-650 text-white shadow-sm' 
-                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Service Delivery Address</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
+                Service Location <span className="text-rose-500">*</span>
+              </label>
               <textarea
                 placeholder="Flat No, Apartment, Street name, Landmark, Pin"
                 value={address}
@@ -101,68 +139,82 @@ export default function BookingModal({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5 font-sans">Payment Method</label>
-              <div className="grid grid-cols-2 gap-2">
-                <PaymentButton active={paymentMethod === 'UPI'} onClick={() => setPaymentMethod('UPI')} icon={<CreditCard className="w-4 h-4" />} label="UPI Apps" />
-                <PaymentButton active={paymentMethod === 'Card'} onClick={() => setPaymentMethod('Card')} icon={<CreditCard className="w-4 h-4" />} label="Cards" />
-                <PaymentButton active={paymentMethod === 'Cash'} onClick={() => setPaymentMethod('Cash')} icon={<DollarSign className="w-4 h-4" />} label="Cash After Job" />
+            {bookingType === 'contract' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5 font-sans">Payment Method <span className="text-rose-500">*</span></label>
+                <div className="grid grid-cols-2 gap-2">
+                  <PaymentButton active={paymentMethod === 'UPI'} onClick={() => setPaymentMethod('UPI')} icon={<CreditCard className="w-4 h-4" />} label="UPI Apps" />
+                  <PaymentButton active={paymentMethod === 'Card'} onClick={() => setPaymentMethod('Card')} icon={<CreditCard className="w-4 h-4" />} label="Cards" />
+                  <PaymentButton active={paymentMethod === 'Cash'} onClick={() => setPaymentMethod('Cash')} icon={<DollarSign className="w-4 h-4" />} label="Cash After Job" />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Billing Summary */}
+          {/* Billing Summary / Quote Notice */}
           <div className="md:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 self-start shadow-xs">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Itemized Bill</span>
-            
-            <div className="space-y-2 pb-3 border-b border-slate-100 text-xs font-bold">
-              <BillRow label="Base Labor Fees" value={`₹${billMetrics.base}`} />
-              <BillRow label="Trust Insurance" value={`₹${billMetrics.fee}`} />
-              <BillRow label="GST (18%)" value={`₹${billMetrics.tax}`} />
+            {bookingType === 'contract' ? (
+              <>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Itemized Bill</span>
+                <div className="space-y-2 pb-3 border-b border-slate-100 text-xs font-bold">
+                  <BillRow label="Duration" value={billMetrics.durationLabel} />
+                  <BillRow label="Base Labor Fees" value={`₹${billMetrics.base}`} />
+                  <BillRow label="Trust Insurance" value={`₹${billMetrics.fee}`} />
+                  <BillRow label="GST (18%)" value={`₹${billMetrics.tax}`} />
 
-              {billMetrics.loyaltyDiscount > 0 && (
-                <div className="flex justify-between text-emerald-600 font-extrabold pt-1 border-t border-dashed border-slate-100">
-                  <span>👑 Loyalty ({loyaltyTier.tier})</span>
-                  <span>-₹{billMetrics.loyaltyDiscount}</span>
+                  {billMetrics.loyaltyDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-extrabold pt-1 border-t border-dashed border-slate-100">
+                      <span>👑 Loyalty ({loyaltyTier.tier})</span>
+                      <span>-₹{billMetrics.loyaltyDiscount}</span>
+                    </div>
+                  )}
+
+                  {billMetrics.referralDiscount > 0 && (
+                    <div className="flex justify-between text-indigo-600 font-extrabold">
+                      <span>🤝 Referral Wallet</span>
+                      <span>-₹{billMetrics.referralDiscount}</span>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {billMetrics.referralDiscount > 0 && (
-                <div className="flex justify-between text-indigo-600 font-extrabold">
-                  <span>🤝 Referral Wallet</span>
-                  <span>-₹{billMetrics.referralDiscount}</span>
+                {currentUser?.referralDiscountBalance > 0 && (
+                  <div className="my-3 bg-indigo-50/50 border border-indigo-100/60 rounded-xl p-3 text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={applyReferralCredit}
+                        onChange={(e) => setApplyReferralCredit(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                      />
+                      <span>Redeem Credits</span>
+                    </label>
+                    <div className="text-[11px] text-slate-500 mt-1 ml-6 flex justify-between">
+                      <span>Balance: ₹{currentUser.referralDiscountBalance}</span>
+                      {applyReferralCredit && <span className="text-indigo-650 font-bold">-₹{billMetrics.referralDiscount}</span>}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-3 flex justify-between font-extrabold text-slate-900 text-sm mb-6">
+                  <span>Payable Total</span>
+                  <span className="text-lg text-indigo-600">₹{billMetrics.total}</span>
                 </div>
-              )}
-            </div>
-
-            {currentUser?.referralDiscountBalance > 0 && (
-              <div className="my-3 bg-indigo-50/50 border border-indigo-100/60 rounded-xl p-3 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={applyReferralCredit}
-                    onChange={(e) => setApplyReferralCredit(e.target.checked)}
-                    className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                  />
-                  <span>Redeem Credits</span>
-                </label>
-                <div className="text-[11px] text-slate-500 mt-1 ml-6 flex justify-between">
-                  <span>Balance: ₹{currentUser.referralDiscountBalance}</span>
-                  {applyReferralCredit && <span className="text-indigo-650 font-bold">-₹{billMetrics.referralDiscount}</span>}
+              </>
+            ) : (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 space-y-3">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Quote Request</span>
+                  <p className="font-semibold text-slate-900">Permanent service pricing is not fixed upfront.</p>
+                  <p>We’ll route this request to the provider and confirm the final quote once they verify availability.</p>
                 </div>
               </div>
             )}
 
-            <div className="pt-3 flex justify-between font-extrabold text-slate-900 text-sm mb-6">
-              <span>Payable Total</span>
-              <span className="text-lg text-indigo-600">₹{billMetrics.total}</span>
-            </div>
-            
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-lg text-center text-sm transition-all shadow-md focus:outline-none"
+              className="cursor-pointer w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-lg text-center text-sm transition-all shadow-md focus:outline-none mt-6"
             >
-              Confirm Booking
+              {bookingType === 'contract' ? 'Confirm Booking' : 'Request Permanent Service'}
             </button>
           </div>
         </form>
@@ -176,13 +228,32 @@ function PaymentButton({ active, onClick, icon, label }) {
     <button
       type="button"
       onClick={onClick}
-      className={`p-2.5 rounded-xl border flex items-center gap-2 justify-center transition-all ${
+      className={`cursor-pointer p-2.5 rounded-xl border flex items-center gap-2 justify-center transition-all ${
         active ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-600 text-xs hover:bg-slate-100'
       }`}
     >
       {icon}
       <span>{label}</span>
     </button>
+  );
+}
+
+function DurationSelect({ label, value, onChange, options }) {
+  return (
+    <label className="block">
+      <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3 py-2 text-sm font-semibold text-slate-800 outline-none cursor-pointer"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

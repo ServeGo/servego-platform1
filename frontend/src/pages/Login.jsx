@@ -147,26 +147,6 @@ export function Login({ onNavigate }) {
 
         </form>
 
-        {/* Demo accounts display */}
-        <div className="mt-8 p-3 bg-slate-50 rounded-xl border border-slate-200 text-[10px] text-slate-500 font-medium space-y-1">
-          <span className="block font-bold text-slate-700 uppercase tracking-wide text-[9px] mb-1">Demo Accounts (Password: 'password')</span>
-          <div className="flex justify-between border-b border-slate-100 py-0.5">
-            <span>👤 Customer</span>
-            <span className="font-mono text-slate-600">anand.kumar@gmail.com</span>
-          </div>
-          <div className="flex justify-between border-b border-slate-100 py-0.5">
-            <span>👤 Customer 2</span>
-            <span className="font-mono text-slate-600">purnashekhar2352@gmail.com</span>
-          </div>
-          <div className="flex justify-between border-b border-slate-100 py-0.5">
-            <span>🛠 Expert Provider</span>
-            <span className="font-mono text-slate-600">srinivas.ksr@servego.com</span>
-          </div>
-          <div className="flex justify-between py-0.5">
-            <span>🛡 System Admin</span>
-            <span className="font-mono text-slate-600">admin@servego.com</span>
-          </div>
-        </div>
 
       </div>
     </div>

@@ -6,9 +6,9 @@ import { TicketController } from '../controllers/ticketController.js';
 import { NotificationController } from '../controllers/notificationController.js';
 import { ReviewController } from '../controllers/reviewController.js';
 import { ServiceController } from '../controllers/serviceController.js';
+import { PaymentController } from '../controllers/paymentController.js';
 
 const apiRouter = Router();
-
 
 // --- Authentication & Users ---
 apiRouter.post('/auth/register', UserController.register);
@@ -42,6 +42,10 @@ apiRouter.patch('/tickets/:id/resolve', TicketController.resolve);
 
 // --- Reviews ---
 apiRouter.post('/reviews', ReviewController.create);
+
+// --- Payments ---
+apiRouter.get('/payments', PaymentController.getAll);
+apiRouter.post('/payments', PaymentController.create);
 
 // --- Services (Service Categories) ---
 apiRouter.get('/services', ServiceController.getAll);

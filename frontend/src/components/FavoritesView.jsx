@@ -31,7 +31,7 @@ export default function FavoritesView({ favorites, onToggleFavorite, onNavigate 
           <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed font-medium">{prov.bio}</p>
 
           <div className="flex gap-2 text-xs font-bold pt-3 border-t border-slate-100 items-center justify-between">
-            <span className="text-slate-900">₹{prov.hourlyRate}/hr</span>
+            <span className="text-slate-900">₹{prov.hourlyRate}/day</span>
             <div className="flex gap-1.5">
               <button 
                 onClick={() => onToggleFavorite(prov.id)}

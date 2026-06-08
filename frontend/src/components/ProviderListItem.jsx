@@ -64,8 +64,8 @@ export default function ProviderListItem({
         {/* Pricing & Actions */}
         <div className="w-full lg:w-48 lg:border-l lg:border-slate-100 lg:pl-6 space-y-4 flex flex-row lg:flex-col justify-between items-center lg:items-stretch gap-4 shrink-0 mt-4 lg:mt-0">
           <div className="text-left lg:text-center shrink-0">
-            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block leading-none">Hourly Charge</span>
-            <span className="text-2xl font-extrabold text-slate-900 block mt-1">₹{provider.hourlyRate}<span className="text-xs text-slate-500 font-normal">/hr</span></span>
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block leading-none">Daily Charge</span>
+            <span className="text-2xl font-extrabold text-slate-900 block mt-1">₹{provider.hourlyRate}<span className="text-xs text-slate-500 font-normal">/day</span></span>
             <span className="text-[10px] font-semibold text-emerald-700 block mt-0.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit lg:mx-auto">No Travel Surcharges</span>
           </div>
 

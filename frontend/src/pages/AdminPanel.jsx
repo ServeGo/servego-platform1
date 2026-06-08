@@ -77,12 +77,14 @@ export const AdminPanel = ({ activeTab: activeTabProp, setActiveTabExternal }) =
 
   // Aggregate stats calculate
   const totalVolume = useMemo(() => {
-    return bookings.reduce((sum, b) => sum + b.totalAmount, 0);
+    const bookingList = Array.isArray(bookings) ? bookings : [];
+    return bookingList.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
   }, [bookings]);
 
   const administrativeEarnings = useMemo(() => {
+    const bookingList = Array.isArray(bookings) ? bookings : [];
     const factor = parseFloat(platformCommission) / 100;
-    return Math.round(bookings.filter(b => b.status === 'completed').reduce((sum, b) => sum + (b.totalAmount * factor), 0));
+    return Math.round(bookingList.filter(b => b.status === 'completed').reduce((sum, b) => sum + ((Number(b.totalAmount) || 0) * factor), 0));
   }, [bookings, platformCommission]);
 
   const pendingPartnersCount = useMemo(() => {

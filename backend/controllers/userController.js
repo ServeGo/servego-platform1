@@ -1,10 +1,27 @@
-import { UserModel } from '../models/userModel.js';
-import { ProviderModel } from '../models/providerModel.js';
+import bcrypt from 'bcryptjs';
+import prisma from '../prisma/client.js';
 
 export const UserController = {
   getUsers: async (req, res) => {
     try {
-      const users = await UserModel.getAll();
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          avatar: true,
+          status: true,
+          address: true,
+          pincode: true,
+          referralCode: true,
+          referralsCount: true,
+          referralDiscountBalance: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
       res.json(users);
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve users', details: err.message });
@@ -28,12 +45,10 @@ export const UserController = {
       } = req.body;
 
       if (!name || !email || !phone || !role || !password) {
-        return res
-          .status(400)
-          .json({ error: 'Missing required signup parameters (name, email, phone, role, password)' });
+        return res.status(400).json({ error: 'Missing required signup parameters (name, email, phone, role, password)' });
       }
 
-      if (typeof acceptedTerms !== 'boolean' || !acceptedTerms) {
+      if (!acceptedTerms) {
         return res.status(400).json({ error: 'You must agree to the Terms & Conditions to continue.' });
       }
 
@@ -47,80 +62,76 @@ export const UserController = {
 
       if (role === 'customer') {
         if (!address || !pincode) {
-          return res
-            .status(400)
-            .json({ error: 'Address and pincode are required for customer signup.' });
+          return res.status(400).json({ error: 'Address and pincode are required for customer signup.' });
         }
         if (!/^[0-9]{5,6}$/.test(String(pincode))) {
           return res.status(400).json({ error: 'Invalid pincode. Expected 5-6 digits.' });
         }
-      }
-
-      if (role === 'provider') {
+      } else if (role === 'provider') {
         if (!serviceInterested) {
-          return res.status(400).json({ error: 'service interseted is required for provider signup.' });
+          return res.status(400).json({ error: 'Service interested is required for provider signup.' });
         }
+      } else {
+        return res.status(400).json({ error: 'Signup role must be either customer or provider.' });
       }
 
-      const existingUser = await UserModel.getByEmail(email);
+      const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return res.status(400).json({ error: 'An account with this email address already exists. Please choose another email.' });
       }
 
-      // Generate a unique ID & referral code
-      const id = role === 'provider' ? `p_${Math.floor(1000 + Math.random() * 9000)}` : `c_${Math.floor(1000 + Math.random() * 9000)}`;
-      const refAbbrev = name.substring(0, 3).toUpperCase().replace(/\s/g, 'X');
-      const referralCode = `SERVEGO-${role === 'provider' ? 'PRO' : 'CUST'}-${refAbbrev}${Math.floor(10 + Math.random() * 90)}`;
-
-      // Default high-quality avatars based on role and initials
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const referralCode = `SERVEGO-${role === 'provider' ? 'PRO' : 'CUST'}-${name.substring(0, 3).toUpperCase().replace(/\s/g, 'X')}${Math.floor(10 + Math.random() * 90)}`;
       const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F172A&color=fff&size=150`;
 
-      // 1. Create User in SQLite
-      const newUser = await UserModel.create({
-        id,
-        name,
-        email,
-        phone,
-        role,
-        password,
-        avatar,
-        address: role === 'customer' ? address : null,
-        pincode: role === 'customer' ? pincode : null,
-        referralCode,
-        referralDiscountBalance: 0,
-        referralsCount: 0
-      });
-
-      // 2. If registering as a provider, bootstrap their Provider table profile
-      if (role === 'provider') {
-        const cat = serviceInterested || 'Service Provider';
-        await ProviderModel.create({
-          id,
+      const newUser = await prisma.user.create({
+        data: {
           name,
           email,
           phone,
+          role,
+          password: hashedPassword,
           avatar,
-          category: cat,
-          rating: 4.8,
-          reviewCount: 0,
-          experienceYears: 3,
-          jobsCompleted: 0,
-          hourlyRate: cat.toLowerCase().includes('plumb') ? 280 : 350,
-          bio: `Experienced specialist offering high-quality professional home servicing in ${cat}. Clean, certified, and fully background-vetted.`,
-          specialties: [`Emergency ${cat} Repair`, `Residential Installation`, `Routine Maintenance`],
-          serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills'],
-          photo: photo || null,
-          serviceInterested: serviceInterested,
-          isVerified: 1,
-          isFeatured: 0,
-          availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-          timeSlots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM'],
-          earnings: 0
+          status: 'ACTIVE',
+          address: role === 'customer' ? address : null,
+          pincode: role === 'customer' ? pincode : null,
+          referralCode,
+          referralsCount: 0,
+          referralDiscountBalance: 0
+        }
+      });
+
+      if (role === 'provider') {
+        await prisma.provider.create({
+          data: {
+            userId: newUser.id,
+            category: serviceInterested,
+            bio: `Experienced specialist offering high-quality professional home servicing in ${serviceInterested}.`,
+            specialties: [`Emergency ${serviceInterested} Repair`, `Residential Installation`, `Routine Maintenance`],
+            serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills'],
+            photo: photo || null,
+            serviceInterested,
+            isVerified: true,
+            isFeatured: false,
+            availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+            timeSlots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM']
+          }
         });
       }
 
-      res.status(201).json({ success: true, user: newUser });
+      await prisma.authEvent.create({
+        data: {
+          userId: newUser.id,
+          email: newUser.email,
+          eventType: 'SIGNUP',
+          success: true
+        }
+      });
+
+      const { password: _, ...safeUser } = newUser;
+      res.status(201).json({ success: true, user: safeUser });
     } catch (err) {
+      console.error('Signup registration error:', err);
       res.status(500).json({ error: 'Server signup registration failed', details: err.message });
     }
   },
@@ -132,17 +143,35 @@ export const UserController = {
         return res.status(400).json({ error: 'Please enter both your email address and password.' });
       }
 
-      const user = await UserModel.getByEmail(email);
-      if (!user || user.password !== password) {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user || !(await bcrypt.compare(password, user.password))) {
+        await prisma.authEvent.create({
+          data: {
+            email,
+            eventType: 'LOGIN',
+            success: false
+          }
+        });
         return res.status(401).json({ error: 'Incorrect email address or password. Please verify and try again.' });
       }
 
-      if (user.status !== 'active') {
+      if (user.status !== 'ACTIVE') {
         return res.status(403).json({ error: 'Your account is currently inactive or under safety review. Please contact support.' });
       }
 
-      res.json({ success: true, user });
+      await prisma.authEvent.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          eventType: 'LOGIN',
+          success: true
+        }
+      });
+
+      const { password: _, ...safeUser } = user;
+      res.json({ success: true, user: safeUser });
     } catch (err) {
+      console.error('Login error:', err);
       res.status(500).json({ error: 'Server authentication login failed', details: err.message });
     }
   }

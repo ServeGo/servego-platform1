@@ -1,9 +1,9 @@
-import { TicketModel } from '../models/ticketModel.js';
+import prisma from '../prisma/client.js';
 
 export const TicketController = {
   getAll: async (req, res) => {
     try {
-      const tickets = await TicketModel.getAll();
+      const tickets = await prisma.ticket.findMany({ orderBy: { createdAt: 'desc' } });
       res.json(tickets);
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve support tickets', details: err.message });
@@ -17,7 +17,15 @@ export const TicketController = {
         return res.status(400).json({ error: 'Missing support claim parameters' });
       }
 
-      const ticket = await TicketModel.create({ name, email, subject, message });
+      const ticket = await prisma.ticket.create({
+        data: {
+          requesterName: name,
+          requesterEmail: email,
+          subject,
+          message,
+          status: 'OPEN'
+        }
+      });
       res.status(201).json(ticket);
     } catch (err) {
       res.status(500).json({ error: 'Failed to file support ticket', details: err.message });
@@ -33,10 +41,20 @@ export const TicketController = {
         return res.status(400).json({ error: 'An admin resolution comment string is required.' });
       }
 
-      const ticket = await TicketModel.resolve(id, response);
+      const ticket = await prisma.ticket.update({
+        where: { id },
+        data: {
+          status: 'RESOLVED',
+          adminResponse: response,
+          resolvedAt: new Date()
+        }
+      });
       res.json(ticket);
     } catch (err) {
-      res.status(550).json({ error: 'Failed to resolve support ticket', details: err.message });
+      if (err.code === 'P2025') {
+        return res.status(404).json({ error: 'Support ticket not found' });
+      }
+      res.status(500).json({ error: 'Failed to resolve support ticket', details: err.message });
     }
   }
 };

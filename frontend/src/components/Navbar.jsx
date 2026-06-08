@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Menu, X, Bell, User, Briefcase, Shield, ChevronDown, LogOut, Heart
@@ -26,6 +26,24 @@ export default function Navbar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const userDropdownRef = useRef(null);
+  const notifDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (userDropdownOpen && userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setUserDropdownOpen(false);
+      }
+      if (notifDropdownOpen && notifDropdownRef.current && !notifDropdownRef.current.contains(event.target)) {
+        setNotifDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [userDropdownOpen, notifDropdownOpen]);
 
   const unreadNotifications = notifications.filter(
     n => !n.read && (n.userId === currentUser?.id || n.role === currentUser?.role)
@@ -253,7 +271,7 @@ export default function Navbar({
 
           <div className="flex items-center gap-3">
             {/* Notification Bell */}
-            <div className="relative">
+            <div className="relative" ref={notifDropdownRef}>
               <button 
                 onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
                 className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 relative focus:outline-none"
@@ -293,7 +311,7 @@ export default function Navbar({
             </div>
 
             {/* Profile Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={userDropdownRef}>
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-xs focus:outline-none"
@@ -310,6 +328,18 @@ export default function Navbar({
                   </div>
 
                   <div className="space-y-1 font-semibold text-slate-700">
+                    <button 
+                      onClick={() => { setUserDropdownOpen(false); handleLinkClick('home'); }} 
+                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
+                    >
+                      Home
+                    </button>
+                    <button 
+                      onClick={() => { setUserDropdownOpen(false); handleLinkClick('services'); }} 
+                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
+                    >
+                      Services
+                    </button>
                     <button 
                       onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('bookings'); handleLinkClick('dashboard-customer'); }} 
                       className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"

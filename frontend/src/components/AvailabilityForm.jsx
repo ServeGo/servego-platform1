@@ -37,7 +37,7 @@ export default function AvailabilityForm({
                 <input type="number" value={experience} onChange={(e) => setExperience(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Rate (₹)</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Daily Rate (₹)</label>
                 <input type="number" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none" />
               </div>
             </div>
