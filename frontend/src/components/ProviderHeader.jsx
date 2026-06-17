@@ -8,7 +8,31 @@ export default function ProviderHeader({ provider, earnings }) {
         
         {/* Info */}
         <div className="flex gap-4 items-center">
-          <img className="w-14 h-14 rounded-2xl object-cover border-2 border-white/10" src={provider.avatar} />
+          {(() => {
+            const avatarSrc = provider?.avatar || provider?.photo;
+            const name = provider?.name || '';
+            const initials = name
+              .split(' ')
+              .filter(Boolean)
+              .slice(0, 2)
+              .map(s => s[0]?.toUpperCase())
+              .join('') || 'PR';
+
+            return avatarSrc ? (
+              <img
+                className="w-14 h-14 rounded-2xl object-cover border-2 border-white/10"
+                src={avatarSrc}
+                alt={`${name || 'Provider'} avatar`}
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white">
+                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+            );
+          })()}
           <div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-wide">

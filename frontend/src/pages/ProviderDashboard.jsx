@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext';
 import ProviderHeader from '../components/ProviderHeader';
 import LeadCard from '../components/LeadCard';
 import EarningsChart from '../components/EarningsChart';
-import AvailabilityForm from '../components/AvailabilityForm';
+import ProviderServicesPanel from '../components/ProviderServicesPanel';
 import ProviderReviews from '../components/ProviderReviews';
 import ProviderSupport from '../components/ProviderSupport';
 import ProviderReferrals from '../components/ProviderReferrals';
@@ -19,8 +19,15 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   } = useApp();
 
   const activeProvider = useMemo(() => {
-    const provId = currentUser?.providerId || 'p1';
-    return providers.find(p => p.id === provId) || providers[0];
+    // currentUser.providerId (from backend) might represent either User.id or Provider.id
+    // Prefer matching by Provider.id; if missing, fall back to matching by userId.
+    const providerIdCandidate = currentUser?.providerId;
+    const providerUserIdCandidate = currentUser?.id;
+
+    const byProviderId = providerIdCandidate ? providers.find(p => p.id === providerIdCandidate) : null;
+    const byUserId = providerUserIdCandidate ? providers.find(p => p.userId === providerUserIdCandidate) : null;
+
+    return byProviderId || byUserId || providers[0];
   }, [providers, currentUser]);
 
   const [internalActiveTab, setInternalActiveTab] = useState('leads');
@@ -127,17 +134,9 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
         {activeTab === 'earnings' && <EarningsChart completedJobs={completedJobs} />}
 
-        {activeTab === 'settings' && activeProvider && (
-          <AvailabilityForm 
-            onSubmit={handleSaveSettings}
-            phone={profilePhone} setPhone={setProfilePhone}
-            experience={profileExperience} setExperience={setProfileExperience}
-            hourlyRate={profileHourlyRate} setHourlyRate={setProfileHourlyRate}
-            bio={profileBio} setBio={setProfileBio}
-            days={workingDays} toggleDay={(d) => setWorkingDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
-            slots={workingHours} toggleSlot={(s) => setWorkingHours(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-            isSaved={isSavedText}
-            specialties={activeProvider.specialties}
+        {activeTab === 'services' && activeProvider && (
+          <ProviderServicesPanel
+            provider={activeProvider}
           />
         )}
 
@@ -190,7 +189,7 @@ function TabList({ activeTab, setActiveTab, leadsCount, reviewsCount }) {
   const tabs = [
     { id: 'leads', label: `Leads (${leadsCount})` },
     { id: 'earnings', label: 'Earnings' },
-    { id: 'settings', label: 'Profile & Shifts' },
+    { id: 'services', label: 'My Services' },
     { id: 'reviews', label: `Reviews (${reviewsCount})` },
     { id: 'support', label: 'Support' },
     { id: 'referrals', label: '🤝 Ambassador' }

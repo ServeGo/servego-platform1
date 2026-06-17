@@ -31,7 +31,9 @@ import {
   Activity,
   LogOut,
   Briefcase,
+  ShieldCheck,
 } from 'lucide-react';
+
 
 export function MainLayout() {
   const { currentUser, logout } = useApp();
@@ -255,6 +257,19 @@ export function MainLayout() {
                 <Activity className="w-4 h-4 shrink-0" />
                 <span>Services</span>
               </button>
+
+              <button
+                onClick={() => setAdminActiveTabExternal('providerServiceRequests')}
+                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                  adminActiveTabExternal === 'providerServiceRequests'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'hover:bg-white/5 text-slate-305'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <span>Service Requests</span>
+              </button>
+
 
               <button
                 onClick={() => setAdminActiveTabExternal('bookings')}

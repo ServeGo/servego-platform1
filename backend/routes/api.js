@@ -7,8 +7,10 @@ import { NotificationController } from '../controllers/notificationController.js
 import { ReviewController } from '../controllers/reviewController.js';
 import { ServiceController } from '../controllers/serviceController.js';
 import { PaymentController } from '../controllers/paymentController.js';
+import { AdminProviderServiceController } from '../controllers/adminProviderServiceController.js';
 
 const apiRouter = Router();
+
 
 // --- Authentication & Users ---
 apiRouter.post('/auth/register', UserController.register);
@@ -18,6 +20,8 @@ apiRouter.get('/users', UserController.getUsers);
 // --- Service Providers (Partners) ---
 apiRouter.get('/providers', ProviderController.getAll);
 apiRouter.get('/providers/:id', ProviderController.getById);
+apiRouter.get('/providers/:id/services', ProviderController.getProviderServices);
+apiRouter.post('/providers/:id/services/register', ProviderController.registerProviderService);
 apiRouter.patch('/providers/:id/profile', ProviderController.updateProfile);
 apiRouter.patch('/providers/:id/availability', ProviderController.updateAvailability);
 apiRouter.patch('/providers/:id/verify', ProviderController.verify);
@@ -54,7 +58,13 @@ apiRouter.delete('/services/:id', ServiceController.deleteOne);
 apiRouter.patch('/services/:id', ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', ServiceController.hideOne);
 
+// --- Admin: approve/deny provider service requests ---
+apiRouter.get('/admin/provider-service-requests', AdminProviderServiceController.getPendingRequests);
+apiRouter.patch('/admin/provider-service-requests/:id/approve', AdminProviderServiceController.approveService);
+apiRouter.patch('/admin/provider-service-requests/:id/deny', AdminProviderServiceController.denyService);
+
 export default apiRouter;
+
 
 
 

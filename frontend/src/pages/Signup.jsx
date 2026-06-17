@@ -17,7 +17,8 @@ export function Signup({ onNavigate }) {
 
   const partnerApplied = getQueryParam('partnerApplied');
   const partnerMessage = decodeURIComponent(getQueryParam('partnerMessage') || '');
-  const { registerUser } = useApp();
+  const { registerUser, services } = useApp();
+
 
   const [signupType, setSignupType] = useState('customer');
 
@@ -31,6 +32,8 @@ export function Signup({ onNavigate }) {
   // Provider fields
   const [photoDataUrl, setPhotoDataUrl] = useState(''); // base64 data URL
   const [serviceInterested, setServiceInterested] = useState('');
+  const [serviceInterestedOption, setServiceInterestedOption] = useState(''); // selected dropdown value
+  const [serviceInterestedOther, setServiceInterestedOther] = useState(''); // custom text
 
   // Password fields
   const [password, setPassword] = useState('');
@@ -81,15 +84,44 @@ export function Signup({ onNavigate }) {
   };
 
   const validateProvider = () => {
+    if (signupType !== 'provider') return null;
+
+    // Require dropdown selection OR custom text when OTHER is chosen.
+    if (serviceInterestedOption && serviceInterestedOption !== 'OTHER') {
+      if (!serviceInterestedOption.trim()) return 'Please select what service you are interested in.';
+      return null;
+    }
+
+    if (serviceInterestedOption === 'OTHER') {
+      if (!serviceInterestedOther.trim()) return 'Please enter service name.';
+      return null;
+    }
+
+    // No selection made
     if (!serviceInterested.trim()) return 'Please select what service you are interested in.';
+
     return null;
   };
+
+
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     resetErrorsAndSuccess();
 
+    // sync final serviceInterested based on selection
+    if (signupType === 'provider') {
+      if (serviceInterestedOption && serviceInterestedOption !== 'OTHER') {
+        setServiceInterested(serviceInterestedOption);
+      } else {
+        setServiceInterested(serviceInterestedOther);
+      }
+    }
+
     const commonError = validateCommon();
+
     if (commonError) {
       setErrorMsg(commonError);
       return;
@@ -111,7 +143,11 @@ export function Signup({ onNavigate }) {
       }
     }
 
+    // normalize final serviceInterested in state is handled before payload creation
+    // setProviderServiceError removed (no longer used)
+
     setIsLoading(true);
+
 
     const payload =
       signupType === 'customer'
@@ -134,9 +170,13 @@ export function Signup({ onNavigate }) {
             password,
             confirmPassword,
             photo: photoDataUrl || null,
-            serviceInterested: serviceInterested.trim(),
+            serviceInterested: (serviceInterestedOption && serviceInterestedOption !== 'OTHER'
+              ? serviceInterestedOption
+              : serviceInterestedOther
+            ).trim(),
             acceptedTerms
           };
+
 
     const result = await registerUser(payload);
 
@@ -344,18 +384,54 @@ export function Signup({ onNavigate }) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1 font-sans">service interseted *</label>
-                <input
-                  type="text"
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1 font-sans">service interested *</label>
+
+                <select
                   required
-                  value={serviceInterested}
-                  onChange={(e) => setServiceInterested(e.target.value)}
-                  placeholder="e.g. Electrician"
-                  className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none"
-                />
+                  value={serviceInterestedOption}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setServiceInterestedOption(val);
+                    // providerServiceError removed (no longer used)
+
+                    if (val !== 'OTHER') {
+                      setServiceInterestedOther('');
+                      setServiceInterested(val);
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
+                >
+                  <option value="">Select service</option>
+                  {Array.isArray(services) &&
+                    services.filter(s => !s.isHidden).map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  <option value="OTHER">Other</option>
+                </select>
+
+                {serviceInterestedOption === 'OTHER' && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      required
+                      value={serviceInterestedOther}
+                      onChange={(e) => {
+                        setServiceInterestedOther(e.target.value);
+                        setServiceInterested(e.target.value);
+                      }}
+                      placeholder="Enter service name"
+                      className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
+                    />
+                  </div>
+                )}
+
+
               </div>
             </div>
           )}
+
 
           <div>
             <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Password *</label>
@@ -371,6 +447,8 @@ export function Signup({ onNavigate }) {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
               />
+
+
             </div>
           </div>
 
@@ -420,6 +498,7 @@ export function Signup({ onNavigate }) {
 
           {signupType === 'provider' && (
             <div className="text-[10px] font-semibold text-slate-400 text-center leading-relaxed mt-2.5 flex items-start gap-1 justify-center bg-amber-50/50 p-2 rounded-lg border border-amber-100/50">
+
               <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
               <span>By registering, you confirm you have basic business eligibility under Hyderabad local guidelines.</span>
             </div>

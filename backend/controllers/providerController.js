@@ -1,6 +1,157 @@
 import prisma from '../prisma/client.js';
 
 export const ProviderController = {
+  getProviderServices: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Provider sees:
+      // - approved links (ProviderService)
+      // - pending/denied requests (ProviderServiceRequest)
+      const [approvedLinks, requests] = await Promise.all([
+        prisma.providerService.findMany({
+          where: { providerId: id },
+          include: { service: true },
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.providerServiceRequest.findMany({
+          where: { providerId: id },
+          orderBy: { createdAt: 'desc' }
+        })
+      ]);
+
+      const formattedApproved = approvedLinks.map((link) => ({
+        id: link.id,
+        name: link.service.name,
+        approvalStatus: 'APPROVED',
+        basePricePerDay: link.basePricePerDay,
+        description: link.description,
+        createdAt: link.createdAt
+      }));
+
+      const formattedRequests = requests.map((r) => ({
+        id: r.id,
+        name: r.requestedServiceName,
+        approvalStatus: r.status,
+        basePricePerDay: r.basePricePerDay,
+        description: r.description,
+        createdAt: r.createdAt
+      }));
+
+      // sort newest first across both arrays
+      const combined = [...formattedApproved, ...formattedRequests].sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+      res.json(combined);
+    } catch (err) {
+      res.status(500).json({
+        error: 'Failed to fetch provider services',
+        details: err.message,
+        // helps identify if the request providerId is wrong type/value
+        providerId: req.params?.id
+      });
+    }
+  },
+
+  registerProviderService: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { serviceName, description, popularIssues, experienceYears, basePricePerDay } = req.body || {};
+
+      if (!serviceName) {
+        return res.status(400).json({ error: 'Missing required field: serviceName' });
+      }
+      if (basePricePerDay === undefined || basePricePerDay === null || basePricePerDay === '') {
+        return res.status(400).json({ error: 'Missing required field: basePricePerDay' });
+      }
+      if (!description || !String(description).trim()) {
+        return res.status(400).json({ error: 'Missing required field: description' });
+      }
+
+      const provider = await prisma.provider.findUnique({ where: { id } });
+      if (!provider) return res.status(404).json({ error: 'Service provider not found' });
+
+      const requestedService = String(serviceName).trim();
+
+      // Prevent duplicate requests:
+      // - Block if there's an APPROVED ProviderService for same provider + service name.
+      // - Block if there's an existing PENDING ProviderServiceRequest for same provider + service name.
+      // - Allow only when all previous requests were DENIED (or no request exists).
+      const existingApproved = await prisma.providerService.findFirst({
+        where: {
+          providerId: provider.id,
+          service: {
+            name: requestedService
+          }
+        },
+        select: { id: true }
+      });
+      if (existingApproved) {
+        return res.status(409).json({ error: 'Service already approved for this provider.' });
+      }
+
+      const existingPending = await prisma.providerServiceRequest.findFirst({
+        where: {
+          providerId: provider.id,
+          requestedServiceName: requestedService,
+          status: 'PENDING'
+        },
+        select: { id: true }
+      });
+      if (existingPending) {
+        return res.status(409).json({ error: 'Service request already pending approval.' });
+      }
+
+      const existingRequest = await prisma.providerServiceRequest.findFirst({
+        where: {
+          providerId: provider.id,
+          requestedServiceName: requestedService
+        },
+        select: { status: true }
+      });
+
+      if (existingRequest?.status !== 'DENIED') {
+        return res.status(409).json({ error: 'Service request already submitted for this provider.' });
+      }
+
+      // Create a provider service request in PENDING state.
+      const created = await prisma.providerServiceRequest.create({
+        data: {
+          providerId: provider.id,
+          requestedServiceName: requestedService,
+          basePricePerDay: Number(basePricePerDay),
+          description: String(description).trim(),
+          popularIssues: Array.isArray(popularIssues) ? popularIssues : [],
+          experienceYears:
+            experienceYears !== undefined && experienceYears !== null && experienceYears !== ''
+              ? Number(experienceYears)
+              : null,
+          status: 'PENDING'
+        }
+      });
+
+
+      // Optionally update experienceYears on provider profile from request
+      if (
+        experienceYears !== undefined &&
+        experienceYears !== null &&
+        experienceYears !== '' &&
+        !Number.isNaN(Number(experienceYears))
+      ) {
+        await prisma.provider.update({
+          where: { id },
+          data: { experienceYears: Number(experienceYears) }
+        });
+      }
+
+      res.status(201).json(created);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to register provider service', details: err.message });
+    }
+  },
+
+
   getAll: async (req, res) => {
     try {
       const providers = await prisma.provider.findMany({
