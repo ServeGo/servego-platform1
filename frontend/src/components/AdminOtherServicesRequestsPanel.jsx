@@ -1,0 +1,119 @@
+import React, { useEffect, useState } from 'react';
+
+import { useApp } from '../context/AppContext';
+
+export default function AdminOtherServicesRequestsPanel() {
+  const {
+    providerServiceRequests,
+    fetchProviderServiceRequests,
+    approveProviderServiceRequest,
+    denyProviderServiceRequest
+  } = useApp();
+
+  const [loading, setLoading] = useState(false);
+
+  const loadNow = async () => {
+    setLoading(true);
+    try {
+      await fetchProviderServiceRequests();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Provider Service Requests</h2>
+          <p className="text-slate-500 text-xs">Admin approval required for both existing dropdown selections and OTHER requests.</p>
+        </div>
+        <div>
+          <button
+            type="button"
+            onClick={loadNow}
+            disabled={loading}
+            className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-2 shadow-xs disabled:bg-slate-700"
+          >
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+        {providerServiceRequests.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-slate-400 italic text-xs font-semibold">No pending service requests.</p>
+            <p className="text-slate-500 text-[10px] mt-2">If you expected requests, refresh or check backend logs.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-semibold">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-slate-50/50">
+                  <th className="py-3 px-6">Request ID</th>
+                  <th className="py-3 px-6">Provider</th>
+                  <th className="py-3 px-6">Service Name</th>
+                  <th className="py-3 px-6">Experience</th>
+                  <th className="py-3 px-6">Base Price/Day</th>
+                  <th className="py-3 px-6">Description</th>
+                  <th className="py-3 px-6 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-150 text-slate-700">
+                {providerServiceRequests.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 px-6 font-mono font-bold text-slate-900">{r.id}</td>
+                    <td className="py-4 px-6">
+                      <div className="font-extrabold text-slate-900">
+                        {r.provider?.user?.name || r.provider?.user?.email || 'Unknown'}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-semibold">{r.provider?.user?.email || ''}</div>
+                    </td>
+                    <td className="py-4 px-6 font-extrabold text-slate-900">{r.name}</td>
+                    <td className="py-4 px-6 text-slate-700">{r.provider?.experienceYears ?? '-' } years</td>
+                    <td className="py-4 px-6 text-slate-700">₹{r.basePricePerDay ?? '-'}</td>
+                    <td className="py-4 px-6 text-slate-700 max-w-[260px]">{r.description ?? '-'}</td>
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await approveProviderServiceRequest(r.id);
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-[10px] shadow-2xs"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const reason = window.prompt('Reason for denial?');
+                            if (!reason || !reason.trim()) {
+                              alert('Please enter a reason to deny the request.');
+                              return;
+                            }
+                            await denyProviderServiceRequest(r.id, reason.trim());
+                          }}
+                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-2 rounded-lg text-[10px]"
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

@@ -92,22 +92,67 @@ model Provider {
   bookings          Booking[]
   user              User      @relation(fields: [userId], references: [id])
   reviews           Review[]  @relation("ProviderReviews")
-  services          Service[]
+
+  providerServices        ProviderService[]
+  providerServiceRequests ProviderServiceRequest[]
 }
 
+
 model Service {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?
-  basePrice     Float     @default(0)
-  popularIssues Json      @default("[]")
-  isHidden      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  providerId    String?
-  bookings      Booking[]
-  provider      Provider? @relation(fields: [providerId], references: [id])
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  basePrice      Float          @default(0)
+  popularIssues  Json           @default("[]")
+  isHidden       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // This is a global “category” record. Providers link to it via ProviderService.
+  bookings       Booking[]
+  providerServices ProviderService[]
 }
+
+
+// Provider’s approved global services
+model ProviderService {
+  id              String   @id @default(cuid())
+  providerId      String
+  serviceId       String
+  basePricePerDay Float
+  description     String?
+  providerServiceRequestId String? // if this link was created from an approval request
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  provider        Provider @relation(fields: [providerId], references: [id])
+  service         Service  @relation(fields: [serviceId], references: [id])
+
+  // Opposite relations
+  providerServiceRequests ProviderServiceRequest[]
+}
+
+// Provider’s pending/denied service registration request
+model ProviderServiceRequest {
+  id                    String        @id @default(cuid())
+  providerId            String
+  requestedServiceName String
+  basePricePerDay      Float
+  description           String
+  popularIssues        Json          @default("[]")
+  experienceYears      Int?
+  status                ApprovalStatus @default(PENDING)
+  denialReason         String? // reason when admin denies
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  provider              Provider @relation(fields: [providerId], references: [id])
+  // Opposite relation
+  providerServices     ProviderService[]
+}
+
+
+
 
 model Booking {
   id              String        @id @default(cuid())
@@ -208,4 +253,10 @@ enum PaymentStatus {
   UNPAID
   PAID
   FAILED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
 }

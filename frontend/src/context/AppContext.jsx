@@ -508,6 +508,80 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // --- Admin: provider service request approvals ---
+  const [providerServiceRequests, setProviderServiceRequests] = useState([]);
+
+  const fetchProviderServiceRequests = async () => {
+    if (currentUser?.role !== 'admin') return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests?role=admin`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setProviderServiceRequests(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Failed to fetch provider service requests:', data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch provider service requests:', err);
+    }
+  };
+
+  // Ensure admin can see service requests without clicking Refresh
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      fetchProviderServiceRequests();
+    } else {
+      setProviderServiceRequests([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.role]);
+
+
+  const approveProviderServiceRequest = async (serviceRequestId) => {
+    if (currentUser?.role !== 'admin') return { error: 'Admin access required' };
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/approve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchProviderServiceRequests();
+        return data;
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to approve provider service request:', err);
+      return { error: 'Network error' };
+    }
+  };
+
+  const denyProviderServiceRequest = async (serviceRequestId, reason) => {
+    if (currentUser?.role !== 'admin') return { error: 'Admin access required' };
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/deny`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin', reason })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchProviderServiceRequests();
+        return data;
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to deny provider service request:', err);
+      return { error: 'Network error' };
+    }
+  };
+
+
   return (
     <AppContext.Provider value={{
       currentUser,
@@ -535,6 +609,8 @@ export const AppProvider = ({ children }) => {
       updateProviderProfile,
       toggleFavoriteProvider,
       favoriteProviders,
+      // fetchProviderServices: not implemented yet in this context
+      // registerProviderService: not implemented yet in this context
       submitSupportTicket,
       respondToTicket,
       markNotificationAsRead,
@@ -547,9 +623,15 @@ export const AppProvider = ({ children }) => {
       createService,
       updateService,
       deleteService,
-      hideService
+      hideService,
+      // admin provider service request approvals
+      providerServiceRequests,
+      fetchProviderServiceRequests,
+      approveProviderServiceRequest,
+      denyProviderServiceRequest
 
     }}>
+
 
 
       {children}

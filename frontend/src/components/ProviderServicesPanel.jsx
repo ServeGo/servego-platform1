@@ -1,0 +1,356 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Plus, Save } from 'lucide-react';
+
+import { useApp } from '../context/AppContext';
+
+export default function ProviderServicesPanel({ provider }) {
+  const { currentUser } = useApp();
+
+  const [myServices, setMyServices] = useState([]);
+  const [servicesError, setServicesError] = useState('');
+
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [serviceInterestedOption, setServiceInterestedOption] = useState('');
+  const [serviceInterestedOther, setServiceInterestedOther] = useState('');
+  const [experienceYears, setExperienceYears] = useState(provider?.experienceYears || 3);
+
+  // Mandatory fields (per your requirement)
+  const [basePricePerDay, setBasePricePerDay] = useState('');
+  const [description, setDescription] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+
+
+  const providerId = provider?.id;
+
+  const API_BASE_URL = 'http://localhost:4000/api';
+
+  const availableServices = useMemo(() => {
+    // We show dropdown options from DB via existing public services list.
+    // If a service name is selected, we still allow provider to register (create) a service
+    // owned by that provider with that name.
+    return [];
+  }, []);
+
+  const [allServices, setAllServices] = useState([]);
+
+  const fetchAllServices = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/services`);
+      const data = await res.json();
+      setAllServices(Array.isArray(data) ? data : []);
+    } catch (e) {
+      // ignore for now
+      setAllServices([]);
+    }
+  };
+
+  const fetchProviderServices = async () => {
+    if (!providerId) return;
+    try {
+      const url = `${API_BASE_URL}/providers/${providerId}/services`;
+      console.log('[ProviderServicesPanel] GET', url);
+
+      const res = await fetch(url, { method: 'GET' });
+      const text = await res.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { raw: text };
+      }
+
+      if (!res.ok) {
+        console.log('[ProviderServicesPanel] GET failed', res.status, data);
+        setServicesError(data?.error || `Failed to load your services. (${res.status})`);
+        setMyServices([]);
+        return;
+      }
+
+      setMyServices(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.log('[ProviderServicesPanel] GET exception', e);
+      setServicesError('Failed to load your services.');
+      setMyServices([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviderServices();
+    fetchAllServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerId]);
+
+  const openRegister = () => {
+    setServicesError('');
+    setServiceInterestedOption('');
+    setServiceInterestedOther('');
+    setExperienceYears(provider?.experienceYears || 3);
+    setIsRegisterOpen(true);
+  };
+
+  const closeRegister = () => {
+    setIsRegisterOpen(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!providerId) return;
+
+    console.log('[ProviderServicesPanel] providerId', providerId);
+
+    const selectedName =
+      serviceInterestedOption && serviceInterestedOption !== 'OTHER'
+        ? serviceInterestedOption
+        : serviceInterestedOther;
+
+    if (!selectedName?.trim()) {
+      setServicesError('Please enter/select a service name.');
+      return;
+    }
+
+    if (basePricePerDay === '' || basePricePerDay === null || basePricePerDay === undefined) {
+      setServicesError('Please enter Base Price Per Day.');
+      return;
+    }
+
+    if (!description || !description.trim()) {
+      setServicesError('Please enter service description.');
+      return;
+    }
+
+
+    setSubmitting(true);
+    setServicesError('');
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/services/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceName: selectedName.trim(),
+            description: description.trim(),
+            popularIssues: [],
+            experienceYears: Number(experienceYears ?? 0),
+            basePricePerDay: Number(basePricePerDay)
+          })
+      });
+
+
+      const data = await res.json();
+      if (!res.ok) {
+        setServicesError(data?.error || 'Failed to register service.');
+        setSubmitting(false);
+        return;
+      }
+
+      setIsRegisterOpen(false);
+      await fetchProviderServices();
+    } catch (err) {
+      setServicesError('Failed to register service.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start text-left">
+      <div className="md:col-span-7 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight">My Services</h3>
+            <p className="text-slate-500 text-xs mt-1 font-medium">
+              Your registered service specialties appear here.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openRegister}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-4 py-2 rounded-xl text-xs transition-colors shadow-sm flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Register For a service
+          </button>
+        </div>
+
+        {servicesError && (
+          <div className="bg-rose-50 border border-rose-100 text-rose-700 p-3 rounded-xl text-xs font-bold">
+            {servicesError}
+          </div>
+        )}
+
+        {myServices.length === 0 ? (
+          <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="text-slate-500 text-xs font-semibold">No registered services yet.</div>
+            <div className="text-slate-400 text-[11px] mt-2 font-medium">Click Register to add your service.</div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {myServices.map((sv) => (
+              <div key={sv.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Service</div>
+                    <div className="text-sm font-black text-slate-900 mt-1">{sv.name}</div>
+                    <div className="text-[11px] text-slate-600 mt-1 font-semibold">
+                      Experience: {provider?.experienceYears ?? experienceYears} years
+                    </div>
+                    <div className="text-[11px] text-slate-800 mt-1 font-semibold">
+                      ₹{sv.basePricePerDay ?? sv.basePricePerDay === 0 ? sv.basePricePerDay : '-'} / day
+                    </div>
+                  </div>
+                  <div
+                    className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full border ${
+                      sv.approvalStatus === 'APPROVED'
+                        ? 'bg-indigo-50 border-indigo-100 text-indigo-700'
+                        : sv.approvalStatus === 'PENDING'
+                          ? 'bg-amber-50 border-amber-200 text-amber-800'
+                          : 'bg-rose-50 border-rose-200 text-rose-800'
+                    }`}
+                  >
+                    {sv.approvalStatus === 'APPROVED'
+                      ? 'Approved'
+                      : sv.approvalStatus === 'PENDING'
+                        ? 'Pending Approval'
+                        : 'Denied'}
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-700 mt-3">
+                  <div className="font-bold text-slate-500 uppercase tracking-wider text-[9px]">Description</div>
+                  <p className="mt-1 break-words">{sv.description ?? '-'}</p>
+                  {sv.createdAt && (
+                    <div className="text-[10px] text-slate-400 font-semibold mt-2">
+Requested: {new Date(sv.createdAt).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="md:col-span-5 bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-3xs">
+        <h4 className="font-bold text-slate-800 text-sm">How it works</h4>
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-semibold text-slate-700">
+          <ol className="list-decimal list-inside space-y-2">
+            <li>Select a service from the list (or choose OTHER).</li>
+            <li>Add your experience years.</li>
+            <li>Click Register. Your service will appear in this page.</li>
+          </ol>
+        </div>
+      </div>
+
+      {isRegisterOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-black text-slate-900">Register a Service</h3>
+              <p className="text-slate-500 text-xs mt-1 font-medium">Add a new service specialty to your provider profile.</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {servicesError && (
+                <div className="bg-rose-50 border border-rose-100 text-rose-700 p-3 rounded-xl text-xs font-bold">
+                  {servicesError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Service interested *</label>
+                <select
+                  value={serviceInterestedOption}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setServiceInterestedOption(val);
+                    if (val !== 'OTHER') setServiceInterestedOther('');
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
+                >
+                  <option value="">Select service</option>
+                  {allServices
+                    .filter((s) => !s.isHidden)
+                    .map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              {serviceInterestedOption === 'OTHER' && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Service name *</label>
+                  <input
+                    type="text"
+                    value={serviceInterestedOther}
+                    onChange={(e) => setServiceInterestedOther(e.target.value)}
+                    placeholder="Enter service name"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Experience (years)</label>
+                <input
+                  type="number"
+                  value={experienceYears}
+                  min={0}
+                  onChange={(e) => setExperienceYears(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Base Price Per Day (₹) *</label>
+                <input
+                  type="number"
+                  value={basePricePerDay}
+                  min={0}
+                  onChange={(e) => setBasePricePerDay(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
+                  placeholder="e.g. 500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Service Description *</label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
+                  placeholder="Write description about your service"
+                />
+              </div>
+
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRegister}
+                  className="bg-white hover:bg-slate-50 text-slate-800 font-black px-4 py-2 rounded-xl text-xs border border-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white font-black px-4 py-2 rounded-xl text-xs shadow-sm flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {submitting ? 'Registering...' : 'Register Service'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
