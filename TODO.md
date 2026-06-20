@@ -1,5 +1,0 @@
-- [x] Provider services request tab: show base price/day, description, and requested timestamp
-- [ ] Duplicate provider service requests prevention (allow only if previous was DENIED)
-- [ ] Admin deny with reason (UI prompt + backend store + notification message)
-- [ ] Update Prisma schema for denial reason and handle migrations
-- [ ] Final build/test (frontend build already passes with warnings)

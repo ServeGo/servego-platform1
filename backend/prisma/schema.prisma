@@ -72,8 +72,9 @@ model Provider {
   id                String    @id @default(cuid())
   userId            String    @unique
   category          String
-  rating            Float     @default(4.8)
+  rating            Float     @default(0)
   reviewCount       Int       @default(0)
+
   experienceYears   Int       @default(3)
   jobsCompleted     Int       @default(0)
   hourlyRate        Float     @default(300)

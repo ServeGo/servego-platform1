@@ -223,8 +223,14 @@ export const AppProvider = ({ children }) => {
         setCurrentUser(data.user);
         return { success: true, role: data.user.role };
       } else {
-        return { success: false, error: data.error || 'Login failed' };
+        return {
+          success: false,
+          error: data.error || 'Login failed',
+          blockedReason: data.blockedReason,
+          needsReview: data.needsReview
+        };
       }
+
     } catch (err) {
       return { success: false, error: 'Network error. Please try again.' };
     }
@@ -510,6 +516,7 @@ export const AppProvider = ({ children }) => {
 
   // --- Admin: provider service request approvals ---
   const [providerServiceRequests, setProviderServiceRequests] = useState([]);
+  const [providerServiceItems, setProviderServiceItems] = useState([]);
 
   const fetchProviderServiceRequests = async () => {
     if (currentUser?.role !== 'admin') return;
@@ -530,13 +537,35 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const fetchProviderServiceItems = async () => {
+    if (currentUser?.role !== 'admin') return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-items?role=admin`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setProviderServiceItems(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Failed to fetch provider service items:', data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch provider service items:', err);
+    }
+  };
+
+
   // Ensure admin can see service requests without clicking Refresh
   useEffect(() => {
     if (currentUser?.role === 'admin') {
       fetchProviderServiceRequests();
+      fetchProviderServiceItems();
     } else {
       setProviderServiceRequests([]);
+      setProviderServiceItems([]);
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.role]);
 
@@ -626,9 +655,12 @@ export const AppProvider = ({ children }) => {
       hideService,
       // admin provider service request approvals
       providerServiceRequests,
+      providerServiceItems,
       fetchProviderServiceRequests,
+      fetchProviderServiceItems,
       approveProviderServiceRequest,
       denyProviderServiceRequest
+
 
     }}>
 

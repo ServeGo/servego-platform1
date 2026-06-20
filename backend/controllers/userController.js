@@ -156,8 +156,16 @@ export const UserController = {
       }
 
       if (user.status !== 'ACTIVE') {
-        return res.status(403).json({ error: 'Your account is currently inactive or under safety review. Please contact support.' });
+        // Structured response so frontend can show a clean “under review” state for providers/customers.
+        const blockedReason = user.status === 'INACTIVE' || user.status === 'SUSPENDED' ? 'inactive_or_suspended' : 'under_review';
+        return res.status(403).json({
+          success: false,
+          error: 'Your account is currently under review. Please wait for approval.',
+          blockedReason,
+          needsReview: true
+        });
       }
+
 
       await prisma.authEvent.create({
         data: {
