@@ -4,21 +4,23 @@ import { useApp } from '../context/AppContext';
 
 export default function AdminOtherServicesRequestsPanel() {
   const {
-    providerServiceRequests,
-    fetchProviderServiceRequests,
+    providerServiceItems,
+    fetchProviderServiceItems,
     approveProviderServiceRequest,
     denyProviderServiceRequest
   } = useApp();
+
 
   const [loading, setLoading] = useState(false);
 
   const loadNow = async () => {
     setLoading(true);
     try {
-      await fetchProviderServiceRequests();
+      await fetchProviderServiceItems();
     } finally {
       setLoading(false);
     }
+
   };
 
   useEffect(() => {
@@ -30,8 +32,9 @@ export default function AdminOtherServicesRequestsPanel() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Provider Service Requests</h2>
-          <p className="text-slate-500 text-xs">Admin approval required for both existing dropdown selections and OTHER requests.</p>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Provider Service Approvals</h2>
+          <p className="text-slate-500 text-xs">Shows both Pending requests (P) and Approved registrations (A) with correct descriptions.</p>
+
         </div>
         <div>
           <button
@@ -46,7 +49,8 @@ export default function AdminOtherServicesRequestsPanel() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
-        {providerServiceRequests.length === 0 ? (
+        {providerServiceItems.length === 0 ? (
+
           <div className="p-12 text-center">
             <p className="text-slate-400 italic text-xs font-semibold">No pending service requests.</p>
             <p className="text-slate-500 text-[10px] mt-2">If you expected requests, refresh or check backend logs.</p>
@@ -59,14 +63,17 @@ export default function AdminOtherServicesRequestsPanel() {
                   <th className="py-3 px-6">Request ID</th>
                   <th className="py-3 px-6">Provider</th>
                   <th className="py-3 px-6">Service Name</th>
+                  <th className="py-3 px-6 text-center">Type</th>
                   <th className="py-3 px-6">Experience</th>
                   <th className="py-3 px-6">Base Price/Day</th>
                   <th className="py-3 px-6">Description</th>
+
                   <th className="py-3 px-6 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 text-slate-700">
-                {providerServiceRequests.map((r) => (
+                {providerServiceItems.map((r) => (
+
                   <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-4 px-6 font-mono font-bold text-slate-900">{r.id}</td>
                     <td className="py-4 px-6">
@@ -76,7 +83,16 @@ export default function AdminOtherServicesRequestsPanel() {
                       <div className="text-[10px] text-slate-400 font-semibold">{r.provider?.user?.email || ''}</div>
                     </td>
                     <td className="py-4 px-6 font-extrabold text-slate-900">{r.name}</td>
-                    <td className="py-4 px-6 text-slate-700">{r.provider?.experienceYears ?? '-' } years</td>
+                    <td className="py-4 px-6 text-center">
+                        {r.type === 'APPROVED' ? (
+                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">A</span>
+                        ) : (
+                          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">O</span>
+                        )}
+
+                    </td>
+                    <td className="py-4 px-6 text-slate-700">{r.experienceYears ?? '-' } years</td>
+
                     <td className="py-4 px-6 text-slate-700">₹{r.basePricePerDay ?? '-'}</td>
                     <td className="py-4 px-6 text-slate-700 max-w-[260px]">{r.description ?? '-'}</td>
                     <td className="py-4 px-6 text-center">
@@ -84,15 +100,19 @@ export default function AdminOtherServicesRequestsPanel() {
                         <button
                           type="button"
                           onClick={async () => {
+                            if (r.type !== 'PENDING') return;
                             await approveProviderServiceRequest(r.id);
                           }}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-[10px] shadow-2xs"
+                          disabled={r.type !== 'PENDING'}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-[10px] shadow-2xs disabled:bg-emerald-300 disabled:cursor-not-allowed"
                         >
                           Approve
                         </button>
+
                         <button
                           type="button"
                           onClick={async () => {
+                            if (r.type !== 'PENDING') return;
                             const reason = window.prompt('Reason for denial?');
                             if (!reason || !reason.trim()) {
                               alert('Please enter a reason to deny the request.');
@@ -100,10 +120,12 @@ export default function AdminOtherServicesRequestsPanel() {
                             }
                             await denyProviderServiceRequest(r.id, reason.trim());
                           }}
-                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-2 rounded-lg text-[10px]"
+                          disabled={r.type !== 'PENDING'}
+                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-2 rounded-lg text-[10px] disabled:bg-rose-100 disabled:text-rose-300 disabled:border-rose-200 disabled:cursor-not-allowed"
                         >
                           Deny
                         </button>
+
                       </div>
                     </td>
                   </tr>

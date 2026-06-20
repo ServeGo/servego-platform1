@@ -33,8 +33,12 @@ export function Login({ onNavigate }) {
     setIsLoading(false);
 
     if (!response.success) {
-      setErrorMsg(response.error || 'Login failed. Please check your email and password.');
-    } else {
+      if (response.needsReview || response.blockedReason) {
+        setErrorMsg(response.error || 'Your account is currently under review.');
+      } else {
+        setErrorMsg(response.error || 'Login failed. Please check your email and password.');
+      }
+    } else { 
       const destRole = response.role;
       setSuccessMsg(`Welcome Back! Successfully logged in as ${
         destRole === 'admin' ? 'System Administrator' : destRole === 'provider' ? 'Service Provider' : 'Customer'

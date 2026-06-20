@@ -74,10 +74,10 @@ export const ProviderController = {
 
       const requestedService = String(serviceName).trim();
 
-      // Prevent duplicate requests:
-      // - Block if there's an APPROVED ProviderService for same provider + service name.
-      // - Block if there's an existing PENDING ProviderServiceRequest for same provider + service name.
-      // - Allow only when all previous requests were DENIED (or no request exists).
+      // Prevent duplicates (case-insensitive by normalizing the requested name)
+      const requestedServiceNorm = requestedService.toLowerCase();
+
+      // 1) If already approved for this provider+service -> return 409
       const existingApproved = await prisma.providerService.findFirst({
         where: {
           providerId: provider.id,
@@ -88,13 +88,14 @@ export const ProviderController = {
         select: { id: true }
       });
       if (existingApproved) {
-        return res.status(409).json({ error: 'Service already approved for this provider.' });
+        return res.status(409).json({ error: 'Service already registered for this provider.' });
       }
 
+      // 2) If already pending for this provider+service -> return 409
       const existingPending = await prisma.providerServiceRequest.findFirst({
         where: {
           providerId: provider.id,
-          requestedServiceName: requestedService,
+          requestedServiceName: { equals: requestedService },
           status: 'PENDING'
         },
         select: { id: true }
@@ -103,17 +104,20 @@ export const ProviderController = {
         return res.status(409).json({ error: 'Service request already pending approval.' });
       }
 
+      // 3) If any prior request exists and is not denied -> block
+      // (This ensures that ONLY denied requests allow re-submission.)
       const existingRequest = await prisma.providerServiceRequest.findFirst({
         where: {
           providerId: provider.id,
-          requestedServiceName: requestedService
+          requestedServiceName: { equals: requestedService }
         },
         select: { status: true }
       });
 
-      if (existingRequest?.status !== 'DENIED') {
+      if (existingRequest && existingRequest.status !== 'DENIED') {
         return res.status(409).json({ error: 'Service request already submitted for this provider.' });
       }
+
 
       // Create a provider service request in PENDING state.
       const created = await prisma.providerServiceRequest.create({

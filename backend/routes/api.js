@@ -8,11 +8,17 @@ import { ReviewController } from '../controllers/reviewController.js';
 import { ServiceController } from '../controllers/serviceController.js';
 import { PaymentController } from '../controllers/paymentController.js';
 import { AdminProviderServiceController } from '../controllers/adminProviderServiceController.js';
+import { AdminProviderServiceItemsController } from '../controllers/adminProviderServiceItemsController.js';
+
+
+
+
 
 const apiRouter = Router();
 
 
 // --- Authentication & Users ---
+
 apiRouter.post('/auth/register', UserController.register);
 apiRouter.post('/auth/login', UserController.login);
 apiRouter.get('/users', UserController.getUsers);
@@ -58,12 +64,21 @@ apiRouter.delete('/services/:id', ServiceController.deleteOne);
 apiRouter.patch('/services/:id', ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', ServiceController.hideOne);
 
-// --- Admin: approve/deny provider service requests ---
-apiRouter.get('/admin/provider-service-requests', AdminProviderServiceController.getPendingRequests);
-apiRouter.patch('/admin/provider-service-requests/:id/approve', AdminProviderServiceController.approveService);
-apiRouter.patch('/admin/provider-service-requests/:id/deny', AdminProviderServiceController.denyService);
+// --- Admin: provider service items (pending requests + approved registrations) ---
+apiRouter.get('/admin/provider-service-items', (req, res) => AdminProviderServiceItemsController.getAll(req, res));
+
+
+
+// Backward compatible: pending requests only
+apiRouter.get('/admin/provider-service-requests', (req, res) => AdminProviderServiceController.getPendingRequests(req, res));
+
+
+apiRouter.patch('/admin/provider-service-requests/:id/approve', (req, res) => AdminProviderServiceController.approveService(req, res));
+apiRouter.patch('/admin/provider-service-requests/:id/deny', (req, res) => AdminProviderServiceController.denyService(req, res));
+
 
 export default apiRouter;
+
 
 
 

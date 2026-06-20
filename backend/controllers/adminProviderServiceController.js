@@ -126,36 +126,8 @@ export const AdminProviderServiceController = {
     }
   },
 
-  getPendingRequests: async (req, res) => {
-    try {
-      const role = req.body?.role ?? req.query?.role;
-      if (role && role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-
-      const pending = await prisma.providerServiceRequest.findMany({
-        where: { status: 'PENDING' },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          provider: {
-            include: {
-              user: {
-                select: { id: true, name: true, email: true, phone: true, avatar: true }
-              }
-            }
-          }
-        }
-      });
-
-      // Keep response shape compatible with existing AdminPanel (r.name expected)
-      const mapped = pending.map((r) => ({
-        ...r,
-        name: r.requestedServiceName
-      }));
-
-      res.json(mapped);
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch pending service requests', details: err.message });
-    }
-  }
 };
+
+
 
 
