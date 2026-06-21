@@ -13,7 +13,16 @@ export default function ProfileView({ user }) {
           <ProfileField label="Full Name" value={user?.name} />
           <ProfileField label="Email Address" value={user?.email} isMono />
           <ProfileField label="Contact Phone" value={user?.phone} />
-          <ProfileField label="Joined Date" value={user?.joinedDate} />
+          <ProfileField label="Account Role" value={user?.role?.toUpperCase()} />
+          {user?.role === 'customer' && (
+            <>
+              <ProfileField label="Address" value={user?.address || user?.customerProfile?.address} />
+              <ProfileField label="Pincode" value={user?.pincode || user?.customerProfile?.pincode} />
+            </>
+          )}
+          {user?.role === 'provider' && (
+            <ProfileField label="Provider ID" value={user?.providerId || 'Not linked'} isMono />
+          )}
         </div>
 
         <div className="bg-teal-50 border border-teal-100 p-4 rounded-xl text-teal-800 leading-relaxed font-semibold text-[11px]">

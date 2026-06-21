@@ -37,6 +37,7 @@ const apiRouter = Router();
 apiRouter.post('/auth/register', UserController.register);
 apiRouter.post('/auth/login', UserController.login);
 apiRouter.get('/users', UserController.getUsers);
+apiRouter.patch('/users/:id/profile', UserController.updateProfile);
 
 // --- Service Providers (Partners) ---
 apiRouter.get('/providers', ProviderController.getAll);

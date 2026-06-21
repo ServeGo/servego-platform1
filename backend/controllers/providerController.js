@@ -16,7 +16,10 @@ export const ProviderController = {
           orderBy: { createdAt: 'desc' }
         }),
         prisma.providerServiceRequest.findMany({
-          where: { providerId: id },
+          where: {
+            providerId: id,
+            status: { not: 'APPROVED' }
+          },
           orderBy: { createdAt: 'desc' }
         })
       ]);
@@ -34,7 +37,16 @@ export const ProviderController = {
         createdAt: link.createdAt
       }));
 
-      const formattedRequests = requests.map((r) => ({
+      const approvedNameSet = new Set(
+        uniqueApprovedLinks.map((link) => String(link.service.name || '').trim().toLowerCase())
+      );
+
+      const formattedRequests = requests
+        .filter((r) => {
+          const requestedNameNormalized = String(r.requestedServiceName || '').trim().toLowerCase();
+          return !approvedNameSet.has(requestedNameNormalized);
+        })
+        .map((r) => ({
         id: r.id,
         name: r.requestedServiceName,
         approvalStatus: r.status,
@@ -78,9 +90,6 @@ export const ProviderController = {
       if (!provider) return res.status(404).json({ error: 'Service provider not found' });
 
       const requestedService = String(serviceName).trim();
-
-      // Prevent duplicates (case-insensitive by normalizing the requested name)
-      const requestedServiceNorm = requestedService.toLowerCase();
 
       // 1) If already approved for this provider+service -> return 409
       const existingApproved = await prisma.providerService.findFirst({

@@ -32,8 +32,6 @@ export function Signup({ onNavigate }) {
   // Provider fields
   const [photoDataUrl, setPhotoDataUrl] = useState(''); // base64 data URL
   const [serviceInterested, setServiceInterested] = useState('');
-  const [serviceInterestedOption, setServiceInterestedOption] = useState(''); // selected dropdown value
-  const [serviceInterestedOther, setServiceInterestedOther] = useState(''); // custom text
 
   // Password fields
   const [password, setPassword] = useState('');
@@ -85,21 +83,7 @@ export function Signup({ onNavigate }) {
 
   const validateProvider = () => {
     if (signupType !== 'provider') return null;
-
-    // Require dropdown selection OR custom text when OTHER is chosen.
-    if (serviceInterestedOption && serviceInterestedOption !== 'OTHER') {
-      if (!serviceInterestedOption.trim()) return 'Please select what service you are interested in.';
-      return null;
-    }
-
-    if (serviceInterestedOption === 'OTHER') {
-      if (!serviceInterestedOther.trim()) return 'Please enter service name.';
-      return null;
-    }
-
-    // No selection made
     if (!serviceInterested.trim()) return 'Please select what service you are interested in.';
-
     return null;
   };
 
@@ -110,15 +94,6 @@ export function Signup({ onNavigate }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     resetErrorsAndSuccess();
-
-    // sync final serviceInterested based on selection
-    if (signupType === 'provider') {
-      if (serviceInterestedOption && serviceInterestedOption !== 'OTHER') {
-        setServiceInterested(serviceInterestedOption);
-      } else {
-        setServiceInterested(serviceInterestedOther);
-      }
-    }
 
     const commonError = validateCommon();
 
@@ -170,10 +145,7 @@ export function Signup({ onNavigate }) {
             password,
             confirmPassword,
             photo: photoDataUrl || null,
-            serviceInterested: (serviceInterestedOption && serviceInterestedOption !== 'OTHER'
-              ? serviceInterestedOption
-              : serviceInterestedOther
-            ).trim(),
+            serviceInterested: serviceInterested.trim(),
             acceptedTerms
           };
 
@@ -388,16 +360,9 @@ export function Signup({ onNavigate }) {
 
                 <select
                   required
-                  value={serviceInterestedOption}
+                  value={serviceInterested}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setServiceInterestedOption(val);
-                    // providerServiceError removed (no longer used)
-
-                    if (val !== 'OTHER') {
-                      setServiceInterestedOther('');
-                      setServiceInterested(val);
-                    }
+                    setServiceInterested(e.target.value);
                   }}
                   className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
                 >
@@ -408,24 +373,7 @@ export function Signup({ onNavigate }) {
                         {s.name}
                       </option>
                     ))}
-                  <option value="OTHER">Other</option>
                 </select>
-
-                {serviceInterestedOption === 'OTHER' && (
-                  <div className="mt-3">
-                    <input
-                      type="text"
-                      required
-                      value={serviceInterestedOther}
-                      onChange={(e) => {
-                        setServiceInterestedOther(e.target.value);
-                        setServiceInterested(e.target.value);
-                      }}
-                      placeholder="Enter service name"
-                      className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
-                    />
-                  </div>
-                )}
 
 
               </div>

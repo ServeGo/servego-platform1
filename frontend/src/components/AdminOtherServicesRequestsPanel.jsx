@@ -63,7 +63,7 @@ export default function AdminOtherServicesRequestsPanel() {
                   <th className="py-3 px-6">Request ID</th>
                   <th className="py-3 px-6">Provider</th>
                   <th className="py-3 px-6">Service Name</th>
-                  <th className="py-3 px-6 text-center">Type</th>
+                  <th className="py-3 px-6 text-center">Status</th>
                   <th className="py-3 px-6">Experience</th>
                   <th className="py-3 px-6">Base Price/Day</th>
                   <th className="py-3 px-6">Description</th>
@@ -84,12 +84,15 @@ export default function AdminOtherServicesRequestsPanel() {
                     </td>
                     <td className="py-4 px-6 font-extrabold text-slate-900">{r.name}</td>
                     <td className="py-4 px-6 text-center">
-                        {r.type === 'APPROVED' ? (
-                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">A</span>
-                        ) : (
-                          <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">O</span>
-                        )}
-
+                      {r.approvalStatus === 'APPROVED' ? (
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Approved</span>
+                      ) : r.approvalStatus === 'PENDING' ? (
+                        <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Pending</span>
+                      ) : r.approvalStatus === 'DENIED' ? (
+                        <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Denied</span>
+                      ) : (
+                        <span className="bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Unknown</span>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-slate-700">{r.experienceYears ?? '-' } years</td>
 
@@ -100,10 +103,10 @@ export default function AdminOtherServicesRequestsPanel() {
                         <button
                           type="button"
                           onClick={async () => {
-                            if (r.type !== 'PENDING') return;
+                            if (r.approvalStatus !== 'PENDING') return;
                             await approveProviderServiceRequest(r.id);
                           }}
-                          disabled={r.type !== 'PENDING'}
+                          disabled={r.approvalStatus !== 'PENDING'}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-[10px] shadow-2xs disabled:bg-emerald-300 disabled:cursor-not-allowed"
                         >
                           Approve
@@ -112,7 +115,7 @@ export default function AdminOtherServicesRequestsPanel() {
                         <button
                           type="button"
                           onClick={async () => {
-                            if (r.type !== 'PENDING') return;
+                            if (r.approvalStatus !== 'PENDING') return;
                             const reason = window.prompt('Reason for denial?');
                             if (!reason || !reason.trim()) {
                               alert('Please enter a reason to deny the request.');
@@ -120,7 +123,7 @@ export default function AdminOtherServicesRequestsPanel() {
                             }
                             await denyProviderServiceRequest(r.id, reason.trim());
                           }}
-                          disabled={r.type !== 'PENDING'}
+                          disabled={r.approvalStatus !== 'PENDING'}
                           className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-2 rounded-lg text-[10px] disabled:bg-rose-100 disabled:text-rose-300 disabled:border-rose-200 disabled:cursor-not-allowed"
                         >
                           Deny
