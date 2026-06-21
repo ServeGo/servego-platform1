@@ -1,0 +1,206 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { useApp } from '../context/AppContext';
+
+function parseCommaList(text) {
+  if (!text) return [];
+  return text
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <span className="text-[10px] text-slate-400 uppercase font-black block mb-1">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Input({ value, onChange, placeholder, type = 'text' }) {
+  return (
+    <input
+      value={value}
+      type={type}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs font-bold outline-none text-slate-800"
+    />
+  );
+}
+
+export default function ProviderAvailability() {
+  const { currentUser, providers, updateProviderAvailability } = useApp();
+
+  const activeProvider = useMemo(() => {
+    const providerIdCandidate = currentUser?.providerId;
+    const providerUserIdCandidate = currentUser?.id;
+
+    const byProviderId = providerIdCandidate ? providers.find(p => p.id === providerIdCandidate) : null;
+    const byUserId = providerUserIdCandidate ? providers.find(p => p.userId === providerUserIdCandidate) : null;
+
+    return byProviderId || byUserId || null;
+  }, [currentUser, providers]);
+
+  const [loading, setLoading] = useState(!activeProvider);
+
+  const [availableDays, setAvailableDays] = useState([]);
+
+
+  // Time slots removed from UI as requested.
+  const [newSlotText, setNewSlotText] = useState('');
+
+
+
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+
+  useEffect(() => {
+    setLoading(!activeProvider);
+    setSaveErr('');
+    setSaveMsg('');
+
+    if (!activeProvider) return;
+
+    setAvailableDays(Array.isArray(activeProvider.availableDays) ? activeProvider.availableDays : (activeProvider.availableDays ? parseCommaList(activeProvider.availableDays) : []));
+
+
+
+    setLoading(false);
+  }, [activeProvider]);
+
+  const validate = () => {
+    const errors = [];
+
+    if (!availableDays.length) errors.push('Available days is required');
+
+    if (availableDays.some(d => d.length > 20)) errors.push('Day names look too long');
+
+    return errors;
+  };
+
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaveErr('');
+    setSaveMsg('');
+
+
+    if (!activeProvider?.id) {
+      setSaveErr('Partner not available');
+      return;
+    }
+
+    const errors = validate();
+    if (errors.length) {
+      setSaveErr(errors.join('. '));
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // backend currently expects (providerId, availableDays, timeSlots)
+      // but UI no longer collects timeSlots. Pass empty list.
+      await updateProviderAvailability(activeProvider.id, availableDays, []);
+      setSaveMsg('Availability saved successfully');
+    } catch (err) {
+      setSaveErr(err?.message || 'Failed to save availability');
+    } finally {
+      setSaving(false);
+    }
+
+
+
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs max-w-3xl mx-auto">
+        <div className="text-sm font-bold text-slate-900">Loading availability...</div>
+      </div>
+    );
+  }
+
+  if (!activeProvider) {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs max-w-3xl mx-auto">
+        <div className="text-sm font-bold text-rose-700">Partner availability not found.</div>
+      </div>
+    );
+  }
+
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const toggleDay = (d) => {
+    setAvailableDays(prev => (prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]));
+  };
+
+
+
+  return (
+    <div className="space-y-6 text-left">
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-3xl mx-auto">
+        <h2 className="text-xl font-black text-slate-900">Availability</h2>
+        <p className="text-xs text-slate-500 font-semibold mt-1">
+          Click to add/remove days and time slots. Save updates backend for provider.
+        </p>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-3xl mx-auto">
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="grid grid-cols-1 gap-5">
+            <Field label="Available Days">
+              <div className="flex flex-wrap gap-2">
+                {DAYS.map(d => {
+                  const active = availableDays.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => toggleDay(d)}
+                      className={
+                        `px-3 py-2 text-xs font-black rounded-xl border transition-colors ` +
+                        (active
+                          ? 'bg-indigo-600 border-indigo-600 text-white'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50')
+                      }
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+
+          </div>
+
+          <div className="text-xs text-slate-500 font-semibold bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            Tip: Select the available days for your appointments.
+          </div>
+
+
+          {saveErr ? (
+            <div className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl p-3">{saveErr}</div>
+          ) : null}
+          {saveMsg ? (
+            <div className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl p-3">{saveMsg}</div>
+          ) : null}
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs font-black px-5 py-2 rounded-xl transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Availability'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+

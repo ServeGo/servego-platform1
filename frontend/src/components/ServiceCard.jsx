@@ -5,17 +5,19 @@ import CategoryIcon from './CategoryIcon';
 export default function ServiceCard({ 
   category, 
   providers, 
+  providersByApprovedService, 
   onSelect, 
   onIssueClick 
 }) {
-  const categoryProviders = providers.filter(
-    p => p.category.toLowerCase() === category.name.toLowerCase()
-  );
+  const categoryProviders = Array.isArray(providersByApprovedService) && providersByApprovedService.length > 0
+    ? providersByApprovedService
+    : providers.filter(p => (p.category || '').toLowerCase() === category.name.toLowerCase());
   
   const verifiedProviders = categoryProviders.filter(p => p.isVerified);
-  const bestRating = verifiedProviders.length > 0 
+  const bestRating = verifiedProviders.length > 0
     ? Math.max(...verifiedProviders.map(p => p.rating))
     : 5.0;
+
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-xs hover:border-indigo-400 transition-all flex flex-col justify-between text-left">

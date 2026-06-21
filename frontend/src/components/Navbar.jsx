@@ -154,7 +154,7 @@ export default function Navbar({
 
           <div className="flex items-center gap-3">
             {/* Notifications */}
-            <div className="relative text-slate-800">
+            <div className="relative text-slate-800" ref={notifDropdownRef}>
               <button 
                 onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
                 className="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 relative focus:outline-none"
@@ -171,7 +171,7 @@ export default function Navbar({
                 <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
                     <span className="font-extrabold text-slate-950 block uppercase text-[10px] tracking-wide">Notifications</span>
-                    <button onClick={() => clearNotifications()} className="hover:underline text-[9px] text-teal-700 font-bold">Clear all</button>
+                    <button onClick={() => { clearNotifications(); setNotifDropdownOpen(false); }} className="hover:underline text-[9px] text-teal-700 font-bold">Clear all</button>
                   </div>
                   {unreadNotifications.length === 0 ? (
                     <p className="text-slate-400 italic text-center py-4 font-semibold">No unread alerts.</p>
@@ -194,7 +194,7 @@ export default function Navbar({
             </div>
 
             {/* Profile Dropdown */}
-            <div className="relative text-slate-850">
+            <div className="relative text-slate-850" ref={userDropdownRef}>
               <button
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all focus:outline-none"
@@ -211,8 +211,8 @@ export default function Navbar({
                   </div>
 
                   <div className="space-y-1 font-semibold text-slate-700">
-                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('settings'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Profile</button>
-                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('settings'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Availability</button>
+                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('profile'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Profile</button>
+                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('availability'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Availability</button>
                     <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('earnings'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Earnings</button>
                     <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('support'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Support Center</button>
                     <button 

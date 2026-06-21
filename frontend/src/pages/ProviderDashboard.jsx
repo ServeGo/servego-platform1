@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+
 import { ShieldAlert, ListOrdered } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -10,8 +11,13 @@ import ProviderServicesPanel from '../components/ProviderServicesPanel';
 import ProviderReviews from '../components/ProviderReviews';
 import ProviderSupport from '../components/ProviderSupport';
 import ProviderReferrals from '../components/ProviderReferrals';
+import ProviderProfileView from '../components/ProviderProfileView';
+import ProviderAvailability from '../components/ProviderAvailability';
+
+
 
 export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setActiveTabExternal }) => {
+
   const { 
     currentUser, providers, bookings, 
     updateBookingStatus, updateProviderAvailability, updateProviderProfile, submitSupportTicket, tickets,
@@ -51,8 +57,14 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   const [copied, setCopied] = useState(false);
   const [refSuccess, setRefSuccess] = useState('');
   const [refError, setRefError] = useState('');
+  const [referralMeta, setReferralMeta] = useState({
+    referredBy: null,
+    referredCount: 0,
+    bonusEarned: 0
+  });
 
   useEffect(() => {
+
     if (activeProvider) {
       setProfileBio(activeProvider.bio || '');
       setWorkingDays(activeProvider.availableDays || []);
@@ -83,12 +95,24 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
     setTimeout(() => setTicketSuccess(false), 4000);
   };
 
-  const handleApplyReferral = (e) => {
+  const handleApplyReferral = async (e) => {
     e.preventDefault();
-    const res = applyReferralCode(referralInput);
-    if (res.success) { setRefSuccess(res.message); setRefError(''); setReferralInput(''); }
-    else { setRefError(res.message); setRefSuccess(''); }
+    const res = await applyReferralCode(referralInput);
+    if (res.success) {
+      setRefSuccess(res.message);
+      setRefError('');
+      setReferralInput('');
+      setReferralMeta({
+        referredBy: res.referredBy,
+        referredCount: res.referredCount,
+        bonusEarned: res.bonusEarned
+      });
+    } else {
+      setRefError(res.message);
+      setRefSuccess('');
+    }
   };
+
 
   const isPending = currentUser?.status === 'pending' || !activeProvider?.isVerified;
 
@@ -105,32 +129,21 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         <TabList activeTab={activeTab} setActiveTab={setActiveTab} leadsCount={activeLeads.length} reviewsCount={activeProvider?.reviews?.length || 0} />
 
         {activeTab === 'leads' && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight text-left">Leads Queue</h3>
-            {activeLeads.length === 0 ? (
-              <EmptyLeads />
-            ) : (
-              <div className="space-y-4">
-                {activeLeads.map(bk => (
-                  <LeadCard 
-                    key={bk.id}
-                    lead={bk}
-                    onAccept={(id) => updateBookingStatus(id, 'confirmed', 'Accepted.')}
-                    onReject={(id) => updateBookingStatus(id, 'cancelled', 'Rejected.')}
-                    onTravel={(id) => updateBookingStatus(id, 'en_route', 'En-route.')}
-                    onStartWork={(id) => updateBookingStatus(id, 'ongoing', 'Work started.')}
-                    onFinishWork={(id) => updateBookingStatus(id, 'completed', 'Completed.')}
-                    chatOpen={openChatBookingId === bk.id}
-                    onToggleChat={() => setOpenChatBookingId(openChatBookingId === bk.id ? null : bk.id)}
-                    chatInput={chatInput}
-                    setChatInput={setChatInput}
-                    onSendMessage={sendChatMessage}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <LeadsPage
+            activeLeads={activeLeads}
+            openChatBookingId={openChatBookingId}
+            onToggleChat={(id) => setOpenChatBookingId(openChatBookingId === id ? null : id)}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            onAccept={(id) => updateBookingStatus(id, 'confirmed', 'Accepted.')}
+            onReject={(id) => updateBookingStatus(id, 'cancelled', 'Rejected.')}
+            onTravel={(id) => updateBookingStatus(id, 'en_route', 'En-route.')}
+            onStartWork={(id) => updateBookingStatus(id, 'ongoing', 'Work started.')}
+            onFinishWork={(id) => updateBookingStatus(id, 'completed', 'Completed.')}
+            onSendMessage={sendChatMessage}
+          />
         )}
+
 
         {activeTab === 'earnings' && <EarningsChart completedJobs={completedJobs} />}
 
@@ -144,7 +157,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
         {activeTab === 'support' && (
           <ProviderSupport 
-            tickets={tickets.filter(t => t.email === currentUser?.email)}
+            tickets={tickets.filter(t => t.requesterEmail === currentUser?.email)}
             onSubmit={handleSupportSubmit}
             subject={supportSubject} setSubject={setSupportSubject}
             message={supportMsg} setMessage={setSupportMsg}
@@ -161,11 +174,22 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
             copied={copied}
             refError={refError}
             refSuccess={refSuccess}
-            referredBy={currentUser?.referredBy}
+            referredBy={referralMeta?.referredBy || currentUser?.referredBy}
           />
         )}
 
+
+
+        {activeTab === 'availability' && activeProvider && (
+          <ProviderAvailability />
+        )}
+
+        {activeTab === 'profile' && activeProvider && (
+          <ProviderProfileView />
+        )}
+
       </div>
+
     </div>
   );
 };
@@ -192,8 +216,11 @@ function TabList({ activeTab, setActiveTab, leadsCount, reviewsCount }) {
     { id: 'services', label: 'My Services' },
     { id: 'reviews', label: `Reviews (${reviewsCount})` },
     { id: 'support', label: 'Support' },
-    { id: 'referrals', label: '🤝 Ambassador' }
+    { id: 'referrals', label: '🤝 Ambassador' },
+    { id: 'availability', label: 'Availability' },
+    { id: 'profile', label: 'Profile' }
   ];
+
   return (
     <div className="flex flex-wrap gap-1 bg-white border border-slate-200 p-1.5 rounded-2xl mb-8 w-full sm:w-fit">
       {tabs.map(t => (
@@ -203,12 +230,163 @@ function TabList({ activeTab, setActiveTab, leadsCount, reviewsCount }) {
   );
 }
 
-function EmptyLeads() {
+function EmptyLeads({ variant = 'pending' }) {
+  const title = variant === 'active' ? 'No Active Leads' : 'No Pending Lead Proposals';
+  const desc =
+    variant === 'active'
+      ? 'Once you accept an offer, it will move to Active Duty.'
+      : 'When customers choose you in your zones, new orders will appear here.';
+
   return (
     <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-2xs max-w-md mx-auto">
       <ListOrdered className="w-10 h-10 text-slate-300 mx-auto mb-4" />
-      <h4 className="text-base font-bold text-slate-900">No Pending Lead Proposals</h4>
-      <p className="text-slate-500 text-xs mt-1 font-medium">When customers choose you in your zones, new orders will appear here.</p>
+      <h4 className="text-base font-bold text-slate-900">{title}</h4>
+      <p className="text-slate-500 text-xs mt-1 font-medium">{desc}</p>
     </div>
   );
 }
+
+function LeadsPage({
+  activeLeads,
+  openChatBookingId,
+  onToggleChat,
+  chatInput,
+  setChatInput,
+  onAccept,
+  onReject,
+  onTravel,
+  onStartWork,
+  onFinishWork,
+  onSendMessage
+}) {
+  const [statusFilter, setStatusFilter] = useState('pending'); // pending | active | all
+  const [query, setQuery] = useState('');
+  const [sortDir, setSortDir] = useState('desc'); // desc | asc
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    let arr = [...activeLeads];
+
+    if (statusFilter === 'pending') {
+      arr = arr.filter(b => b.status === 'pending');
+    } else if (statusFilter === 'active') {
+      arr = arr.filter(b => ['confirmed', 'en_route', 'ongoing'].includes(b.status));
+    }
+
+    if (q) {
+      arr = arr.filter(b => {
+        const hay = [
+          b.serviceCategory,
+          b.customerName,
+          b.locationAddress,
+          b.instructions,
+          b.bookingDate,
+          b.bookingTimeSlot,
+          b.id
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    const toSortableDate = (b) => {
+      // bookingDate is expected like YYYY-MM-DD in most cases; fall back gracefully.
+      const d = b.bookingDate ? new Date(b.bookingDate) : null;
+      return d && !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+    };
+
+    arr.sort((a, b) => {
+      const diff = toSortableDate(a) - toSortableDate(b);
+      return sortDir === 'desc' ? -diff : diff;
+    });
+
+    return arr;
+  }, [activeLeads, query, statusFilter, sortDir]);
+
+  const leadsLabel = statusFilter === 'pending' ? 'Pending Offers' : statusFilter === 'active' ? 'Active Duty' : 'All Leads';
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+          <div>
+              <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight text-left">{leadsLabel}</h3>
+
+            <p className="text-xs text-slate-500 font-semibold mt-1">Accept, coordinate, and complete jobs directly from here.</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <div className="flex gap-2 bg-slate-50 border border-slate-200 p-1 rounded-2xl">
+              <button
+                onClick={() => setStatusFilter('pending')}
+                className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                  statusFilter === 'pending' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Pending
+              </button>
+              <button
+                onClick={() => setStatusFilter('active')}
+                className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                  statusFilter === 'active' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                  statusFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                All
+              </button>
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by client, address, date, ID..."
+                className="w-full sm:w-64 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-2 text-xs font-bold outline-none"
+              />
+              <button
+                onClick={() => setSortDir(prev => (prev === 'desc' ? 'asc' : 'desc'))}
+                className="shrink-0 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black px-4 py-2 rounded-xl transition-all"
+              >
+                Sort: {sortDir === 'desc' ? 'Newest' : 'Oldest'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyLeads variant={statusFilter === 'active' ? 'active' : 'pending'} />
+      ) : (
+        <div className="space-y-4">
+          {filtered.map(bk => (
+            <LeadCard
+              key={bk.id}
+              lead={bk}
+              onAccept={onAccept}
+              onReject={onReject}
+              onTravel={onTravel}
+              onStartWork={onStartWork}
+              onFinishWork={onFinishWork}
+              chatOpen={openChatBookingId === bk.id}
+              onToggleChat={() => onToggleChat(bk.id)}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              onSendMessage={onSendMessage}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+

@@ -9,6 +9,19 @@ import { ServiceController } from '../controllers/serviceController.js';
 import { PaymentController } from '../controllers/paymentController.js';
 import { AdminProviderServiceController } from '../controllers/adminProviderServiceController.js';
 import { AdminProviderServiceItemsController } from '../controllers/adminProviderServiceItemsController.js';
+import { ReferralsController } from '../controllers/referralsController.js';
+import { ProviderServiceDiscoveryController } from '../controllers/providerServiceDiscoveryController.js';
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -17,7 +30,9 @@ import { AdminProviderServiceItemsController } from '../controllers/adminProvide
 const apiRouter = Router();
 
 
+
 // --- Authentication & Users ---
+
 
 apiRouter.post('/auth/register', UserController.register);
 apiRouter.post('/auth/login', UserController.login);
@@ -57,12 +72,17 @@ apiRouter.post('/reviews', ReviewController.create);
 apiRouter.get('/payments', PaymentController.getAll);
 apiRouter.post('/payments', PaymentController.create);
 
+// --- Referrals / Ambassador ---
+apiRouter.post('/referrals/apply', (req, res) => ReferralsController.applyReferral(req, res));
+apiRouter.get('/referrals/me', (req, res) => ReferralsController.getMeReferral(req, res));
+
 // --- Services (Service Categories) ---
 apiRouter.get('/services', ServiceController.getAll);
 apiRouter.post('/services', ServiceController.create);
 apiRouter.delete('/services/:id', ServiceController.deleteOne);
 apiRouter.patch('/services/:id', ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', ServiceController.hideOne);
+
 
 // --- Admin: provider service items (pending requests + approved registrations) ---
 apiRouter.get('/admin/provider-service-items', (req, res) => AdminProviderServiceItemsController.getAll(req, res));
@@ -76,6 +96,8 @@ apiRouter.get('/admin/provider-service-requests', (req, res) => AdminProviderSer
 apiRouter.patch('/admin/provider-service-requests/:id/approve', (req, res) => AdminProviderServiceController.approveService(req, res));
 apiRouter.patch('/admin/provider-service-requests/:id/deny', (req, res) => AdminProviderServiceController.denyService(req, res));
 
+// --- Customer: approved providers by service name (sector listing) ---
+apiRouter.get('/providers/by-approved-service', (req, res) => ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res));
 
 export default apiRouter;
 

@@ -1,15 +1,79 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
-export default function ProviderSupport({ 
-  tickets, 
-  onSubmit, 
-  subject, setSubject, 
-  message, setMessage, 
-  success 
+export default function ProviderSupport({
+  tickets = [],
+  onSubmit,
+  subject,
+  setSubject,
+  message,
+  setMessage,
+  success
 }) {
+  const [statusFilter, setStatusFilter] = useState('open'); // open | resolved | all
+  const [query, setQuery] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+
+  const normalizedTickets = useMemo(() => {
+    return (tickets || []).map((t) => {
+      const rawStatus = t?.status;
+      const status = typeof rawStatus === 'string' ? rawStatus.toUpperCase() : '';
+      return {
+        ...t,
+        _statusNorm: status
+      };
+    });
+  }, [tickets]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let arr = [...normalizedTickets];
+
+    if (statusFilter === 'open') arr = arr.filter((t) => t._statusNorm === 'OPEN');
+    if (statusFilter === 'resolved') arr = arr.filter((t) => t._statusNorm === 'RESOLVED' || t._statusNorm === 'CLOSED');
+    if (statusFilter === 'all') {
+      // no-op
+    }
+
+    if (q) {
+      arr = arr.filter((t) => {
+        const hay = [t.id, t.subject, t.message].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    arr.sort((a, b) => {
+      const da = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db - da;
+    });
+
+    return arr;
+  }, [normalizedTickets, statusFilter, query]);
+
+  // Keep for future expansion; currently UI uses raw ticket status.
+  // const statusPill = (normStatus) => {
+  //   const s = normStatus || '';
+  //   if (s === 'OPEN') {
+  //     return {
+  //       text: 'OPEN',
+  //       className:
+  //         'bg-amber-50 border-amber-200 text-amber-800'
+  //     };
+  //   }
+  //   if (s === 'RESOLVED' || s === 'CLOSED') {
+  //     return {
+  //       text: s === 'RESOLVED' ? 'RESOLVED' : 'CLOSED',
+  //       className:
+  //         'bg-emerald-50 border-emerald-200 text-emerald-800'
+  //     };
+  //   }
+  //   return { text: normStatus || 'UNKNOWN', className: 'bg-slate-50 border-slate-200 text-slate-700' };
+  // };
+
   return (
     <div className="space-y-6 text-left">
       <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight">Partner Support Desk</h3>
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
         <div className="md:col-span-5 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-4">
           <h4 className="font-extrabold text-slate-900 text-sm uppercase">Submit Dispute Ticket</h4>
@@ -40,7 +104,16 @@ export default function ProviderSupport({
                       <span className="text-[10px] bg-slate-100 font-mono text-slate-500 px-1.5 py-0.5 rounded">#{t.id}</span>
                       <h5 className="font-black text-slate-900 text-xs mt-1 uppercase">{t.subject}</h5>
                     </div>
-                    <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase rounded-full border ${t.status === 'open' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>{t.status}</span>
+                    <span
+                      className={`px-2.5 py-0.5 text-[9px] font-black uppercase rounded-full border ${
+                        String(t.status || '').toUpperCase() === 'OPEN'
+                          ? 'bg-amber-50 border-amber-200 text-amber-800'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      }`}
+                    >
+                      {String(t.status || '').toUpperCase()}
+                    </span>
+
                   </div>
                   <p className="text-slate-600 font-medium text-xs italic">"{t.message}"</p>
                   {t.response && (

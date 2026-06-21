@@ -11,8 +11,8 @@ import BookingModal from '../components/BookingModal';
 import BookingSuccess from '../components/BookingSuccess';
 
 export const ServiceDetails = ({ catId, onNavigate }) => {
-  const { 
-    providers, currentUser, createBooking, 
+  const {
+    providers, currentUser, createBooking,
     toggleFavoriteProvider, favoriteProviders, selectedArea,
     bookings, getCustomerLoyaltyTier
   } = useApp();
@@ -46,8 +46,9 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
   // Filter & Sort logic
   const categoryProviders = useMemo(() => {
     let list = providers.filter(
-      p => p.category.toLowerCase() === categoryMeta.name.toLowerCase() && p.isVerified
+      p => (p.category || '').toLowerCase() === categoryMeta.name.toLowerCase() && p.isVerified
     );
+
 
     if (filterArea) {
       list = list.filter(p => p.serviceAreas.includes(filterArea));
@@ -58,7 +59,9 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
       case 'experience': list.sort((a, b) => b.experienceYears - a.experienceYears); break;
       case 'priceAsc': list.sort((a, b) => a.hourlyRate - b.hourlyRate); break;
       case 'priceDesc': list.sort((a, b) => b.hourlyRate - a.hourlyRate); break;
+      default: break;
     }
+
     return list;
   }, [providers, categoryMeta, filterArea, sortBy]);
 

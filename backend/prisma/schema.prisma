@@ -19,8 +19,11 @@ model User {
   address                 String?
   pincode                 String?
   referralCode            String?
+  referredBy              String?
   referralsCount          Int            @default(0)
   referralDiscountBalance Float          @default(0)
+  referralBonusEarned     Float          @default(0)
+
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   authEvents              AuthEvent[]

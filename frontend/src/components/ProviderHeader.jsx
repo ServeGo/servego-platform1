@@ -1,6 +1,55 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useApp } from '../context/AppContext';
+
+const API_BASE_URL = 'http://localhost:4000/api';
+
+function ServiceChip({ name }) {
+  return (
+    <span className="bg-emerald-500/10 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded border border-emerald-500/20">
+      {name}
+    </span>
+  );
+}
 
 export default function ProviderHeader({ provider, earnings }) {
+  const { currentUser } = useApp();
+  const providerId = provider?.id;
+
+  const [approvedServices, setApprovedServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+
+  const isEnabled = !!providerId && !!currentUser;
+
+  useEffect(() => {
+    let alive = true;
+    const fetchApprovedServices = async () => {
+      if (!isEnabled) return;
+      setLoadingServices(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/providers/${providerId}/services`);
+        const data = await res.json();
+        if (!alive) return;
+        const arr = Array.isArray(data) ? data : [];
+        setApprovedServices(arr.filter(s => s?.approvalStatus === 'APPROVED'));
+      } catch {
+        if (!alive) return;
+        setApprovedServices([]);
+      } finally {
+        if (alive) setLoadingServices(false);
+      }
+    };
+
+    fetchApprovedServices();
+    return () => {
+      alive = false;
+    };
+  }, [isEnabled, providerId]);
+
+  const approvedNames = useMemo(
+    () => approvedServices.map(s => s.name).filter(Boolean),
+    [approvedServices]
+  );
+
   return (
     <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl mb-8 relative overflow-hidden text-left">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_right_top,#1e293b_10%,transparent_50%)] pointer-events-none" />
@@ -8,6 +57,7 @@ export default function ProviderHeader({ provider, earnings }) {
         
         {/* Info */}
         <div className="flex gap-4 items-center">
+
           {(() => {
             const avatarSrc = provider?.avatar || provider?.photo;
             const name = provider?.name || '';
@@ -42,9 +92,23 @@ export default function ProviderHeader({ provider, earnings }) {
                 {provider.category} Sector
               </span>
             </div>
+
+            {loadingServices ? (
+              <div className="mt-2 text-[10px] text-slate-300 font-semibold">Loading approved services...</div>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {approvedNames.length ? (
+                  approvedNames.map((n, idx) => <ServiceChip key={`${n}-${idx}`} name={n} />)
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-semibold">No approved services yet.</span>
+                )}
+              </div>
+            )}
+
             <h2 className="text-2xl font-bold font-sans mt-1.5 tracking-tight">{provider.name}</h2>
             <p className="text-slate-400 text-xs mt-1 font-medium">{provider.phone} • Hyderabad Node</p>
           </div>
+
         </div>
 
         {/* Stats */}

@@ -45,12 +45,47 @@ export default function LeadCard({
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-4">
         <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Customer Requirements</span>
         <p className="text-slate-700 text-xs font-semibold">
-          👤 {lead.customerName}: <span className="text-slate-400 italic font-medium">"{lead.instructions || 'No special notes.'}"</span>
+          👤 {lead.customerName || 'Client'}: <span className="text-slate-400 italic font-medium">"{lead.instructions || 'No special notes.'}"</span>
         </p>
       </div>
+
+      <div className="mb-6">
+        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Status Timeline</span>
+        <div className="flex flex-wrap gap-2">
+          {['pending', 'confirmed', 'en_route', 'ongoing', 'completed'].map(s => {
+            const labels = {
+              pending: 'Offer',
+              confirmed: 'Accepted',
+              en_route: 'En-route',
+              ongoing: 'Work',
+              completed: 'Done'
+            };
+            const order = ['pending', 'confirmed', 'en_route', 'ongoing', 'completed'];
+            const currentIdx = order.indexOf(lead.status);
+            const sIdx = order.indexOf(s);
+            const isDone = sIdx <= currentIdx && currentIdx !== -1;
+            const isActive = s === lead.status;
+            return (
+              <span
+                key={s}
+                className={`px-2 py-1 text-[10px] font-black rounded-xl border ${
+                  isActive
+                    ? 'bg-indigo-100 border-indigo-300 text-indigo-800'
+                    : isDone
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                      : 'bg-slate-50 border-slate-200 text-slate-400'
+                }`}
+              >
+                {labels[s]}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
 
       <div className="flex gap-2 justify-end flex-wrap">
         <button 
@@ -63,10 +98,21 @@ export default function LeadCard({
 
         {lead.status === 'pending' && (
           <>
-            <button onClick={() => onReject(lead.id)} className="bg-white border border-slate-300 hover:bg-rose-50 hover:text-rose-700 px-4 py-2 text-xs font-bold rounded-xl transition-all">Decline</button>
-            <button onClick={() => onAccept(lead.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 text-xs font-bold rounded-xl transition-all">Accept Job</button>
+            <button
+              onClick={() => { if (window.confirm('Decline this lead proposal?')) onReject(lead.id); }}
+              className="bg-white border border-slate-300 hover:bg-rose-50 hover:text-rose-700 px-4 py-2 text-xs font-bold rounded-xl transition-all"
+            >
+              Decline
+            </button>
+            <button
+              onClick={() => { if (window.confirm('Accept this job offer?')) onAccept(lead.id); }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 text-xs font-bold rounded-xl transition-all"
+            >
+              Accept Job
+            </button>
           </>
         )}
+
 
         {lead.status === 'confirmed' && (
           <button onClick={() => onTravel(lead.id)} className="bg-indigo-600 hover:bg-indigo-750 text-white px-6 py-2.5 text-xs font-bold rounded-xl transition-all">🚚 Mark En-Route</button>

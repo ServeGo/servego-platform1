@@ -1,33 +1,274 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  try {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+  } catch {
+    return String(value);
+  }
+}
+
+function Stars({ rating }) {
+  const safe = typeof rating === 'number' && !Number.isNaN(rating) ? rating : 0;
+  const full = clamp(Math.round(safe), 0, 5);
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-amber-500 font-black">★</span>
+      <span className="text-xs font-black text-slate-900">{safe.toFixed(1)}</span>
+      <span className="text-[10px] font-bold text-amber-400">({full}/5)</span>
+    </span>
+  );
+}
+
+function RatingBar({ value, max, label }) {
+  const pct = max ? (value / max) * 100 : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-8 text-[10px] font-black text-slate-500">{label}</div>
+      <div className="flex-1 h-2 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+        <div className="h-full bg-amber-400" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="w-12 text-right text-[10px] font-bold text-slate-500">{value}</div>
+    </div>
+  );
+}
 
 export default function ProviderReviews({ rating, reviews }) {
+  const [sort, setSort] = useState('newest'); // newest | highest | lowest
+  const [category, setCategory] = useState('all');
+  const [query, setQuery] = useState('');
+
+  const safeReviews = Array.isArray(reviews) ? reviews : [];
+
+  const computed = useMemo(() => {
+    const list = safeReviews;
+
+    const byCategory = new Map();
+    for (const r of list) {
+      const cat = (r.serviceCategory || 'Other').toString();
+      byCategory.set(cat, (byCategory.get(cat) || 0) + 1);
+    }
+
+    let avg = 0;
+    if (typeof rating === 'number' && !Number.isNaN(rating)) {
+      avg = rating;
+    } else if (list.length) {
+      const sum = list.reduce((acc, r) => acc + (typeof r.rating === 'number' ? r.rating : 0), 0);
+      avg = sum / list.length;
+    }
+
+    const ratingCounts = [0, 0, 0, 0, 0];
+    for (const r of list) {
+      const v = typeof r.rating === 'number' ? r.rating : 0;
+      const bucket = clamp(Math.round(v), 1, 5) - 1;
+      ratingCounts[bucket]++;
+    }
+
+    return {
+      avg,
+      count: list.length,
+      ratingCounts,
+      categories: Array.from(byCategory.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }))
+    };
+  }, [safeReviews, rating]);
+
+  const categories = useMemo(() => [{ name: 'all', count: computed.count }, ...computed.categories], [computed]);
+
+  const filteredSorted = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    let arr = [...safeReviews];
+
+    if (category !== 'all') {
+      arr = arr.filter(r => (r.serviceCategory || 'Other').toString() === category);
+    }
+
+    if (q) {
+      arr = arr.filter(r => {
+        const hay = [
+          r.reviewerName,
+          r.comment,
+          r.serviceCategory,
+          r.bookingId,
+          r.id
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    const toTime = (r) => {
+      if (!r?.date) return 0;
+      const d = new Date(r.date);
+      return !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+    };
+
+    arr.sort((a, b) => {
+      if (sort === 'highest') {
+        const diff = (a.rating || 0) - (b.rating || 0);
+        if (diff !== 0) return -diff;
+        return toTime(b) - toTime(a);
+      }
+      if (sort === 'lowest') {
+        const diff = (a.rating || 0) - (b.rating || 0);
+        if (diff !== 0) return diff;
+        return toTime(b) - toTime(a);
+      }
+      // newest (default)
+      return toTime(b) - toTime(a);
+    });
+
+    return arr;
+  }, [safeReviews, category, query, sort]);
+
   return (
     <div className="space-y-6 text-left">
-      <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight">Client Review Audit</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-        <div className="bg-slate-900 text-white p-6 rounded-2xl text-center space-y-2 border border-slate-800">
-          <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Feedback Score</span>
-          <span className="text-3xl font-black text-amber-400 block">⭐ {(typeof rating === 'number' ? rating : 0).toFixed(1)}</span>
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight">Client Review Audit</h3>
+        <p className="text-xs text-slate-500 font-semibold mt-1">Track quality signals and respond to feedback opportunities.</p>
+      </div>
 
-          <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-tight">{reviews?.length || 0} Customer Audits</span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Summary */}
+        <div className="lg:col-span-4">
+          <div className="bg-slate-900 text-white p-6 rounded-2xl text-center space-y-2 border border-slate-800">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide block">Feedback Score</span>
+            <span className="text-3xl font-black text-amber-400 block">⭐ {(computed.count ? computed.avg : 0).toFixed(1)}</span>
+            <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-tight">{computed.count} Customer Audits</span>
+          </div>
+
+          <div className="mt-4 bg-white rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-black text-slate-900">Rating distribution</div>
+              <div className="text-[10px] font-bold text-slate-500">1★ → 5★</div>
+            </div>
+
+            {computed.count === 0 ? (
+              <div className="text-center text-xs text-slate-400 italic font-semibold py-6">No histogram data.</div>
+            ) : (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((star, idx) => (
+                  <RatingBar key={star} value={computed.ratingCounts[idx]} max={Math.max(...computed.ratingCounts)} label={`${star}★`} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="md:col-span-3 space-y-4">
-          {(!reviews || reviews.length === 0) ? (
-            <div className="bg-white p-10 rounded-2xl border text-center text-xs text-slate-400 italic font-semibold">No feedback found.</div>
+        {/* Controls + list */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
+              <div>
+                <div className="text-xs font-black text-slate-900 uppercase tracking-wide">Filters</div>
+                <div className="text-[11px] text-slate-500 font-semibold mt-1">Narrow by service category and keywords.</div>
+              </div>
 
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {reviews.map((rev, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-2 text-xs shadow-3xs">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                    <span className="text-slate-900 font-black block uppercase tracking-tight">{rev.reviewerName}</span>
-                    <span className="text-amber-500 font-black">★ {rev.rating}</span>
-                  </div>
-                  <p className="text-slate-600 italic font-medium leading-relaxed">"{rev.comment}"</p>
-                  <span className="text-[9px] text-slate-400 font-mono block text-right">{rev.date}</span>
+              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                <div className="flex-1">
+                  <label className="block text-[10px] text-slate-400 font-black uppercase tracking-wide mb-1">Search</label>
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Name, comment, category..."
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-2 text-xs font-bold outline-none"
+                  />
                 </div>
-              ))}
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-black uppercase tracking-wide mb-1">Sort</label>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-2 text-xs font-black outline-none"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="highest">Highest rating</option>
+                    <option value="lowest">Lowest rating</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex flex-wrap gap-2">
+                {categories.map((c) => (
+                  <button
+                    key={c.name}
+                    onClick={() => setCategory(c.name)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                      category === c.name
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:text-slate-800 hover:border-slate-300'
+                    }`}
+                  >
+                    {c.name === 'all' ? 'All' : c.name} <span className="text-[10px]">({c.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {filteredSorted.length === 0 ? (
+            <div className="bg-white p-10 rounded-3xl border border-slate-200 text-center text-xs text-slate-400 italic font-semibold">
+              No matching reviews found.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-black text-slate-900">Showing {filteredSorted.length} reviews</div>
+                <div className="text-[10px] font-bold text-slate-500">Tip: filter by category for targeted insights.</div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {filteredSorted.map((rev, idx) => {
+                  const comment = rev.comment ? String(rev.comment) : '';
+                  return (
+                    <div key={rev.id || idx} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 text-xs shadow-3xs">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="min-w-0">
+                          <div className="text-slate-900 font-black uppercase tracking-tight truncate">{rev.reviewerName || 'Anonymous'}</div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Stars rating={rev.rating} />
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[9px] text-slate-400 font-mono block">{formatDate(rev.date)}</div>
+                          <div className="mt-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black border border-slate-200 bg-slate-50 text-slate-700">
+                              {(rev.serviceCategory || 'Other').toString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {comment ? (
+                        <p className="text-slate-600 italic font-medium leading-relaxed">“{comment}”</p>
+                      ) : (
+                        <p className="text-slate-400 italic font-semibold">No comment provided.</p>
+                      )}
+
+                      {rev.bookingId ? (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                          <div className="text-[10px] font-bold text-slate-400">Booking</div>
+                          <div className="text-[10px] font-mono text-slate-700">{rev.bookingId}</div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -35,3 +276,4 @@ export default function ProviderReviews({ rating, reviews }) {
     </div>
   );
 }
+
