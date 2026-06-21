@@ -16,10 +16,15 @@ export const UserController = {
           address: true,
           pincode: true,
           referralCode: true,
+          referredBy: true,
           referralsCount: true,
           referralDiscountBalance: true,
+          referralBonusEarned: true,
+          providerId: true,
           createdAt: true,
-          updatedAt: true
+          updatedAt: true,
+          customerProfile: true,
+          providerProfile: true
         }
       });
       res.json(users);
@@ -101,8 +106,22 @@ export const UserController = {
         }
       });
 
+      let customerProfile = null;
+      let providerProfile = null;
+
+      if (role === 'customer') {
+        customerProfile = await prisma.customer.create({
+          data: {
+            userId: newUser.id,
+            address,
+            pincode,
+            preferences: []
+          }
+        });
+      }
+
       if (role === 'provider') {
-        await prisma.provider.create({
+        providerProfile = await prisma.provider.create({
           data: {
             userId: newUser.id,
             category: serviceInterested,
@@ -117,6 +136,11 @@ export const UserController = {
             timeSlots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM']
           }
         });
+
+        await prisma.user.update({
+          where: { id: newUser.id },
+          data: { providerId: providerProfile.id }
+        });
       }
 
       await prisma.authEvent.create({
@@ -128,7 +152,27 @@ export const UserController = {
         }
       });
 
-      const { password: _, ...safeUser } = newUser;
+      const safeUser = {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        avatar: newUser.avatar,
+        status: newUser.status,
+        address: newUser.address,
+        pincode: newUser.pincode,
+        providerId: role === 'provider' ? providerProfile?.id || null : null,
+        customerProfile: customerProfile,
+        providerProfile: providerProfile,
+        referralCode: newUser.referralCode,
+        referredBy: newUser.referredBy,
+        referralsCount: newUser.referralsCount,
+        referralDiscountBalance: newUser.referralDiscountBalance,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt
+      };
+
       res.status(201).json({ success: true, user: safeUser });
     } catch (err) {
       console.error('Signup registration error:', err);
@@ -143,7 +187,13 @@ export const UserController = {
         return res.status(400).json({ error: 'Please enter both your email address and password.' });
       }
 
-      const user = await prisma.user.findUnique({ where: { email } });
+      const user = await prisma.user.findUnique({
+        where: { email },
+        include: {
+          customerProfile: true,
+          providerProfile: true
+        }
+      });
       if (!user || !(await bcrypt.compare(password, user.password))) {
         await prisma.authEvent.create({
           data: {
@@ -181,6 +231,62 @@ export const UserController = {
     } catch (err) {
       console.error('Login error:', err);
       res.status(500).json({ error: 'Server authentication login failed', details: err.message });
+    }
+  },
+
+  updateProfile: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, phone, address, pincode } = req.body;
+      const user = await prisma.user.findUnique({ where: { id }, include: { customerProfile: true } });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          name: name ?? user.name,
+          phone: phone ?? user.phone,
+          address: address ?? user.address,
+          pincode: pincode ?? user.pincode
+        },
+        include: {
+          customerProfile: true,
+          providerProfile: true
+        }
+      });
+
+      if (user.role === 'customer') {
+        if (user.customerProfile) {
+          await prisma.customer.update({
+            where: { id: user.customerProfile.id },
+            data: {
+              address: address ?? user.customerProfile.address,
+              pincode: pincode ?? user.customerProfile.pincode
+            }
+          });
+        } else if (address && pincode) {
+          await prisma.customer.create({
+            data: {
+              userId: user.id,
+              address,
+              pincode,
+              preferences: []
+            }
+          });
+        }
+      }
+
+      const refreshed = await prisma.user.findUnique({
+        where: { id },
+        include: { customerProfile: true, providerProfile: true }
+      });
+      const { password: __, ...safeUser } = refreshed;
+      res.json({ success: true, user: safeUser });
+    } catch (err) {
+      console.error('Failed to update user profile:', err);
+      res.status(500).json({ error: 'Failed to update user profile', details: err.message });
     }
   }
 };

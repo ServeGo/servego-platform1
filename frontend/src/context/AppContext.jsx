@@ -113,7 +113,8 @@ export const AppProvider = ({ children }) => {
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
       } else if (currentUser?.role === 'provider') {
-        setBookings(bookingsArray.filter(b => b.providerId === currentUser.id));
+        const providerId = currentUser.providerId || currentUser.id;
+        setBookings(bookingsArray.filter(b => b.providerId === providerId));
       } else {
         setBookings(bookingsArray.filter(b => b.customerId === currentUser.id));
       }
@@ -412,8 +413,28 @@ export const AppProvider = ({ children }) => {
       if (data.id) {
         setProviders(prev => prev.map(p => p.id === providerId ? data : p));
       }
+      return data;
     } catch (err) {
       console.error('Failed to update provider profile:', err);
+      return { error: 'Network error' };
+    }
+  };
+
+  const updateUserProfile = async (userId, profileData) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${userId}/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
+      });
+      const data = await res.json();
+      if (res.ok && data?.success) {
+        setCurrentUser(data.user);
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to update user profile:', err);
+      return { error: 'Network error' };
     }
   };
 
@@ -689,6 +710,7 @@ export const AppProvider = ({ children }) => {
       verifyProvider,
       updateProviderAvailability,
       updateProviderProfile,
+      updateUserProfile,
       toggleFavoriteProvider,
       favoriteProviders,
       // fetchProviderServices: not implemented yet in this context

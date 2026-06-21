@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Save } from 'lucide-react';
 
-import { useApp } from '../context/AppContext';
-
 function FilterButton({ label, active, onClick }) {
   return (
     <button
@@ -21,12 +19,9 @@ function FilterButton({ label, active, onClick }) {
 }
 
 export default function ProviderServicesPanel({ provider }) {
-  const { currentUser } = useApp();
-
   const [myServices, setMyServices] = useState([]);
   const [servicesError, setServicesError] = useState('');
   const [loadingMyServices, setLoadingMyServices] = useState(false);
-  const [loadingAllServices, setLoadingAllServices] = useState(false);
 
   const [query, setQuery] = useState(''); // search within my services
 
@@ -35,7 +30,6 @@ export default function ProviderServicesPanel({ provider }) {
 
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [serviceInterestedOption, setServiceInterestedOption] = useState('');
-  const [serviceInterestedOther, setServiceInterestedOther] = useState('');
   const [experienceYears, setExperienceYears] = useState(provider?.experienceYears || 3);
 
   // Mandatory fields (per your requirement)
@@ -49,12 +43,6 @@ export default function ProviderServicesPanel({ provider }) {
 
   const API_BASE_URL = 'http://localhost:4000/api';
 
-  const availableServices = useMemo(() => {
-    // We show dropdown options from DB via existing public services list.
-    // If a service name is selected, we still allow provider to register (create) a service
-    // owned by that provider with that name.
-    return [];
-  }, []);
 
   const filteredServices = useMemo(() => {
     if (!Array.isArray(myServices)) return [];
@@ -89,15 +77,11 @@ export default function ProviderServicesPanel({ provider }) {
 
   const fetchAllServices = async () => {
     try {
-      setLoadingAllServices(true);
       const res = await fetch(`${API_BASE_URL}/services`);
       const data = await res.json();
       setAllServices(Array.isArray(data) ? data : []);
     } catch (e) {
-      // ignore for now
       setAllServices([]);
-    } finally {
-      setLoadingAllServices(false);
     }
   };
 
@@ -145,7 +129,6 @@ export default function ProviderServicesPanel({ provider }) {
   const openRegister = () => {
     setServicesError('');
     setServiceInterestedOption('');
-    setServiceInterestedOther('');
     setExperienceYears(provider?.experienceYears || 3);
     setIsRegisterOpen(true);
   };
@@ -160,13 +143,10 @@ export default function ProviderServicesPanel({ provider }) {
 
     console.log('[ProviderServicesPanel] providerId', providerId);
 
-    const selectedName =
-      serviceInterestedOption && serviceInterestedOption !== 'OTHER'
-        ? serviceInterestedOption
-        : serviceInterestedOther;
+    const selectedName = serviceInterestedOption;
 
     if (!selectedName?.trim()) {
-      setServicesError('Please enter/select a service name.');
+      setServicesError('Please select a service.');
       return;
     }
 
@@ -336,7 +316,7 @@ Requested: {new Date(sv.createdAt).toLocaleString()}
         <h4 className="font-bold text-slate-800 text-sm">How it works</h4>
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-semibold text-slate-700">
           <ol className="list-decimal list-inside space-y-2">
-            <li>Select a service from the list (or choose OTHER).</li>
+            <li>Select a service from the list.</li>
             <li>Add your experience years.</li>
             <li>Click Register. Your service will appear in this page.</li>
           </ol>
@@ -362,11 +342,7 @@ Requested: {new Date(sv.createdAt).toLocaleString()}
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Service interested *</label>
                 <select
                   value={serviceInterestedOption}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setServiceInterestedOption(val);
-                    if (val !== 'OTHER') setServiceInterestedOther('');
-                  }}
+                  onChange={(e) => setServiceInterestedOption(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
                 >
                   <option value="">Select service</option>
@@ -377,22 +353,8 @@ Requested: {new Date(sv.createdAt).toLocaleString()}
                         {s.name}
                       </option>
                     ))}
-                  <option value="OTHER">Other</option>
                 </select>
               </div>
-
-              {serviceInterestedOption === 'OTHER' && (
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Service name *</label>
-                  <input
-                    type="text"
-                    value={serviceInterestedOther}
-                    onChange={(e) => setServiceInterestedOther(e.target.value)}
-                    placeholder="Enter service name"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
-                  />
-                </div>
-              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Experience (years)</label>

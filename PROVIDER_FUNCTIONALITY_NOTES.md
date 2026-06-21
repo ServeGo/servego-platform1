@@ -557,10 +557,12 @@ My Services list:
 Register modal:
 - Opens modal with inputs:
   - service interested (dropdown)
-  - if “OTHER” selected → manual service name
   - experience years
   - base price per day (required)
   - service description (required)
+
+Important change:
+- The provider UI no longer supports a freeform “OTHER” service name entry; providers must choose from the existing catalog returned by `GET /api/services`.
 
 Submit:
 - `POST /api/providers/:providerId/services/register`
@@ -625,9 +627,12 @@ Component: `frontend/src/components/AdminOtherServicesRequestsPanel.jsx`
 
 ### 6.3 Provider registers a new service (requires admin approval)
 - UI: `ProviderServicesPanel`
+  - provider picks a service from the catalog.
+  - freeform “OTHER” entry is removed.
 - Backend:
   - `POST /api/providers/:id/services/register`
   - creates `ProviderServiceRequest (PENDING)`
+- Backend validation prevents duplicate requests and approved services for the same provider/service.
 
 ### 6.4 Admin approves/denies
 - Approve:
@@ -641,7 +646,8 @@ Component: `frontend/src/components/AdminOtherServicesRequestsPanel.jsx`
 
 ### 6.5 Provider sees services in “My Services”
 - UI fetches `GET /api/providers/:id/services`
-- Backend combines approved ProviderService + all ProviderServiceRequest records.
+- Backend combines approved `ProviderService` links and pending/denied `ProviderServiceRequest` records.
+- Approved requests are excluded from the provider-facing request list to prevent duplicate display of the same service.
 
 ### 6.6 Reviews
 - Customers can create reviews via `POST /api/reviews`.
@@ -679,7 +685,7 @@ The provider should understand these as separate concepts:
 
 ## 7) Current gaps / code caveats found while documenting
 
-1. `ProviderServicesPanel` defines `availableServices` as empty and instead relies on `allServices` fetched from `/api/services`.
+1. `ProviderServicesPanel` loads provider dropdown options from `/api/services` and no longer relies on any empty helper array.
 2. `AppContext.applyReferralCode` is explicitly “not implemented yet”; provider referral UI calls a local stub.
 3. `prisma generate` may fail on Windows if a running Node/backend process has the Prisma query engine DLL locked.
    - Stop running Node/backend processes, then rerun Prisma migration/generate.
