@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { refreshProviderReputation } from '../services/providerReputationService.js';
 
 export const ProviderController = {
   getProviderServices: async (req, res) => {
@@ -20,7 +21,11 @@ export const ProviderController = {
         })
       ]);
 
-      const formattedApproved = approvedLinks.map((link) => ({
+      const uniqueApprovedLinks = Array.from(
+        new Map(approvedLinks.map((link) => [link.serviceId, link])).values()
+      );
+
+      const formattedApproved = uniqueApprovedLinks.map((link) => ({
         id: link.id,
         name: link.service.name,
         approvalStatus: 'APPROVED',
@@ -82,7 +87,7 @@ export const ProviderController = {
         where: {
           providerId: provider.id,
           service: {
-            name: requestedService
+            name: { equals: requestedService, mode: 'insensitive' }
           }
         },
         select: { id: true }
@@ -95,7 +100,7 @@ export const ProviderController = {
       const existingPending = await prisma.providerServiceRequest.findFirst({
         where: {
           providerId: provider.id,
-          requestedServiceName: { equals: requestedService },
+          requestedServiceName: { equals: requestedService, mode: 'insensitive' },
           status: 'PENDING'
         },
         select: { id: true }
@@ -109,7 +114,7 @@ export const ProviderController = {
       const existingRequest = await prisma.providerServiceRequest.findFirst({
         where: {
           providerId: provider.id,
-          requestedServiceName: { equals: requestedService }
+          requestedServiceName: { equals: requestedService, mode: 'insensitive' }
         },
         select: { status: true }
       });
@@ -163,7 +168,8 @@ export const ProviderController = {
           user: {
             select: { id: true, name: true, email: true, phone: true, avatar: true }
           },
-          reviews: true
+          reviews: true,
+          badges: true
         }
       });
       res.json(providers);
@@ -181,7 +187,8 @@ export const ProviderController = {
           user: {
             select: { id: true, name: true, email: true, phone: true, avatar: true }
           },
-          reviews: true
+          reviews: true,
+          badges: true
         }
       });
       if (!provider) {
@@ -243,12 +250,13 @@ export const ProviderController = {
       const { id } = req.params;
       const { isVerified } = req.body;
 
-      const updated = await prisma.provider.update({
+      await prisma.provider.update({
         where: { id },
         data: {
           isVerified: Boolean(isVerified)
         }
       });
+      const updated = await refreshProviderReputation(id);
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: 'Failed to verify provider credentials', details: err.message });

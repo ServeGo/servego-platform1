@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapPin } from 'lucide-react';
+import { ReputationBadgeStrip, VerificationLevelPill } from './ProviderReputation';
 
 export default function ProviderListItem({ 
   provider, 
@@ -19,16 +20,15 @@ export default function ProviderListItem({
             className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-slate-200"
           />
           <div>
-            {provider.isVerified && (
-              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[9px] font-extrabold uppercase border border-emerald-200">
-                Verified
-              </span>
-            )}
+            {provider.isVerified && <VerificationLevelPill provider={provider} />}
             <h4 className="font-bold text-slate-900 mt-1 line-clamp-1 text-sm sm:text-base leading-tight">{provider.name}</h4>
             
             <div className="flex items-center gap-1 mt-1 text-xs">
               <span className="text-amber-500 font-bold">⭐ {provider.rating}</span>
               <span className="text-slate-500 font-medium">({provider.reviewCount} reviews)</span>
+            </div>
+            <div className="mt-2">
+              <ReputationBadgeStrip badges={provider.badges} limit={2} />
             </div>
           </div>
         </div>

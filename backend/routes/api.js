@@ -95,6 +95,7 @@ apiRouter.get('/admin/provider-service-requests', (req, res) => AdminProviderSer
 
 apiRouter.patch('/admin/provider-service-requests/:id/approve', (req, res) => AdminProviderServiceController.approveService(req, res));
 apiRouter.patch('/admin/provider-service-requests/:id/deny', (req, res) => AdminProviderServiceController.denyService(req, res));
+apiRouter.post('/admin/providers/reputation/refresh', (req, res) => AdminProviderServiceController.refreshReputation(req, res));
 
 // --- Customer: approved providers by service name (sector listing) ---
 apiRouter.get('/providers/by-approved-service', (req, res) => ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res));

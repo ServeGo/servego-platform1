@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { ReputationBadgeStrip, VerificationLevelPill } from './ProviderReputation';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -61,12 +62,6 @@ export default function ProviderHeader({ provider, earnings }) {
           {(() => {
             const avatarSrc = provider?.avatar || provider?.photo;
             const name = provider?.name || '';
-            const initials = name
-              .split(' ')
-              .filter(Boolean)
-              .slice(0, 2)
-              .map(s => s[0]?.toUpperCase())
-              .join('') || 'PR';
 
             return avatarSrc ? (
               <img
@@ -96,14 +91,28 @@ export default function ProviderHeader({ provider, earnings }) {
             {loadingServices ? (
               <div className="mt-2 text-[10px] text-slate-300 font-semibold">Loading approved services...</div>
             ) : (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {approvedNames.length ? (
-                  approvedNames.map((n, idx) => <ServiceChip key={`${n}-${idx}`} name={n} />)
-                ) : (
-                  <span className="text-[10px] text-slate-400 font-semibold">No approved services yet.</span>
-                )}
+              <div className="mt-3">
+                <span className="text-[9px] uppercase font-black text-slate-500 block tracking-wider mb-1.5">Approved Services</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {approvedNames.length ? (
+                    approvedNames.map((n, idx) => <ServiceChip key={`${n}-${idx}`} name={n} />)
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-semibold">No approved services yet.</span>
+                  )}
+                </div>
               </div>
             )}
+
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <span className="text-[9px] uppercase font-black text-slate-500 block tracking-wider mb-1.5">Trust Level</span>
+                <VerificationLevelPill provider={provider} dark />
+              </div>
+              <div>
+                <span className="text-[9px] uppercase font-black text-slate-500 block tracking-wider mb-1.5">Badges</span>
+                <ReputationBadgeStrip badges={provider.badges} limit={3} dark />
+              </div>
+            </div>
 
             <h2 className="text-2xl font-bold font-sans mt-1.5 tracking-tight">{provider.name}</h2>
             <p className="text-slate-400 text-xs mt-1 font-medium">{provider.phone} • Hyderabad Node</p>

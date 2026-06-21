@@ -1,8 +1,34 @@
 import prisma from '../prisma/client.js';
+import { refreshAllProviderReputations, refreshProviderReputation } from '../services/providerReputationService.js';
 
 const normalize = (s) => (s || '').toString().trim().toLowerCase();
 
 export const AdminProviderServiceController = {
+  getPendingRequests: async (req, res) => {
+    try {
+      const role = req.body?.role ?? req.query?.role;
+      if (role && role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+
+      const requests = await prisma.providerServiceRequest.findMany({
+        where: { status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          provider: {
+            include: {
+              user: {
+                select: { id: true, name: true, email: true, phone: true, avatar: true }
+              }
+            }
+          }
+        }
+      });
+
+      res.json(requests);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch provider service requests', details: err.message });
+    }
+  },
+
   approveService: async (req, res) => {
     try {
       const { id } = req.params; // ProviderServiceRequest id
@@ -19,12 +45,7 @@ export const AdminProviderServiceController = {
       });
 
       if (!request) return res.status(404).json({ error: 'Service request not found' });
-
-      // Mark request approved
-      await prisma.providerServiceRequest.update({
-        where: { id },
-        data: { status: 'APPROVED' }
-      });
+      const wasAlreadyApproved = request.status === 'APPROVED';
 
       // Ensure global service category exists
       const requestedName = request.requestedServiceName;
@@ -48,8 +69,19 @@ export const AdminProviderServiceController = {
         });
       }
 
-      // Link provider to global service (ProviderService). Enforce 1 link per request.
-      await prisma.providerService.create({
+      const existingLink = await prisma.providerService.findFirst({
+        where: {
+          OR: [
+            { providerServiceRequestId: request.id },
+            {
+              providerId: request.providerId,
+              serviceId: service.id
+            }
+          ]
+        }
+      });
+
+      const link = existingLink || await prisma.providerService.create({
         data: {
           providerId: request.providerId,
           serviceId: service.id,
@@ -59,8 +91,15 @@ export const AdminProviderServiceController = {
         }
       });
 
+      await prisma.providerServiceRequest.update({
+        where: { id },
+        data: { status: 'APPROVED' }
+      });
+
+      await refreshProviderReputation(request.providerId);
+
       // Notify provider
-      if (request?.provider?.user?.id) {
+      if (!wasAlreadyApproved && request?.provider?.user?.id) {
         await prisma.notification.create({
           data: {
             userId: request.provider.user.id,
@@ -72,9 +111,21 @@ export const AdminProviderServiceController = {
         });
       }
 
-      res.json({ success: true, requestId: request.id, serviceId: service.id });
+      res.json({ success: true, requestId: request.id, serviceId: service.id, providerServiceId: link.id });
     } catch (err) {
       res.status(500).json({ error: 'Failed to approve service request', details: err.message });
+    }
+  },
+
+  refreshReputation: async (req, res) => {
+    try {
+      const role = req.body?.role ?? req.query?.role;
+      if (role && role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+
+      const providers = await refreshAllProviderReputations();
+      res.json({ success: true, providersUpdated: providers.filter(Boolean).length });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to refresh provider reputation', details: err.message });
     }
   },
 

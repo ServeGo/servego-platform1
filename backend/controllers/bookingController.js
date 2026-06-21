@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { refreshProviderReputation } from '../services/providerReputationService.js';
 
 export const BookingController = {
   getAll: async (req, res) => {
@@ -133,6 +134,8 @@ export const BookingController = {
           statusHistory: newHistory
         }
       });
+
+      await refreshProviderReputation(booking.providerId);
 
       await prisma.notification.create({
         data: {
