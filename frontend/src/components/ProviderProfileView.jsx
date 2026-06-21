@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { AchievementList, VerificationLevelPill } from './ProviderReputation';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -198,6 +199,7 @@ export default function ProviderProfileView() {
 
           <div className="flex flex-col sm:items-end gap-2">
             <div className="flex gap-2">
+              <VerificationLevelPill provider={provider} />
               <StatPill label="Rating" value={rating} />
               <StatPill label="Reviews" value={reviewsCount} />
             </div>
@@ -282,8 +284,13 @@ export default function ProviderProfileView() {
             />
             <Field label="Featured" value={String(!!provider.isFeatured)} />
             <Field label="Verified" value={String(!!provider.isVerified)} />
+            <Field label="Verification Level" value={provider.verificationLevel || 'BRONZE'} />
           </div>
         )}
+      </Section>
+
+      <Section title="Badges">
+        <AchievementList badges={provider.badges} />
       </Section>
 
       <Section title="User details">

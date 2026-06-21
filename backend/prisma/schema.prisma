@@ -77,6 +77,7 @@ model Provider {
   category          String
   rating            Float     @default(0)
   reviewCount       Int       @default(0)
+  verificationLevel VerificationLevel @default(BRONZE)
 
   experienceYears   Int       @default(3)
   jobsCompleted     Int       @default(0)
@@ -96,15 +97,28 @@ model Provider {
   bookings          Booking[]
   user              User      @relation(fields: [userId], references: [id])
   reviews           Review[]  @relation("ProviderReviews")
+  badges            ProviderBadge[]
 
   providerServices        ProviderService[]
   providerServiceRequests ProviderServiceRequest[]
+}
+
+model ProviderBadge {
+  id         String    @id @default(cuid())
+  providerId String
+  badgeType  BadgeType
+  awardedAt  DateTime  @default(now())
+
+  provider   Provider  @relation(fields: [providerId], references: [id])
+
+  @@unique([providerId, badgeType])
 }
 
 
 model Service {
   id             String         @id @default(cuid())
   name           String
+  nameNormalized String?        @unique
   description    String?
   basePrice      Float          @default(0)
   popularIssues  Json           @default("[]")
@@ -134,6 +148,9 @@ model ProviderService {
 
   // Opposite relations
   providerServiceRequests ProviderServiceRequest[]
+
+  @@unique([providerId, serviceId])
+  @@unique([providerServiceRequestId])
 }
 
 // Provider’s pending/denied service registration request
@@ -192,6 +209,7 @@ model Booking {
 model Review {
   id              String   @id @default(cuid())
   reviewerId      String
+  reviewerName    String?
   providerId      String
   bookingId       String?
   rating          Float
@@ -263,4 +281,21 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   DENIED
+}
+
+enum VerificationLevel {
+  BRONZE
+  SILVER
+  GOLD
+  ELITE
+}
+
+enum BadgeType {
+  TOP_RATED
+  FAST_RESPONSE
+  JOBS_100
+  RELIABLE_PROVIDER
+  MULTI_SERVICE_EXPERT
+  CUSTOMER_FAVORITE
+  ELITE_PROVIDER
 }

@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { refreshProviderReputation } from '../services/providerReputationService.js';
 
 export const ReviewController = {
   create: async (req, res) => {
@@ -60,7 +61,9 @@ export const ReviewController = {
         });
       }
 
-      res.status(201).json(review);
+      await refreshProviderReputation(providerId);
+
+      res.status(201).json({ success: true, review });
     } catch (err) {
       res.status(500).json({ error: 'Failed to record customer review log', details: err.message });
     }

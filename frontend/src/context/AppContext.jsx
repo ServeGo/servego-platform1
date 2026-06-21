@@ -630,6 +630,8 @@ export const AppProvider = ({ children }) => {
       const data = await res.json();
       if (res.ok) {
         await fetchProviderServiceRequests();
+        await fetchProviderServiceItems();
+        await fetchProviders();
         return data;
       }
       return data;

@@ -1,9 +1,5 @@
 import prisma from '../prisma/client.js';
 
-function toLowerSafe(s) {
-  return typeof s === 'string' ? s.toLowerCase() : '';
-}
-
 export const ProviderServiceDiscoveryController = {
   // Returns providers who have an APPROVED ProviderService link for the given Service name.
   // Used for customer-facing category sectors (Plumber/Electrician etc.).
@@ -37,7 +33,8 @@ export const ProviderServiceDiscoveryController = {
                   avatar: true
                 }
               },
-              reviews: true
+              reviews: true,
+              badges: true
             }
           },
           service: true
@@ -65,6 +62,8 @@ export const ProviderServiceDiscoveryController = {
         specialties: Array.isArray(p.specialties) ? p.specialties : [],
         serviceAreas: Array.isArray(p.serviceAreas) ? p.serviceAreas : [],
         isVerified: p.isVerified,
+        verificationLevel: p.verificationLevel,
+        badges: p.badges || [],
         reviews: p.reviews || []
       }));
 

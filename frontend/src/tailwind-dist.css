@@ -8,7 +8,9 @@
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
     --color-red-100: oklch(93.6% 0.032 17.717);
     --color-red-800: oklch(44.4% 0.177 26.899);
+    --color-orange-50: oklch(98% 0.016 73.684);
     --color-orange-100: oklch(95.4% 0.038 75.164);
+    --color-orange-200: oklch(90.1% 0.076 70.697);
     --color-orange-800: oklch(47% 0.157 37.304);
     --color-amber-50: oklch(98.7% 0.022 95.277);
     --color-amber-100: oklch(96.2% 0.059 95.617);
@@ -41,6 +43,7 @@
     --color-teal-800: oklch(43.7% 0.078 188.216);
     --color-teal-900: oklch(38.6% 0.063 188.416);
     --color-teal-950: oklch(27.7% 0.046 192.524);
+    --color-sky-50: oklch(97.7% 0.013 236.62);
     --color-sky-100: oklch(95.1% 0.026 236.824);
     --color-sky-200: oklch(90.1% 0.058 230.902);
     --color-sky-800: oklch(44.3% 0.11 240.79);
@@ -57,10 +60,16 @@
     --color-indigo-800: oklch(39.8% 0.195 277.366);
     --color-indigo-900: oklch(35.9% 0.144 278.697);
     --color-indigo-950: oklch(25.7% 0.09 281.288);
+    --color-violet-50: oklch(96.9% 0.016 293.756);
+    --color-violet-200: oklch(89.4% 0.057 293.283);
+    --color-violet-800: oklch(43.2% 0.232 292.759);
     --color-purple-100: oklch(94.6% 0.033 307.174);
     --color-purple-200: oklch(90.2% 0.063 306.703);
     --color-purple-600: oklch(55.8% 0.288 302.321);
     --color-purple-800: oklch(43.8% 0.218 303.724);
+    --color-pink-50: oklch(97.1% 0.014 343.198);
+    --color-pink-200: oklch(89.9% 0.061 343.231);
+    --color-pink-800: oklch(45.9% 0.187 3.815);
     --color-rose-50: oklch(96.9% 0.015 12.422);
     --color-rose-100: oklch(94.1% 0.03 12.58);
     --color-rose-200: oklch(89.2% 0.058 10.001);
@@ -506,9 +515,6 @@
   }
   .mb-20 {
     margin-bottom: calc(var(--spacing) * 20);
-  }
-  .ml-2 {
-    margin-left: calc(var(--spacing) * 2);
   }
   .ml-6 {
     margin-left: calc(var(--spacing) * 6);
@@ -1157,6 +1163,12 @@
   .border-indigo-600 {
     border-color: var(--color-indigo-600);
   }
+  .border-orange-200 {
+    border-color: var(--color-orange-200);
+  }
+  .border-pink-200 {
+    border-color: var(--color-pink-200);
+  }
   .border-purple-200 {
     border-color: var(--color-purple-200);
   }
@@ -1268,6 +1280,9 @@
   .border-teal-700 {
     border-color: var(--color-teal-700);
   }
+  .border-violet-200 {
+    border-color: var(--color-violet-200);
+  }
   .border-white {
     border-color: var(--color-white);
   }
@@ -1281,6 +1296,12 @@
     border-color: color-mix(in srgb, #fff 10%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       border-color: color-mix(in oklab, var(--color-white) 10%, transparent);
+    }
+  }
+  .border-white\/15 {
+    border-color: color-mix(in srgb, #fff 15%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 15%, transparent);
     }
   }
   .bg-amber-50 {
@@ -1388,8 +1409,14 @@
       background-color: color-mix(in oklab, var(--color-indigo-900) 90%, transparent);
     }
   }
+  .bg-orange-50 {
+    background-color: var(--color-orange-50);
+  }
   .bg-orange-100 {
     background-color: var(--color-orange-100);
+  }
+  .bg-pink-50 {
+    background-color: var(--color-pink-50);
   }
   .bg-purple-100 {
     background-color: var(--color-purple-100);
@@ -1417,6 +1444,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-rose-500) 20%, transparent);
     }
+  }
+  .bg-sky-50 {
+    background-color: var(--color-sky-50);
   }
   .bg-sky-100 {
     background-color: var(--color-sky-100);
@@ -1534,6 +1564,9 @@
   }
   .bg-transparent {
     background-color: transparent;
+  }
+  .bg-violet-50 {
+    background-color: var(--color-violet-50);
   }
   .bg-white {
     background-color: var(--color-white);
@@ -1967,6 +2000,9 @@
   .text-orange-800 {
     color: var(--color-orange-800);
   }
+  .text-pink-800 {
+    color: var(--color-pink-800);
+  }
   .text-purple-600 {
     color: var(--color-purple-600);
   }
@@ -2047,6 +2083,9 @@
   }
   .text-teal-950 {
     color: var(--color-teal-950);
+  }
+  .text-violet-800 {
+    color: var(--color-violet-800);
   }
   .text-white {
     color: var(--color-white);

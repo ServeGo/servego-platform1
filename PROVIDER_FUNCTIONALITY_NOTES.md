@@ -14,6 +14,9 @@ A **Provider** is a specialized account created when a user signs up with `role 
 - Can submit **service registration requests** for new services to an admin (`ProviderServiceRequest`).
 - Receive **bookings** made by customers (`Booking` where `providerId` matches).
 - Receive **reviews** tied to bookings (`Review` where `providerId` matches).
+- Have automatic **reputation data**:
+  - `verificationLevel` is the trust rank (`BRONZE`, `SILVER`, `GOLD`, `ELITE`).
+  - `ProviderBadge` records are achievement badges (`TOP_RATED`, `FAST_RESPONSE`, `JOBS_100`, etc.).
 - Have **notifications** created by backend events (e.g., service approved/denied).
 
 Admin approval flow:
@@ -49,6 +52,7 @@ Provider model: `model Provider`
   - `category` (String) → provider’s sector/category
   - `rating` (Float, default 0)
   - `reviewCount` (Int, default 0)
+  - `verificationLevel` (enum `VerificationLevel`, default `BRONZE`)
   - `experienceYears` (Int, default 3)
   - `jobsCompleted` (Int, default 0)
   - `hourlyRate` (Float, default 300)
@@ -69,20 +73,46 @@ Provider model: `model Provider`
 - Relations:
   - `user: User` (relation by `userId`)
   - `reviews: Review[]` (relation name `ProviderReviews`)
+  - `badges: ProviderBadge[]`
   - `bookings: Booking[]`
   - `providerServices: ProviderService[]`
   - `providerServiceRequests: ProviderServiceRequest[]`
 
-### 2.3 `Service` (global service catalog)
+### 2.3 `ProviderBadge` (achievement badges)
+Model: `model ProviderBadge`
+
+Badges are earned achievements. They are separate from approved services and separate from verification level.
+
+Fields:
+- `id` (String, PK)
+- `providerId` (String)
+- `badgeType` (enum `BadgeType`)
+- `awardedAt` (DateTime default now)
+
+Rules:
+- A provider can have many badges.
+- A provider can only have one row for the same badge type:
+  - `@@unique([providerId, badgeType])`
+- Badges are recalculated automatically by `backend/services/providerReputationService.js`.
+- Admins do not manually assign badges.
+
+Current badge types:
+- `TOP_RATED`: high rating and enough reviews
+- `FAST_RESPONSE`: confirms bookings quickly on average
+- `JOBS_100`: 100+ completed jobs
+- `RELIABLE_PROVIDER`: no cancellations in the last 30 bookings
+- `MULTI_SERVICE_EXPERT`: 5+ approved services
+- `CUSTOMER_FAVORITE`: many repeat customers
+- `ELITE_PROVIDER`: provider has Elite trust level
+
+### 2.4 `Service` (global service catalog)
 Model: `model Service`
 
 - `id` (String, PK)
 - `name` (String)
-- `nameNormalized` is referenced in code as if it exists, but the schema snippet shown does **not** include it in the pasted output.
-  - The admin approve controller calls:
-    - `prisma.service.findUnique({ where: { nameNormalized } })`
-    - and sets `nameNormalized` when creating service.
-  - If your real schema includes `nameNormalized` elsewhere (or in migration), that’s what the code expects.
+- `nameNormalized` (String?, unique)
+  - Used by admin approval logic to find/create service names consistently.
+  - Created from service name using lowercase + trim.
 
 Important fields:
 - `description?`
@@ -94,7 +124,7 @@ Relations:
 - `providerServices: ProviderService[]`
 - `bookings: Booking[]` (serviceId optional)
 
-### 2.4 `ProviderService` (approved services offered by a provider)
+### 2.5 `ProviderService` (approved services offered by a provider)
 Model: `model ProviderService`
 
 Fields:
@@ -115,7 +145,7 @@ In practice:
 - Created by admin approval.
 - Displayed to provider by `/providers/:id/services`.
 
-### 2.5 `ProviderServiceRequest` (pending/denied submissions)
+### 2.6 `ProviderServiceRequest` (pending/denied submissions)
 Model: `model ProviderServiceRequest`
 
 Fields:
@@ -134,7 +164,7 @@ Relations:
 - `provider: Provider`
 - `providerServices: ProviderService[]` (opposite relation)
 
-### 2.6 `Booking`, `Review`, `Payment` (provider-facing relations)
+### 2.7 `Booking`, `Review`, `Payment` (provider-facing relations)
 
 `Booking`:
 - `providerId` (String)
@@ -145,10 +175,28 @@ Relations:
 
 `Review`:
 - `reviewerId`, `providerId`
+- `reviewerName?`
 - `rating` (Float)
 - `comment?`
 - `bookingId?`
 - relation names: `ProviderReviews` and `ReviewerReviews`
+
+### 2.8 Reputation enums
+
+`VerificationLevel`:
+- `BRONZE`
+- `SILVER`
+- `GOLD`
+- `ELITE`
+
+`BadgeType`:
+- `TOP_RATED`
+- `FAST_RESPONSE`
+- `JOBS_100`
+- `RELIABLE_PROVIDER`
+- `MULTI_SERVICE_EXPERT`
+- `CUSTOMER_FAVORITE`
+- `ELITE_PROVIDER`
 
 ---
 
@@ -253,6 +301,115 @@ Request body:
 
 Behavior:
 - Updates `Provider.isVerified`.
+- Calls `refreshProviderReputation(id)` so the trust level is recalculated after verification changes.
+
+### 3.2 Provider reputation engine
+
+Main file:
+- `backend/services/providerReputationService.js`
+
+Purpose:
+- Keeps provider trust level and badges automatic.
+- Recomputes cached provider stats from source records:
+  - `rating`
+  - `reviewCount`
+  - `jobsCompleted`
+  - `verificationLevel`
+  - `ProviderBadge` rows
+
+Important rule:
+- Admins should not manually assign `verificationLevel` or badges.
+- The backend calculates them from reviews, completed bookings, approved services, and booking history.
+
+#### Verification level thresholds
+
+`calculateVerificationLevel(provider)`:
+
+- `ELITE`
+  - `isVerified = true`
+  - `jobsCompleted >= 100`
+  - `rating >= 4.8`
+  - `reviewCount >= 50`
+
+- `GOLD`
+  - `isVerified = true`
+  - `jobsCompleted >= 50`
+  - `rating >= 4.5`
+  - `reviewCount >= 20`
+
+- `SILVER`
+  - `isVerified = true`
+  - `jobsCompleted >= 10`
+  - `rating >= 4.0`
+
+- `BRONZE`
+  - fallback/default level
+  - also used when provider is not verified
+
+#### Badge thresholds
+
+Current badge rules:
+- `TOP_RATED`
+  - `rating >= 4.8`
+  - `reviewCount >= 20`
+- `FAST_RESPONSE`
+  - average time from booking creation to `CONFIRMED` status is under 5 minutes
+- `JOBS_100`
+  - `jobsCompleted >= 100`
+- `RELIABLE_PROVIDER`
+  - last 30 bookings contain no `CANCELLED` status
+- `MULTI_SERVICE_EXPERT`
+  - provider has 5+ approved `ProviderService` records
+- `CUSTOMER_FAVORITE`
+  - 50+ repeat customers based on completed bookings
+- `ELITE_PROVIDER`
+  - `verificationLevel === ELITE`
+
+#### When reputation refresh runs
+
+`refreshProviderReputation(providerId)` is called after:
+- Booking status update:
+  - `BookingController.updateStatus`
+  - updates jobs completed, fast response, reliability badges
+- Review submission:
+  - `ReviewController.create`
+  - updates rating, review count, trust level, review-based badges
+- Admin verification:
+  - `ProviderController.verify`
+  - updates trust level after `isVerified` changes
+- Admin service approval:
+  - `AdminProviderServiceController.approveService`
+  - updates `MULTI_SERVICE_EXPERT`
+
+#### Review submission flow
+
+Endpoint:
+- `POST /api/reviews`
+
+Behavior:
+1. Validates required fields:
+   - `reviewerId`
+   - `reviewerName`
+   - `rating`
+   - `providerId`
+2. Validates rating is between 1 and 5.
+3. If `bookingId` is provided:
+   - verifies booking exists
+   - verifies booking belongs to the same provider
+4. Creates `Review`.
+5. Marks booking as `reviewed = true` when `bookingId` exists.
+6. Calls `refreshProviderReputation(providerId)`.
+7. Returns:
+```json
+{
+  "success": true,
+  "review": {
+    "id": "...",
+    "providerId": "...",
+    "rating": 5
+  }
+}
+```
 
 ---
 
@@ -306,6 +463,8 @@ Behavior:
    - title: `Service approved`
    - message includes request name
    - type: `SERVICE_APPROVAL`
+6. Calls `refreshProviderReputation(request.providerId)`.
+   - This can award or remove the `MULTI_SERVICE_EXPERT` badge.
 
 Response:
 - `{ success: true, requestId: ..., serviceId: ... }`
@@ -358,11 +517,22 @@ Renders:
 - avatar from `provider.avatar` or `provider.photo`
 - category + name + phone
 - rating, jobs completed, lifetime net earnings
-- **Active Specialist (approved services chips)**:
+- **Active Specialist**:
+  - Shows provider/service status only.
+  - This is not a badge.
+- **Approved Services**:
   - Fetches `GET /api/providers/:providerId/services`
   - Filters items where `approvalStatus === 'APPROVED'`
-  - Displays the approved `name` values as chips under the “Active Specialist” label
+  - Displays approved service names as service chips
   - Shows loading state and “No approved services yet” when empty
+- **Trust Level**:
+  - Displays `VerificationLevelPill`
+  - Shows `BRONZE`, `SILVER`, `GOLD`, or `ELITE`
+  - This is separate from badges.
+- **Badges**:
+  - Displays `ReputationBadgeStrip`
+  - Shows earned achievement badges only.
+  - Examples: `Top Rated`, `Fast Response`, `100 Jobs`, `Reliable`, `Multi-Service Expert`.
 
 
 ### 5.3 Provider services registration + listing
@@ -412,15 +582,26 @@ ProviderDashboard passes:
 - `rating={activeProvider?.rating}`
 - `reviews={activeProvider?.reviews}`
 
+Review impact:
+- Reviews are not just display data.
+- After a customer submits a review, backend recalculates provider `rating` and `reviewCount`.
+- Those values can upgrade the provider trust level and can award `TOP_RATED`.
+
 ### 5.5 Provider listings (public browsing)
 Component: `frontend/src/components/ProviderListItem.jsx`
 
 Used to display provider card with:
 - avatar
-- verified badge (`provider.isVerified`)
+- trust level pill when provider is verified
+- reputation badges, limited to the first 2 badges on the card
 - rating and reviewCount
 - bio, specialties, service areas
 - booking action and favorite toggle
+
+Important UI distinction:
+- Approved services show what the provider can offer.
+- Trust level shows how trustworthy the provider is.
+- Badges show achievements earned by performance.
 
 ### 5.6 Admin “other services requests” UI
 Component: `frontend/src/components/AdminOtherServicesRequestsPanel.jsx`
@@ -465,16 +646,43 @@ Component: `frontend/src/components/AdminOtherServicesRequestsPanel.jsx`
 ### 6.6 Reviews
 - Customers can create reviews via `POST /api/reviews`.
 - Backend `ReviewController.create` stores `Review` and marks the booking `reviewed=true` when `bookingId` is provided.
+- Backend then calls `refreshProviderReputation(providerId)`.
+- This recalculates:
+  - average rating
+  - review count
+  - verification level
+  - review-related badges
+
+### 6.7 Reputation refresh
+
+Reputation refresh is automatic and event-driven.
+
+Events that trigger it:
+- booking status changes
+- customer review submission
+- admin provider verification toggle
+- admin service approval
+
+What gets recalculated:
+- `Provider.rating`
+- `Provider.reviewCount`
+- `Provider.jobsCompleted`
+- `Provider.verificationLevel`
+- `ProviderBadge` rows
+
+The provider should understand these as separate concepts:
+- **Approved Services**: what services they are allowed to offer.
+- **Trust Level**: Bronze/Silver/Gold/Elite rank.
+- **Badges**: achievement labels earned from performance.
 
 ---
 
 ## 7) Current gaps / code caveats found while documenting
 
-1. `ProviderController.getAll/getById` uses `provider.reviews` and Provider schema includes `reviews` relation, but provider rating/reviewCount recomputation is not shown in current controllers.
-2. `ProviderServicesPanel` defines `availableServices` as empty and instead relies on `allServices` fetched from `/api/services`.
-3. `AppContext.applyReferralCode` is explicitly “not implemented yet”; provider referral UI calls a local stub.
-4. Prisma schema snippet you showed does not display `nameNormalized` field, but admin controller expects it.
-   - If it’s missing in your real DB schema, admin service approval may fail.
+1. `ProviderServicesPanel` defines `availableServices` as empty and instead relies on `allServices` fetched from `/api/services`.
+2. `AppContext.applyReferralCode` is explicitly “not implemented yet”; provider referral UI calls a local stub.
+3. `prisma generate` may fail on Windows if a running Node/backend process has the Prisma query engine DLL locked.
+   - Stop running Node/backend processes, then rerun Prisma migration/generate.
 
 ---
 
@@ -491,13 +699,14 @@ From `User` model:
 From `Provider` model:
 - id, userId
 - category
-- rating, reviewCount
+- rating, reviewCount, verificationLevel
 - experienceYears, jobsCompleted, hourlyRate, earnings
 - bio
 - specialties (Json), serviceAreas (Json)
 - photo
 - isVerified, isFeatured
 - availableDays, timeSlots
+- badges relation (`ProviderBadge[]`)
 
 ### 8.3 Provider service offerings
 - Approved: `ProviderService` (providerId + serviceId + basePricePerDay + description)
@@ -505,7 +714,13 @@ From `Provider` model:
 
 ### 8.4 Provider feedback
 - `Review` records tied by providerId and optionally bookingId
+- Reviews update reputation automatically after submission.
 
-### 8.5 Provider notifications
+### 8.5 Provider badges
+- Stored in `ProviderBadge`.
+- Awarded/removed automatically by `refreshProviderReputation`.
+- Displayed separately from approved services in provider UI.
+
+### 8.6 Provider notifications
 - Notification rows created by admin approval/deny
 

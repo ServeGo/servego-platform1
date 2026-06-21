@@ -1,5 +1,7 @@
 import prisma from '../prisma/client.js';
 
+const normalize = (s) => (s || '').toString().trim().toLowerCase();
+
 export const ServiceController = {
   getAll: async (req, res) => {
     try {
@@ -25,6 +27,7 @@ export const ServiceController = {
       const created = await prisma.service.create({
         data: {
           name,
+          nameNormalized: normalize(name),
           description: description || '',
           basePrice: Number(basePrice ?? 0),
           popularIssues: Array.isArray(popularIssues) ? popularIssues : []
@@ -74,6 +77,7 @@ export const ServiceController = {
         where: { id },
         data: {
           name,
+          nameNormalized: normalize(name),
           description: description || '',
           basePrice: Number(basePrice ?? 0),
           popularIssues: Array.isArray(popularIssues) ? popularIssues : []
