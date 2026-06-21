@@ -3,11 +3,35 @@ import { Plus, Save } from 'lucide-react';
 
 import { useApp } from '../context/AppContext';
 
+function FilterButton({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        `px-3 py-1.5 text-xs font-black rounded-xl border transition-colors ` +
+        (active
+          ? 'bg-slate-900 text-white border-slate-900'
+          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-800')
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function ProviderServicesPanel({ provider }) {
   const { currentUser } = useApp();
 
   const [myServices, setMyServices] = useState([]);
   const [servicesError, setServicesError] = useState('');
+  const [loadingMyServices, setLoadingMyServices] = useState(false);
+  const [loadingAllServices, setLoadingAllServices] = useState(false);
+
+  const [query, setQuery] = useState(''); // search within my services
+
+
+  const [servicesFilter, setServicesFilter] = useState('ALL'); // ALL | APPROVED | PENDING | DENIED
 
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [serviceInterestedOption, setServiceInterestedOption] = useState('');
@@ -32,22 +56,56 @@ export default function ProviderServicesPanel({ provider }) {
     return [];
   }, []);
 
+  const filteredServices = useMemo(() => {
+    if (!Array.isArray(myServices)) return [];
+
+    let arr = myServices;
+
+    if (servicesFilter === 'APPROVED') arr = arr.filter(sv => sv.approvalStatus === 'APPROVED');
+    if (servicesFilter === 'PENDING') arr = arr.filter(sv => sv.approvalStatus === 'PENDING');
+    if (servicesFilter === 'DENIED') arr = arr.filter(sv => sv.approvalStatus === 'DENIED');
+
+    if (servicesFilter !== 'ALL') {
+      // no-op (filter already applied above)
+    }
+
+    const q = query.trim().toLowerCase();
+    if (q) {
+      arr = arr.filter(sv => {
+        const hay = [sv.name, sv.description]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    return arr;
+  }, [myServices, servicesFilter, query]);
+
+
   const [allServices, setAllServices] = useState([]);
+  
 
   const fetchAllServices = async () => {
     try {
+      setLoadingAllServices(true);
       const res = await fetch(`${API_BASE_URL}/services`);
       const data = await res.json();
       setAllServices(Array.isArray(data) ? data : []);
     } catch (e) {
       // ignore for now
       setAllServices([]);
+    } finally {
+      setLoadingAllServices(false);
     }
   };
+
 
   const fetchProviderServices = async () => {
     if (!providerId) return;
     try {
+      setLoadingMyServices(true);
       const url = `${API_BASE_URL}/providers/${providerId}/services`;
       console.log('[ProviderServicesPanel] GET', url);
 
@@ -73,6 +131,8 @@ export default function ProviderServicesPanel({ provider }) {
       console.log('[ProviderServicesPanel] GET exception', e);
       setServicesError('Failed to load your services.');
       setMyServices([]);
+    } finally {
+      setLoadingMyServices(false);
     }
   };
 
@@ -115,7 +175,15 @@ export default function ProviderServicesPanel({ provider }) {
       return;
     }
 
+    const parsedBase = Number(basePricePerDay);
+    if (Number.isNaN(parsedBase) || parsedBase < 0) {
+      setServicesError('Base Price Per Day must be a valid number (0 or more).');
+      return;
+    }
+
+
     if (!description || !description.trim()) {
+
       setServicesError('Please enter service description.');
       return;
     }
@@ -144,6 +212,7 @@ export default function ProviderServicesPanel({ provider }) {
         setSubmitting(false);
         return;
       }
+
 
       setIsRegisterOpen(false);
       await fetchProviderServices();
@@ -174,20 +243,50 @@ export default function ProviderServicesPanel({ provider }) {
           </button>
         </div>
 
+        {/* Filter buttons */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            <FilterButton label="All services" active={servicesFilter === 'ALL'} onClick={() => setServicesFilter('ALL')} />
+            <FilterButton label="Approved services" active={servicesFilter === 'APPROVED'} onClick={() => setServicesFilter('APPROVED')} />
+            <FilterButton label="Denied services" active={servicesFilter === 'DENIED'} onClick={() => setServicesFilter('DENIED')} />
+            <FilterButton label="Pending services" active={servicesFilter === 'PENDING'} onClick={() => setServicesFilter('PENDING')} />
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search services by name or description..."
+              className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-2 text-xs font-bold outline-none"
+            />
+            {loadingMyServices && (
+              <div className="text-[11px] text-slate-500 font-semibold">Loading...</div>
+            )}
+          </div>
+
+        </div>
+
+
         {servicesError && (
           <div className="bg-rose-50 border border-rose-100 text-rose-700 p-3 rounded-xl text-xs font-bold">
             {servicesError}
           </div>
         )}
 
-        {myServices.length === 0 ? (
+        {filteredServices.length === 0 ? (
           <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
-            <div className="text-slate-500 text-xs font-semibold">No registered services yet.</div>
-            <div className="text-slate-400 text-[11px] mt-2 font-medium">Click Register to add your service.</div>
+            <div className="text-slate-500 text-xs font-semibold">
+              {servicesFilter === 'ALL'
+                ? 'No registered services yet.'
+                : `No ${servicesFilter === 'APPROVED' ? 'approved' : servicesFilter === 'PENDING' ? 'pending' : 'denied'} services yet.`}
+            </div>
+            {servicesFilter === 'ALL' && (
+              <div className="text-slate-400 text-[11px] mt-2 font-medium">Click Register to add your service.</div>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {myServices.map((sv) => (
+            {filteredServices.map((sv) => (
               <div key={sv.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-3xs">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -197,8 +296,9 @@ export default function ProviderServicesPanel({ provider }) {
                       Experience: {provider?.experienceYears ?? experienceYears} years
                     </div>
                     <div className="text-[11px] text-slate-800 mt-1 font-semibold">
-                      ₹{sv.basePricePerDay ?? sv.basePricePerDay === 0 ? sv.basePricePerDay : '-'} / day
+                      {sv.basePricePerDay === 0 || sv.basePricePerDay ? `₹${sv.basePricePerDay}` : '-'} / day
                     </div>
+
                   </div>
                   <div
                     className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full border ${

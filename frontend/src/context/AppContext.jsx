@@ -16,6 +16,8 @@ export const AppProvider = ({ children }) => {
 
   const [providers, setProviders] = useState([]);
   const [services, setServices] = useState([]);
+  const [providersByApprovedService, setProvidersByApprovedService] = useState([]);
+
   const [bookings, setBookings] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -30,6 +32,27 @@ export const AppProvider = ({ children }) => {
   const [selectedArea, setSelectedArea] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const fetchProvidersByApprovedServiceName = async (serviceName) => {
+    if (!serviceName) return [];
+    try {
+      const API_BASE_URL = 'http://localhost:4000/api';
+      const res = await fetch(`${API_BASE_URL}/providers/by-approved-service?serviceName=${encodeURIComponent(serviceName)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Failed to fetch providers by approved service:', data);
+        return [];
+      }
+      const arr = Array.isArray(data) ? data : [];
+      setProvidersByApprovedService(arr);
+      return arr;
+    } catch (err) {
+      console.error('Failed to fetch providers by approved service:', err);
+      setProvidersByApprovedService([]);
+      return [];
+    }
+  };
+
 
   // Sync favorites to local storage
   useEffect(() => {
@@ -475,11 +498,37 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const applyReferralCode = (code) => {
-    // This is still local for now as it doesn't have a backend endpoint yet
-    // In a real app, this should also be a backend call
-    return { success: false, message: 'Backend referral logic not implemented yet.' };
+  const applyReferralCode = async (code) => {
+    try {
+      if (!currentUser?.id) return { success: false, message: 'Please login to apply a referral code.' };
+
+      const res = await fetch(`${API_BASE_URL}/referrals/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id, code })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data?.error || 'Failed to apply referral code.' };
+      }
+
+      // Refresh currentUser so referredBy/earnings reflect immediately.
+      // (Backend returns success payload; local user object is updated from existing app only via setCurrentUser.)
+      setCurrentUser(prev => (prev ? { ...prev, referredBy: data.referredBy } : prev));
+
+      return {
+        success: true,
+        message: `Referral applied! You referred by ${data.referredBy}. Bonus: ₹${data.bonusEarned}`,
+        referredBy: data.referredBy,
+        referredCount: data.referredCount,
+        bonusEarned: data.bonusEarned
+      };
+    } catch (err) {
+      return { success: false, message: 'Network error while applying referral code.' };
+    }
   };
+
 
   const getCustomerLoyaltyTier = (completedCount) => {
     if (completedCount >= 10) {
@@ -616,6 +665,8 @@ export const AppProvider = ({ children }) => {
       currentUser,
       users,
       providers,
+      providersByApprovedService,
+
       bookings,
       notifications,
       tickets,
@@ -659,10 +710,13 @@ export const AppProvider = ({ children }) => {
       fetchProviderServiceRequests,
       fetchProviderServiceItems,
       approveProviderServiceRequest,
-      denyProviderServiceRequest
+      denyProviderServiceRequest,
+      fetchProvidersByApprovedServiceName
+
 
 
     }}>
+
 
 
 

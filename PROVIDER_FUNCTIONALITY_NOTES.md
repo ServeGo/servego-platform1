@@ -358,6 +358,12 @@ Renders:
 - avatar from `provider.avatar` or `provider.photo`
 - category + name + phone
 - rating, jobs completed, lifetime net earnings
+- **Active Specialist (approved services chips)**:
+  - Fetches `GET /api/providers/:providerId/services`
+  - Filters items where `approvalStatus === 'APPROVED'`
+  - Displays the approved `name` values as chips under the “Active Specialist” label
+  - Shows loading state and “No approved services yet” when empty
+
 
 ### 5.3 Provider services registration + listing
 Component: `frontend/src/components/ProviderServicesPanel.jsx`

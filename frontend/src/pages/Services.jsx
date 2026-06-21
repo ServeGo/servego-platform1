@@ -13,6 +13,8 @@ export const Services = ({ onNavigate }) => {
     setSearchQuery,
     setCategory,
     providers,
+    providersByApprovedService,
+    fetchProvidersByApprovedServiceName,
     selectedArea,
     services
   } = useApp();
@@ -90,7 +92,11 @@ export const Services = ({ onNavigate }) => {
                 key={cat.id}
                 category={cat}
                 providers={providers}
-                onSelect={handleSelectCategory}
+                providersByApprovedService={providersByApprovedService} 
+                onSelect={(id) => {
+                  fetchProvidersByApprovedServiceName(cat.name);
+                  handleSelectCategory(id);
+                }}
                 onIssueClick={handleIssueClick}
               />
             ))}
