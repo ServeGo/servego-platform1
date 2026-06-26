@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { SERVICE_CATEGORIES } from '../data';
@@ -12,9 +12,16 @@ import BookingSuccess from '../components/BookingSuccess';
 
 export const ServiceDetails = ({ catId, onNavigate }) => {
   const {
-    providers, currentUser, createBooking,
-    toggleFavoriteProvider, favoriteProviders, selectedArea,
-    bookings, getCustomerLoyaltyTier
+    providers,
+    providersByApprovedService,
+    fetchProvidersByApprovedServiceName,
+    currentUser,
+    createBooking,
+    toggleFavoriteProvider,
+    favoriteProviders,
+    selectedArea,
+    bookings,
+    getCustomerLoyaltyTier
   } = useApp();
 
   const [applyReferralCredit, setApplyReferralCredit] = useState(true);
@@ -43,15 +50,32 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
   const [errorText, setErrorText] = useState('');
   const [confirmedBookingDetails, setConfirmedBookingDetails] = useState(null);
 
+  const [autoBookingProviderId, setAutoBookingProviderId] = useState(null);
+
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    // expected formats:
+    // 1) #service-details/<catOrProviderId>
+    // 2) if Favorites passes providerId, catId may become providerId; we treat it as providerId only when booking popup is desired.
+    const parts = hash.replace('#', '').split('/');
+    const last = parts[2] || parts[1];
+    if (last && last !== catId) {
+      setAutoBookingProviderId(last);
+    }
+  }, [catId]);
+
+  useEffect(() => {
+    if (categoryMeta?.name) {
+      fetchProvidersByApprovedServiceName(categoryMeta.name);
+    }
+  }, [categoryMeta.name, fetchProvidersByApprovedServiceName]);
+
   // Filter & Sort logic
   const categoryProviders = useMemo(() => {
-    let list = providers.filter(
-      p => (p.category || '').toLowerCase() === categoryMeta.name.toLowerCase() && p.isVerified
-    );
-
+    let list = Array.isArray(providersByApprovedService) ? providersByApprovedService : [];
 
     if (filterArea) {
-      list = list.filter(p => p.serviceAreas.includes(filterArea));
+      list = list.filter(p => Array.isArray(p.serviceAreas) && p.serviceAreas.includes(filterArea));
     }
 
     switch (sortBy) {
@@ -63,7 +87,7 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     }
 
     return list;
-  }, [providers, categoryMeta, filterArea, sortBy]);
+  }, [providersByApprovedService, filterArea, sortBy]);
 
   // Loyalty calculation
   const customerCompletedBookingsCount = useMemo(() => {

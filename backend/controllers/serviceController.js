@@ -19,7 +19,7 @@ export const ServiceController = {
         return res.status(403).json({ error: 'Admin access required' });
       }
 
-      const { name, description, basePrice, popularIssues } = req.body;
+      const { name, description, popularIssues } = req.body;
       if (!name) {
         return res.status(400).json({ error: 'Missing required field: name' });
       }
@@ -29,10 +29,10 @@ export const ServiceController = {
           name,
           nameNormalized: normalize(name),
           description: description || '',
-          basePrice: Number(basePrice ?? 0),
           popularIssues: Array.isArray(popularIssues) ? popularIssues : []
         }
       });
+
 
       res.status(201).json(created);
     } catch (err) {
@@ -70,7 +70,7 @@ export const ServiceController = {
       const { id } = req.params;
       if (!id) return res.status(400).json({ error: 'Missing service id' });
 
-      const { name, description, basePrice, popularIssues } = req.body || {};
+      const { name, description, popularIssues } = req.body || {};
       if (!name) return res.status(400).json({ error: 'Missing required field: name' });
 
       const updated = await prisma.service.update({
@@ -79,10 +79,10 @@ export const ServiceController = {
           name,
           nameNormalized: normalize(name),
           description: description || '',
-          basePrice: Number(basePrice ?? 0),
           popularIssues: Array.isArray(popularIssues) ? popularIssues : []
         }
       });
+
 
       res.json({ success: true, service: updated });
     } catch (err) {

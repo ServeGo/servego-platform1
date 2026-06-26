@@ -5,13 +5,12 @@ import CategoryIcon from './CategoryIcon';
 export default function ServiceCard({ 
   category, 
   providers, 
-  providersByApprovedService, 
   onSelect, 
   onIssueClick 
 }) {
-  const categoryProviders = Array.isArray(providersByApprovedService) && providersByApprovedService.length > 0
-    ? providersByApprovedService
-    : providers.filter(p => (p.category || '').toLowerCase() === category.name.toLowerCase());
+  const categoryProviders = Array.isArray(providers) ? providers.filter(
+    (p) => (p.category || '').toLowerCase() === category.name.toLowerCase()
+  ) : [];
   
   const verifiedProviders = categoryProviders.filter(p => p.isVerified);
   const bestRating = verifiedProviders.length > 0
@@ -27,9 +26,7 @@ export default function ServiceCard({
           <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
             <CategoryIcon name={category.name} className="w-5 h-5" />
           </div>
-          <span className="text-[10px] bg-slate-150 font-bold text-slate-700 px-2 py-0.5 rounded border border-slate-200">
-            Starts @ ₹{category.basePrice}
-          </span>
+
         </div>
 
         <h3 className="text-base sm:text-lg font-extrabold text-slate-900 uppercase tracking-tight">{category.name}</h3>

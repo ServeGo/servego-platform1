@@ -95,7 +95,6 @@ model Provider {
 
   experienceYears   Int       @default(3)
   jobsCompleted     Int       @default(0)
-  hourlyRate        Float     @default(300)
   bio               String?
   specialties       Json      @default("[]")
   serviceAreas      Json      @default("[]")
@@ -105,7 +104,6 @@ model Provider {
   isFeatured        Boolean   @default(false)
   availableDays     Json      @default("[]")
   timeSlots         Json      @default("[]")
-  earnings          Float     @default(0)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   bookings          Booking[]
@@ -128,39 +126,34 @@ model ProviderBadge {
   @@unique([providerId, badgeType])
 }
 
-
 model Service {
   id             String         @id @default(cuid())
   name           String
   nameNormalized String?        @unique
   description    String?
-  basePrice      Float          @default(0)
+
   popularIssues  Json           @default("[]")
   isHidden       Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  // This is a global “category” record. Providers link to it via ProviderService.
   bookings       Booking[]
   providerServices ProviderService[]
 }
 
-
 // Provider’s approved global services
 model ProviderService {
-  id              String   @id @default(cuid())
-  providerId      String
-  serviceId       String
-  basePricePerDay Float
-  description     String?
+  id          String   @id @default(cuid())
+  providerId  String
+  serviceId   String
+  description String?
   providerServiceRequestId String? // if this link was created from an approval request
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  provider        Provider @relation(fields: [providerId], references: [id])
-  service         Service  @relation(fields: [serviceId], references: [id])
+  provider          Provider @relation(fields: [providerId], references: [id])
+  service           Service  @relation(fields: [serviceId], references: [id])
 
-  // Opposite relations
   providerServiceRequests ProviderServiceRequest[]
 
   @@unique([providerId, serviceId])
@@ -172,7 +165,6 @@ model ProviderServiceRequest {
   id                    String        @id @default(cuid())
   providerId            String
   requestedServiceName String
-  basePricePerDay      Float
   description           String
   popularIssues        Json          @default("[]")
   experienceYears      Int?
@@ -182,12 +174,8 @@ model ProviderServiceRequest {
   updatedAt             DateTime      @updatedAt
 
   provider              Provider @relation(fields: [providerId], references: [id])
-  // Opposite relation
   providerServices     ProviderService[]
 }
-
-
-
 
 model Booking {
   id              String        @id @default(cuid())
@@ -203,16 +191,14 @@ model Booking {
   locationAddress String
   city            String
   instructions    String?
-  totalAmount     Float
-  tax             Float         @default(0)
-  serviceFee      Float         @default(0)
-  invoiceNumber   String?
+
   bookingTime     DateTime
   messages        Json          @default("[]")
   reviewed        Boolean       @default(false)
   statusHistory   Json          @default("[]")
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
   customer        User          @relation("CustomerBookings", fields: [customerId], references: [id])
   provider        Provider      @relation(fields: [providerId], references: [id])
   service         Service?      @relation(fields: [serviceId], references: [id])
@@ -240,8 +226,6 @@ model Payment {
   id            String        @id @default(cuid())
   bookingId     String        @unique
   userId        String
-  amount        Float
-  currency      String        @default("INR")
   paymentMethod String
   status        PaymentStatus @default(PENDING)
   transactionId String?
@@ -313,3 +297,4 @@ enum BadgeType {
   CUSTOMER_FAVORITE
   ELITE_PROVIDER
 }
+

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AppContext = createContext(undefined);
 
@@ -33,7 +33,7 @@ export const AppProvider = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
 
-  const fetchProvidersByApprovedServiceName = async (serviceName) => {
+  const fetchProvidersByApprovedServiceName = useCallback(async (serviceName) => {
     if (!serviceName) return [];
     try {
       const API_BASE_URL = 'http://localhost:4000/api';
@@ -51,7 +51,7 @@ export const AppProvider = ({ children }) => {
       setProvidersByApprovedService([]);
       return [];
     }
-  };
+  }, []);
 
 
   // Sync favorites to local storage

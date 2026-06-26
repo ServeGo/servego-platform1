@@ -7,13 +7,13 @@ export async function seedServicesIfEmpty() {
 
   for (const cat of SERVICE_CATEGORIES) {
     await prisma.service.create({
-      data: {
-        id: cat.id,
-        name: cat.name,
-        description: cat.description,
-        basePrice: cat.basePrice,
-        popularIssues: cat.popularIssues || []
-      }
+        data: {
+          id: cat.id,
+          name: cat.name,
+          description: cat.description,
+          popularIssues: cat.popularIssues || []
+        }
+
     });
   }
 }

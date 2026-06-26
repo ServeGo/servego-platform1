@@ -1,22 +1,24 @@
 
 
-const basePrice = 249;
 const rating = 4.8;
+
 const reviewCount = 24;
 const experienceYears = 6;
 const jobsCompleted = 142;
-const hourlyRate = 350;
 const isVerified = true;
 const isFeatured = true;
 const earnings = 52000;
 
+// Pricing fields removed from the app; keep constants minimal.
+const hourlyRate = undefined;
+
 export const SERVICE_CATEGORIES= [
+
   {
     id: 'electrician',
     name: 'Electrician',
     iconName: 'Zap',
     description: 'Certified electricians for wiring, fixtures, switchboards, and power failures.',
-    basePrice,
     popularIssues: ['Short circuit fixing', 'Fan installation', 'Switchboard repair', 'Complete home rewiring', 'Inverter setup']
   },
   {
@@ -24,7 +26,6 @@ export const SERVICE_CATEGORIES= [
     name: 'Plumber',
     iconName: 'Droplet',
     description: 'Expert plumbing for leakages, pipe blockages, taps, basin installs, and pumps.',
-    basePrice,
     popularIssues: ['Tap leakage repair', 'Drain blockage removal', 'Water meter install', 'Bathroom fittings', 'Water tank repair']
   },
   {
@@ -32,7 +33,6 @@ export const SERVICE_CATEGORIES= [
     name: 'AC Repair',
     iconName: 'Wind',
     description: 'Deep AC filter clean, gas charging, cooling restoration, and system installations.',
-    basePrice,
     popularIssues: ['AC deep servicing', 'Gas leakage refill', 'Cooling troubleshooting', 'AC uninstallation', 'Noise correction']
   },
   {
@@ -40,7 +40,6 @@ export const SERVICE_CATEGORIES= [
     name: 'Home Cleaning',
     iconName: 'Sparkles',
     description: 'Dusting, mopping, bathroom scrubbing, kitchen cleaning & trash handling.',
-    basePrice,
     popularIssues: ['Regular 2BHK cleaning', 'Regular 3BHK cleaning', 'Kitchen deep scrubbing', 'Bathroom disinfection']
   },
   {
@@ -48,7 +47,6 @@ export const SERVICE_CATEGORIES= [
     name: 'Deep Cleaning',
     iconName: 'FlameKindling', // fallback or customized brush
     description: 'Thorough sanitation, steam vacuuming, hard water stain removal, and sofa shampooing.',
-    basePrice,
     popularIssues: ['Full villa deep cleaning', 'Sofa & carpet shampoo', 'Balcony pressure wash', 'Move-out thorough cleaning']
   },
   {
@@ -56,7 +54,6 @@ export const SERVICE_CATEGORIES= [
     name: 'Painting',
     iconName: 'Paintbrush',
     description: 'Premium wall texture, wall putty, interior/exterior painting with free masking service.',
-    basePrice,
     popularIssues: ['Single accent wall design', 'Full apartment painting', 'Waterproofing & crack filling', 'Wall stencil art']
   },
   {
@@ -64,7 +61,6 @@ export const SERVICE_CATEGORIES= [
     name: 'Appliance Repair',
     iconName: 'Tv',
     description: 'Quick diagnostics and genuine spare parts for washing machines, TVs, and refrigerators.',
-    basePrice,
     popularIssues: ['Washing machine spin issue', 'Refrigerator not-cooling', 'Microwave oven healing', 'Chimney filter cleanup']
   },
   {
@@ -72,7 +68,6 @@ export const SERVICE_CATEGORIES= [
     name: 'Carpentry',
     iconName: 'Hammer',
     description: 'Woodwork repairs, hinge replacement, custom wardrobe design, and alignment fixes.',
-    basePrice,
     popularIssues: ['Door hinge replacement', 'Wardrobe latch repair', 'Custom shelves installation', 'Bed assembly / alignment']
   },
   {
@@ -80,12 +75,12 @@ export const SERVICE_CATEGORIES= [
     name: 'Home Maintenance',
     iconName: 'Wrench',
     description: 'General handyman tasks, wall mounting, lock replacements, and minor repairs.',
-    basePrice,
     popularIssues: ['TV wall mounting', 'Curtain rod installation', 'Door lock replacement', 'Mirror / painting hanging']
   }
 ];
 
 export const INITIAL_PROVIDERS = [
+
   // ELECTRICIANS
   {
     id: 'p1',
@@ -98,7 +93,6 @@ export const INITIAL_PROVIDERS = [
     reviewCount,
     experienceYears,
     jobsCompleted,
-    hourlyRate,
     bio: 'Professional licensed electrician trained under industrial standards. Specializes in residential troubleshooting, smart home switch conversions, and complex electrical diagnostics. Committed to speed and electrical safety.',
     specialties: ['Smart Switches Setup', 'Inverter Repairs', 'Short Circuit Detection', '3-Phase Panel Wiring'],
     serviceAreas: ['Gachibowli', 'Madhapur', 'Jubilee Hills', 'Kondapur', 'Kukatpally'],
@@ -123,7 +117,6 @@ export const INITIAL_PROVIDERS = [
     reviewCount,
     experienceYears,
     jobsCompleted,
-    hourlyRate,
     bio: 'Punctual electrician specializing in energy-efficient lighting designs, emergency repairs, and power outages. Serving the wider Gachibowli community with immediate response times.',
     specialties: ['Energy Saving LEDs', 'Fan & Geyser Installation', 'Switchboard Repair'],
     serviceAreas: ['Gachibowli', 'Kondapur', 'Banjara Hills', 'Begumpet'],
@@ -138,6 +131,7 @@ export const INITIAL_PROVIDERS = [
 
   // PLUMBERS
   {
+
     id: 'p3',
     name: 'Super Leak-Fix Plumbers (Sanjay Kumar)',
     email: 'sanjay.plumb@servego.com',
@@ -148,7 +142,6 @@ export const INITIAL_PROVIDERS = [
     reviewCount,
     experienceYears,
     jobsCompleted,
-    hourlyRate,
     bio: 'Lead plumbing engineer specializing in premium sanitary fixture layouts, underground leak detection using audio-sensors, and water pressure optimization across villas.',
     specialties: ['Acoustic Leak Detection', 'Pressure Pump Calibration', 'Luxury Shower Panels', 'Drain Clearing'],
     serviceAreas: ['Jubilee Hills', 'Banjara Hills', 'Madhapur', 'Begumpet', 'Secunderabad'],
@@ -173,8 +166,8 @@ export const INITIAL_PROVIDERS = [
     reviewCount,
     experienceYears,
     jobsCompleted,
-    hourlyRate,
     bio: 'Friendly domestic plumber focusing on pocket-friendly, quality tap fixes, drainage block clearance, and sink repairs. Instant booking confirmation.',
+
     specialties: ['Drain Water Cleansing', 'Sink / Washbasin Fitting', 'Flush Valve Repair'],
     serviceAreas: ['Kukatpally', 'Kondapur', 'Madhapur', 'Secunderabad'],
     isVerified,
@@ -198,8 +191,8 @@ export const INITIAL_PROVIDERS = [
     reviewCount,
     experienceYears,
     jobsCompleted,
-    hourlyRate,
     bio: 'Specialist HVAC technicians trained in premium brands (Daikin, Mitsubishi, Voltas, O General). Equipped with high-pressure jet wash kits for deep AC indoor/outdoor block cooling servicing.',
+
     specialties: ['Jet Pump Servicing', 'R32 Gas Charging', 'Compressor Rebuilding', 'Inverter AC Troubleshooting'],
     serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills', 'Begumpet'],
     isVerified,
@@ -223,7 +216,7 @@ export const INITIAL_PROVIDERS = [
     reviewCount,
     experienceYears,
     jobsCompleted,
-    hourlyRate, // higher rate for cleaning squads
+
     bio: 'Our squad uses eco-friendly, hypoallergenic disinfected chemicals. We clean, sanitize, and de-dust bedrooms, kitchens, and toilets. High-end equipment like Karcher steamers and industrial vacuum cleaners included.',
     specialties: ['Kitchen Disgorging', 'Mattress Vacuuming', 'Tile Grout Cleansing', 'Pet Hair Extraction'],
     serviceAreas: ['Gachibowli', 'Madhapur', 'Jubilee Hills', 'Banjara Hills', 'Kondapur', 'Kukatpally', 'Begumpet'],

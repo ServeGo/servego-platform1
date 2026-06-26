@@ -45,7 +45,6 @@ export const AdminProviderServiceItemsController = {
         provider: r.provider,
         name: r.requestedServiceName,
         description: r.description,
-        basePricePerDay: r.basePricePerDay,
         experienceYears: r.experienceYears,
         createdAt: r.createdAt,
         approvalStatus: r.status
@@ -57,7 +56,6 @@ export const AdminProviderServiceItemsController = {
         provider: link.provider,
         name: link.service.name,
         description: link.description ?? link.service.description,
-        basePricePerDay: link.basePricePerDay,
         experienceYears: null,
         createdAt: link.createdAt,
         approvalStatus: 'APPROVED'

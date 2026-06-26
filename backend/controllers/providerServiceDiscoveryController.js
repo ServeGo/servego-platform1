@@ -14,15 +14,20 @@ export const ProviderServiceDiscoveryController = {
 
       // Note: We filter Approved via providerService rows existing.
       // (There is no approvalStatus field on ProviderService; approval implies the link exists.)
-      const providers = await prisma.providerService.findMany({
+      const providerServices = await prisma.providerService.findMany({
         where: {
           service: {
             name: { equals: serviceName, mode: 'insensitive' }
+          },
+          provider: {
+            isVerified: true,
+            user: {
+              status: 'ACTIVE'
+            }
           }
         },
         include: {
           provider: {
-            where: { isVerified: true },
             include: {
               user: {
                 select: {
@@ -42,13 +47,13 @@ export const ProviderServiceDiscoveryController = {
       });
 
       const unique = new Map();
-      for (const link of providers) {
+      for (const link of providerServices) {
         const p = link.provider;
         if (!p) continue;
-        if (!unique.has(p.id)) unique.set(p.id, p);
+        if (!unique.has(p.id)) unique.set(p.id, { provider: p, link });
       }
 
-      const formatted = Array.from(unique.values()).map((p) => ({
+      const formatted = Array.from(unique.values()).map(({ provider: p, link }) => ({
         id: p.id,
         userId: p.userId,
         name: p.user?.name || 'Unknown',
@@ -57,8 +62,8 @@ export const ProviderServiceDiscoveryController = {
         rating: p.rating,
         reviewCount: p.reviewCount,
         experienceYears: p.experienceYears,
-        hourlyRate: p.hourlyRate,
-        bio: p.bio,
+
+        serviceDescription: link.description || p.bio,
         specialties: Array.isArray(p.specialties) ? p.specialties : [],
         serviceAreas: Array.isArray(p.serviceAreas) ? p.serviceAreas : [],
         isVerified: p.isVerified,

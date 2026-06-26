@@ -32,11 +32,11 @@ export default function ProviderServicesPanel({ provider }) {
   const [serviceInterestedOption, setServiceInterestedOption] = useState('');
   const [experienceYears, setExperienceYears] = useState(provider?.experienceYears || 3);
 
-  // Mandatory fields (per your requirement)
-  const [basePricePerDay, setBasePricePerDay] = useState('');
+  // Mandatory fields
   const [description, setDescription] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+
 
 
   const providerId = provider?.id;
@@ -143,6 +143,7 @@ export default function ProviderServicesPanel({ provider }) {
 
     console.log('[ProviderServicesPanel] providerId', providerId);
 
+
     const selectedName = serviceInterestedOption;
 
     if (!selectedName?.trim()) {
@@ -150,16 +151,7 @@ export default function ProviderServicesPanel({ provider }) {
       return;
     }
 
-    if (basePricePerDay === '' || basePricePerDay === null || basePricePerDay === undefined) {
-      setServicesError('Please enter Base Price Per Day.');
-      return;
-    }
 
-    const parsedBase = Number(basePricePerDay);
-    if (Number.isNaN(parsedBase) || parsedBase < 0) {
-      setServicesError('Base Price Per Day must be a valid number (0 or more).');
-      return;
-    }
 
 
     if (!description || !description.trim()) {
@@ -180,8 +172,7 @@ export default function ProviderServicesPanel({ provider }) {
             serviceName: selectedName.trim(),
             description: description.trim(),
             popularIssues: [],
-            experienceYears: Number(experienceYears ?? 0),
-            basePricePerDay: Number(basePricePerDay)
+            experienceYears: Number(experienceYears ?? 0)
           })
       });
 
@@ -275,9 +266,7 @@ export default function ProviderServicesPanel({ provider }) {
                     <div className="text-[11px] text-slate-600 mt-1 font-semibold">
                       Experience: {provider?.experienceYears ?? experienceYears} years
                     </div>
-                    <div className="text-[11px] text-slate-800 mt-1 font-semibold">
-                      {sv.basePricePerDay === 0 || sv.basePricePerDay ? `₹${sv.basePricePerDay}` : '-'} / day
-                    </div>
+
 
                   </div>
                   <div
@@ -367,17 +356,7 @@ Requested: {new Date(sv.createdAt).toLocaleString()}
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Base Price Per Day (₹) *</label>
-                <input
-                  type="number"
-                  value={basePricePerDay}
-                  min={0}
-                  onChange={(e) => setBasePricePerDay(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
-                  placeholder="e.g. 500"
-                />
-              </div>
+
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Service Description *</label>
