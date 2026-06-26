@@ -41,6 +41,7 @@ apiRouter.patch('/users/:id/profile', UserController.updateProfile);
 
 // --- Service Providers (Partners) ---
 apiRouter.get('/providers', ProviderController.getAll);
+apiRouter.get('/providers/by-approved-service', (req, res) => ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res));
 apiRouter.get('/providers/:id', ProviderController.getById);
 apiRouter.get('/providers/:id/services', ProviderController.getProviderServices);
 apiRouter.post('/providers/:id/services/register', ProviderController.registerProviderService);

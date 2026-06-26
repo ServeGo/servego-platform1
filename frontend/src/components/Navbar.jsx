@@ -138,14 +138,10 @@ export default function Navbar({
             >
               Dashboard
             </button>
-<button 
-              onClick={() => setProviderActiveTab('earnings')} 
-              className={`hover:text-white cursor-pointer ${providerActiveTab === 'earnings' ? 'text-indigo-400 border-b-2 border-indigo-400' : ''}`}
-            >
-              Earnings
-            </button>
-<button 
-              onClick={() => setProviderActiveTab('reviews')} 
+{/* Earnings tab disabled per request */}
+
+            <button 
+              onClick={() => setProviderActiveTab('reviews')}
               className={`hover:text-white cursor-pointer ${providerActiveTab === 'reviews' ? 'text-indigo-400 border-b-2 border-indigo-400' : ''}`}
             >
               Reviews
@@ -213,7 +209,8 @@ export default function Navbar({
                   <div className="space-y-1 font-semibold text-slate-700">
                     <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('profile'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Profile</button>
                     <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('availability'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Availability</button>
-                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('earnings'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Earnings</button>
+                    {/* Earnings disabled per request */}
+                    {/* <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('earnings'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Earnings</button> */}
                     <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('support'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Support Center</button>
                     <button 
                       onClick={handleSignOutAction} 

@@ -92,11 +92,7 @@ export const Services = ({ onNavigate }) => {
                 key={cat.id}
                 category={cat}
                 providers={providers}
-                providersByApprovedService={providersByApprovedService} 
-                onSelect={(id) => {
-                  fetchProvidersByApprovedServiceName(cat.name);
-                  handleSelectCategory(id);
-                }}
+                onSelect={(id) => handleSelectCategory(id)}
                 onIssueClick={handleIssueClick}
               />
             ))}

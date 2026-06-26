@@ -129,7 +129,9 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         <TabList activeTab={activeTab} setActiveTab={setActiveTab} leadsCount={activeLeads.length} reviewsCount={activeProvider?.reviews?.length || 0} />
 
         {activeTab === 'leads' && (
+
           <LeadsPage
+
             activeLeads={activeLeads}
             openChatBookingId={openChatBookingId}
             onToggleChat={(id) => setOpenChatBookingId(openChatBookingId === id ? null : id)}
@@ -145,7 +147,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         )}
 
 
-        {activeTab === 'earnings' && <EarningsChart completedJobs={completedJobs} />}
+
 
         {activeTab === 'services' && activeProvider && (
           <ProviderServicesPanel
@@ -212,7 +214,6 @@ function PendingBanner() {
 function TabList({ activeTab, setActiveTab, leadsCount, reviewsCount }) {
   const tabs = [
     { id: 'leads', label: `Leads (${leadsCount})` },
-    { id: 'earnings', label: 'Earnings' },
     { id: 'services', label: 'My Services' },
     { id: 'reviews', label: `Reviews (${reviewsCount})` },
     { id: 'support', label: 'Support' },

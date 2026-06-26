@@ -62,7 +62,6 @@ export const AdminProviderServiceController = {
             name: requestedName,
             nameNormalized,
             description: request.description,
-            basePrice: 0,
             popularIssues: Array.isArray(request.popularIssues) ? request.popularIssues : [],
             isHidden: false
           }
@@ -85,7 +84,6 @@ export const AdminProviderServiceController = {
         data: {
           providerId: request.providerId,
           serviceId: service.id,
-          basePricePerDay: request.basePricePerDay,
           description: request.description,
           providerServiceRequestId: request.id
         }

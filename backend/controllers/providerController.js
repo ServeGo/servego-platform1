@@ -32,7 +32,6 @@ export const ProviderController = {
         id: link.id,
         name: link.service.name,
         approvalStatus: 'APPROVED',
-        basePricePerDay: link.basePricePerDay,
         description: link.description,
         createdAt: link.createdAt
       }));
@@ -47,13 +46,12 @@ export const ProviderController = {
           return !approvedNameSet.has(requestedNameNormalized);
         })
         .map((r) => ({
-        id: r.id,
-        name: r.requestedServiceName,
-        approvalStatus: r.status,
-        basePricePerDay: r.basePricePerDay,
-        description: r.description,
-        createdAt: r.createdAt
-      }));
+          id: r.id,
+          name: r.requestedServiceName,
+          approvalStatus: r.status,
+          description: r.description,
+          createdAt: r.createdAt
+        }));
 
       // sort newest first across both arrays
       const combined = [...formattedApproved, ...formattedRequests].sort((a, b) => {
@@ -74,13 +72,10 @@ export const ProviderController = {
   registerProviderService: async (req, res) => {
     try {
       const { id } = req.params;
-      const { serviceName, description, popularIssues, experienceYears, basePricePerDay } = req.body || {};
+      const { serviceName, description, popularIssues, experienceYears } = req.body || {};
 
       if (!serviceName) {
         return res.status(400).json({ error: 'Missing required field: serviceName' });
-      }
-      if (basePricePerDay === undefined || basePricePerDay === null || basePricePerDay === '') {
-        return res.status(400).json({ error: 'Missing required field: basePricePerDay' });
       }
       if (!description || !String(description).trim()) {
         return res.status(400).json({ error: 'Missing required field: description' });
@@ -132,13 +127,11 @@ export const ProviderController = {
         return res.status(409).json({ error: 'Service request already submitted for this provider.' });
       }
 
-
       // Create a provider service request in PENDING state.
       const created = await prisma.providerServiceRequest.create({
         data: {
           providerId: provider.id,
           requestedServiceName: requestedService,
-          basePricePerDay: Number(basePricePerDay),
           description: String(description).trim(),
           popularIssues: Array.isArray(popularIssues) ? popularIssues : [],
           experienceYears:
@@ -148,7 +141,6 @@ export const ProviderController = {
           status: 'PENDING'
         }
       });
-
 
       // Optionally update experienceYears on provider profile from request
       if (
@@ -212,7 +204,7 @@ export const ProviderController = {
   updateProfile: async (req, res) => {
     try {
       const { id } = req.params;
-      const { bio, hourlyRate, specialties, serviceAreas } = req.body;
+      const { bio, specialties, serviceAreas } = req.body;
 
       const existing = await prisma.provider.findUnique({ where: { id } });
       if (!existing) {
@@ -223,7 +215,6 @@ export const ProviderController = {
         where: { id },
         data: {
           bio,
-          hourlyRate: hourlyRate !== undefined ? Number(hourlyRate) : existing.hourlyRate,
           specialties: Array.isArray(specialties) ? specialties : existing.specialties,
           serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas
         },
@@ -235,6 +226,7 @@ export const ProviderController = {
       res.status(500).json({ error: 'Failed to update partner profile', details: err.message });
     }
   },
+
 
   updateAvailability: async (req, res) => {
     try {

@@ -55,7 +55,6 @@ export const BookingController = {
       }
 
       const timestamp = new Date().toISOString();
-      const invoiceNumber = `SG-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const result = await prisma.booking.create({
@@ -72,18 +71,17 @@ export const BookingController = {
           locationAddress: bookingData.locationAddress,
           city: bookingData.city || 'Hyderabad',
           instructions: bookingData.instructions || '',
-          totalAmount: Number(bookingData.totalAmount || 0),
-          tax: Number(bookingData.tax ?? Math.round(Number(bookingData.totalAmount || 0) * 0.05)),
-          serviceFee: Number(bookingData.serviceFee ?? 30),
-          invoiceNumber,
           bookingTime: timestamp,
+
           messages: [],
+
           reviewed: false,
           statusHistory: [
             { status: 'PENDING', timestamp, note: 'Booking created by customer' }
           ]
         }
       });
+
 
       await prisma.notification.create({
         data: {

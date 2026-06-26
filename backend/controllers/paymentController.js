@@ -14,10 +14,11 @@ export const PaymentController = {
 
   create: async (req, res) => {
     try {
-      const { bookingId, userId, amount, currency = 'INR', paymentMethod, status = 'PENDING', transactionId } = req.body;
-      if (!bookingId || !userId || !amount || !paymentMethod) {
+      const { bookingId, userId, paymentMethod, status = 'PENDING', transactionId } = req.body;
+      if (!bookingId || !userId || !paymentMethod) {
         return res.status(400).json({ error: 'Missing required payment fields.' });
       }
+
 
       const exists = await prisma.booking.findUnique({ where: { id: bookingId } });
       if (!exists) {
@@ -28,14 +29,13 @@ export const PaymentController = {
         data: {
           bookingId,
           userId,
-          amount: Number(amount),
-          currency,
           paymentMethod,
           status,
           transactionId,
           paidAt: status === 'PAID' ? new Date() : null
         }
       });
+
 
       await prisma.booking.update({
         where: { id: bookingId },
