@@ -17,7 +17,8 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   const { 
     currentUser, bookings, updateBookingStatus, submitReview, 
     providers, favoriteProviders, toggleFavoriteProvider, tickets, submitSupportTicket, 
-    notifications, markNotificationAsRead, applyReferralCode, getCustomerLoyaltyTier, sendChatMessage
+    notifications, markNotificationAsRead, applyReferralCode, getCustomerLoyaltyTier, sendChatMessage,
+    updateUserProfile
   } = useApp();
 
   const [internalActiveTab, setInternalActiveTab] = useState('bookings');
@@ -49,7 +50,32 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   const userBookings = useMemo(() => bookings.filter(b => b.customerId === currentUser?.id), [bookings, currentUser]);
   const userFavorites = useMemo(() => providers.filter(p => favoriteProviders.includes(p.id)), [providers, favoriteProviders]);
   const userTickets = useMemo(() => tickets.filter(t => t.email === currentUser?.email), [tickets, currentUser]);
-  const userNotifications = useMemo(() => notifications.filter(n => n.userId === currentUser?.id || n.role === 'customer'), [notifications, currentUser]);
+  const userNotifications = useMemo(() => notifications.filter(n => n.userId === currentUser?.id), [notifications, currentUser]);
+
+  // Loyalty progression based on completed bookings.
+  const completedCount = useMemo(
+    () => userBookings.filter(b => b.status === 'completed').length,
+    [userBookings]
+  );
+  const loyaltyProgress = useMemo(() => {
+    const tiers = [
+      { threshold: 2, name: 'Silver Care' },
+      { threshold: 5, name: 'Gold Shield' },
+      { threshold: 10, name: 'Platinum Star' },
+    ];
+    const next = tiers.find(t => completedCount < t.threshold);
+    if (!next) {
+      return { nextTierName: null, bookingsNeeded: 0, progressPercent: 100 };
+    }
+    const prevThreshold = tiers.filter(t => t.threshold <= next.threshold && completedCount >= t.threshold).pop()?.threshold || 0;
+    const span = next.threshold - prevThreshold;
+    const done = completedCount - prevThreshold;
+    return {
+      nextTierName: next.name,
+      bookingsNeeded: next.threshold - completedCount,
+      progressPercent: span > 0 ? Math.round((done / span) * 100) : 0,
+    };
+  }, [completedCount]);
 
   // Actions
   const handlePublishReview = (e) => {
@@ -75,17 +101,23 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
     setTimeout(() => setTicketSuccess(false), 3000);
   };
 
-  const handleApplyReferral = (e) => {
+  const handleApplyReferral = async (e) => {
     e.preventDefault();
-    const res = applyReferralCode(referralInput);
-    if (res.success) {
+    const res = await applyReferralCode(referralInput);
+    if (res?.success) {
       setRefSuccess(res.message);
       setRefError('');
       setReferralInput('');
     } else {
-      setRefError(res.message);
+      setRefError(res?.message || 'Failed to apply referral code.');
       setRefSuccess('');
     }
+  };
+
+  const handleSaveProfile = (form) => updateUserProfile(currentUser?.id, form);
+
+  const handleMarkAllRead = () => {
+    userNotifications.filter(n => !n.read).forEach(n => markNotificationAsRead(n.id));
   };
 
   const handleCopyCode = () => {
@@ -173,20 +205,20 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
           <NotificationsView 
             notifications={userNotifications}
             onMarkRead={markNotificationAsRead}
-            onMarkAllRead={() => alert('All notifications marked as read.')}
+            onMarkAllRead={handleMarkAllRead}
           />
         )}
 
-        {activeTab === 'profile' && <ProfileView user={currentUser} />}
+        {activeTab === 'profile' && <ProfileView user={currentUser} onSave={handleSaveProfile} />}
 
         {activeTab === 'referrals' && (
           <ReferralsView 
             user={currentUser}
-            loyaltyTier={getCustomerLoyaltyTier(userBookings.filter(b => b.status === 'completed').length)}
-            completedCount={userBookings.filter(b => b.status === 'completed').length}
-            bookingsNeeded={2} // Mock logic for simplicity
-            progressPercent={50} // Mock
-            nextTierName="Silver" // Mock
+            loyaltyTier={getCustomerLoyaltyTier(completedCount)}
+            completedCount={completedCount}
+            bookingsNeeded={loyaltyProgress.bookingsNeeded}
+            progressPercent={loyaltyProgress.progressPercent}
+            nextTierName={loyaltyProgress.nextTierName}
             referralCode={currentUser?.referralCode || `SERVEGO-CUST-NEW`}
             referralInput={referralInput}
             setReferralInput={setReferralInput}

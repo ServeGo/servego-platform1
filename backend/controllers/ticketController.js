@@ -3,10 +3,22 @@ import prisma from '../prisma/client.js';
 export const TicketController = {
   getAll: async (req, res) => {
     try {
-      // Public/non-admin endpoints should not be able to read tickets.
-      // Keep backward compatibility: require explicit admin role.
       const role = req.body?.role ?? req.query?.role;
-      if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+      const requesterEmail = req.body?.requesterEmail ?? req.query?.requesterEmail
+        ?? req.body?.email ?? req.query?.email;
+
+      // Admins can read every ticket. Non-admin callers may only read their own
+      // tickets, and must scope the request to their email address.
+      if (role !== 'admin') {
+        if (!requesterEmail) {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+        const tickets = await prisma.ticket.findMany({
+          where: { requesterEmail },
+          orderBy: { createdAt: 'desc' }
+        });
+        return res.json(tickets);
+      }
 
       const tickets = await prisma.ticket.findMany({ orderBy: { createdAt: 'desc' } });
       res.json(tickets);

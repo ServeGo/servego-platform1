@@ -9,9 +9,9 @@ export default function InvoiceModal({ booking, onClose }) {
         <div className="flex items-center justify-between pb-3 border-b border-slate-150 mb-6">
           <div>
             <span className="text-[10px] bg-indigo-150 text-indigo-800 px-2.5 py-0.5 rounded uppercase font-bold tracking-wide">
-              Paid Escrow Invoice
+              Service Summary
             </span>
-            <h3 className="text-lg font-bold text-slate-900 mt-1">Receipt #{booking.invoiceNumber}</h3>
+            <h3 className="text-lg font-bold text-slate-900 mt-1">Receipt #{booking.id}</h3>
           </div>
           <button 
             onClick={onClose}
@@ -30,7 +30,7 @@ export default function InvoiceModal({ booking, onClose }) {
             </div>
             <div className="text-right text-xs">
               <span className="text-slate-500 block">Date Issued</span>
-              <span className="text-slate-900 font-bold">{booking.bookingDate}</span>
+              <span className="text-slate-900 font-bold">{booking.bookingDateLabel || booking.bookingDate}</span>
             </div>
           </div>
 
@@ -53,37 +53,35 @@ export default function InvoiceModal({ booking, onClose }) {
             <thead>
               <tr className="border-b border-slate-200 text-[10px] text-slate-400 uppercase tracking-wider font-bold">
                 <th className="py-2">Description</th>
-                <th className="py-2 text-right">Amount</th>
+                <th className="py-2 text-right">Detail</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               <tr>
                 <td className="py-2.5">
-                  <span className="font-bold text-slate-900 block">{booking.serviceCategory} Labor</span>
-                  <span className="text-[10px] text-slate-500">Service completed on {booking.bookingDate}</span>
+                  <span className="font-bold text-slate-900 block">{booking.serviceCategory} Service</span>
+                  <span className="text-[10px] text-slate-500">Completed on {booking.bookingDateLabel || booking.bookingDate}</span>
                 </td>
-                <td className="py-2.5 text-right font-bold text-slate-800">
-                  ₹{(booking.totalAmount - booking.serviceFee - booking.tax).toFixed(0)}
-                </td>
+                <td className="py-2.5 text-right text-slate-800 capitalize">{booking.status}</td>
               </tr>
               <tr>
-                <td className="py-2.5 text-slate-500">ServeGo Trust Surcharge</td>
-                <td className="py-2.5 text-right text-slate-800">₹{booking.serviceFee}</td>
+                <td className="py-2.5 text-slate-500">Schedule</td>
+                <td className="py-2.5 text-right text-slate-800">{booking.bookingTimeSlot}</td>
               </tr>
               <tr>
-                <td className="py-2.5 text-slate-500">Integrated GST (18%)</td>
-                <td className="py-2.5 text-right text-slate-800">₹{booking.tax}</td>
+                <td className="py-2.5 text-slate-500">Payment Method</td>
+                <td className="py-2.5 text-right text-slate-800 capitalize">{booking.paymentMethod || 'On completion'}</td>
               </tr>
             </tbody>
           </table>
 
           <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs">
             <div className="text-[11px] text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded border border-emerald-100">
-              Paid via {booking.paymentMethod}
+              Service Completed
             </div>
             <div className="text-right">
-              <span className="text-slate-400 text-[10px] uppercase block">Total Settled</span>
-              <span className="text-lg font-extrabold text-indigo-600 block leading-none">₹{booking.totalAmount}</span>
+              <span className="text-slate-400 text-[10px] uppercase block">Settlement</span>
+              <span className="text-sm font-extrabold text-indigo-600 block leading-none">Direct with specialist</span>
             </div>
           </div>
         </div>

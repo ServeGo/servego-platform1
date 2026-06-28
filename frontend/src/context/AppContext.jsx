@@ -1,4 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import {
+  normalizeBooking,
+  normalizeBookings,
+  normalizeProviders,
+  normalizeTicket,
+  normalizeTickets,
+  normalizeNotification,
+  normalizeNotifications,
+} from '../utils/normalizeCustomerData';
 
 const AppContext = createContext(undefined);
 
@@ -94,7 +103,7 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/providers`);
       const data = await res.json();
-      setProviders(data);
+      setProviders(normalizeProviders(data));
     } catch (err) {
       console.error('Failed to fetch providers:', err);
     }
@@ -115,7 +124,7 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await fetch(`${API_BASE_URL}/bookings`);
       const data = await res.json();
-      const bookingsArray = Array.isArray(data) ? data : [];
+      const bookingsArray = normalizeBookings(data);
       // Filter for current user if not admin
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
@@ -133,9 +142,13 @@ export const AppProvider = ({ children }) => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/notifications`);
+      // Scope to the signed-in user so customers never receive another inbox.
+      const url = currentUser?.id
+        ? `${API_BASE_URL}/notifications?userId=${encodeURIComponent(currentUser.id)}`
+        : `${API_BASE_URL}/notifications`;
+      const res = await fetch(url);
       const data = await res.json();
-      setNotifications(data);
+      setNotifications(normalizeNotifications(data));
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
     }
@@ -143,15 +156,17 @@ export const AppProvider = ({ children }) => {
 
   const fetchTickets = async () => {
     try {
-      // Backend admin protection expects role in body/query.
-      // Use admin alias endpoint to keep responses consistent.
-      const res = await fetch(`${API_BASE_URL}/admin/tickets?role=admin`, {
+      // Admins read every ticket; customers/providers read only their own,
+      // scoped by email. A GET request must never carry a body.
+      const url = currentUser?.role === 'admin'
+        ? `${API_BASE_URL}/admin/tickets?role=admin`
+        : `${API_BASE_URL}/tickets?requesterEmail=${encodeURIComponent(currentUser?.email || '')}`;
+      const res = await fetch(url, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin' }),
       });
       const data = await res.json();
-      setTickets(Array.isArray(data) ? data : []);
+      setTickets(normalizeTickets(data));
     } catch (err) {
       console.error('Failed to fetch tickets:', err);
       setTickets([]);
@@ -336,11 +351,14 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.id) {
-        setBookings(prev => [data, ...prev]);
-        return data;
+        const normalized = normalizeBooking(data);
+        setBookings(prev => [normalized, ...prev]);
+        return normalized;
       }
+      return data;
     } catch (err) {
       console.error('Failed to create booking:', err);
+      return { error: 'Network error' };
     }
   };
 
@@ -349,14 +367,23 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, note })
+        body: JSON.stringify({
+          status,
+          note,
+          role: currentUser?.role,
+          requesterId: currentUser?.id
+        })
       });
       const data = await res.json();
       if (data.id) {
-        setBookings(prev => prev.map(bk => bk.id === bookingId ? data : bk));
+        const normalized = normalizeBooking(data);
+        setBookings(prev => prev.map(bk => bk.id === bookingId ? normalized : bk));
+        return normalized;
       }
+      return data;
     } catch (err) {
       console.error('Failed to update booking status:', err);
+      return { error: 'Network error' };
     }
   };
 
@@ -472,10 +499,12 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.id) {
-        setTickets(prev => [data, ...prev]);
+        setTickets(prev => [normalizeTicket(data), ...prev]);
       }
+      return data;
     } catch (err) {
       console.error('Failed to submit ticket:', err);
+      return { error: 'Network error' };
     }
   };
 
@@ -504,7 +533,7 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.id) {
-        setNotifications(prev => prev.map(n => n.id === id ? data : n));
+        setNotifications(prev => prev.map(n => n.id === id ? normalizeNotification(data) : n));
       }
     } catch (err) {
       console.error('Failed to mark notification as read:', err);
@@ -529,7 +558,7 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.id) {
-        setNotifications(prev => [data, ...prev]);
+        setNotifications(prev => [normalizeNotification(data), ...prev]);
       }
     } catch (err) {
       console.error('Failed to add notification:', err);
@@ -594,7 +623,8 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.id) {
-        setBookings(prev => prev.map(bk => bk.id === bookingId ? data : bk));
+        const normalized = normalizeBooking(data);
+        setBookings(prev => prev.map(bk => bk.id === bookingId ? normalized : bk));
       }
     } catch (err) {
       console.error('Failed to send message:', err);

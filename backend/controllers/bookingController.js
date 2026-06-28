@@ -54,7 +54,12 @@ export const BookingController = {
         return res.status(400).json({ error: 'Missing critical booking components (customerId, providerId, serviceCategory)' });
       }
 
-      const timestamp = new Date().toISOString();
+      const parsedBookingDate = new Date(bookingData.bookingDate);
+      if (!bookingData.bookingDate || Number.isNaN(parsedBookingDate.getTime())) {
+        return res.status(400).json({ error: 'A valid booking date is required.' });
+      }
+
+      const timestamp = new Date();
       const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const result = await prisma.booking.create({
@@ -63,8 +68,8 @@ export const BookingController = {
           customerId: bookingData.customerId,
           providerId: bookingData.providerId,
           serviceCategory: bookingData.serviceCategory,
-          bookingDate: bookingData.bookingDate,
-          bookingTimeSlot: bookingData.bookingTimeSlot,
+          bookingDate: parsedBookingDate,
+          bookingTimeSlot: bookingData.bookingTimeSlot || 'Flexible',
           status: 'PENDING',
           paymentStatus: bookingData.paymentStatus?.toUpperCase() || 'UNPAID',
           paymentMethod: bookingData.paymentMethod || null,
@@ -77,21 +82,40 @@ export const BookingController = {
 
           reviewed: false,
           statusHistory: [
-            { status: 'PENDING', timestamp, note: 'Booking created by customer' }
+            { status: 'PENDING', timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
           ]
+        },
+        include: {
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          provider: {
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
+          },
+          service: true,
+          payment: true
         }
       });
 
 
-      await prisma.notification.create({
-        data: {
-          userId: bookingData.providerId,
-          title: 'New Service Job Request',
-          message: `You have received a new ${bookingData.serviceCategory} request from ${bookingData.customerName || 'a customer'} on ${bookingData.bookingDate}.`,
-          type: 'BOOKING',
-          isRead: false
+      // Notifications are keyed by User id; map the provider to its owning user.
+      // Never let a notification failure roll back a successful booking.
+      const providerUserId = result.provider?.userId || result.provider?.user?.id;
+      if (providerUserId) {
+        try {
+          await prisma.notification.create({
+            data: {
+              userId: providerUserId,
+              title: 'New Service Job Request',
+              message: `You have received a new ${bookingData.serviceCategory} request from ${bookingData.customerName || 'a customer'}.`,
+              type: 'BOOKING',
+              isRead: false
+            }
+          });
+        } catch (notifyErr) {
+          console.error('Failed to create provider notification for booking:', notifyErr.message);
         }
-      });
+      }
 
       const io = req.app.get('socketio');
       if (io) {
@@ -107,23 +131,30 @@ export const BookingController = {
   updateStatus: async (req, res) => {
     try {
       const role = req.body?.role ?? req.query?.role;
-      if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-
       const { id } = req.params;
       const { status, note } = req.body;
-
-
 
       if (!status) {
         return res.status(400).json({ error: 'A valid service status string is required.' });
       }
+
+      const updatedStatus = String(status).toUpperCase();
 
       const booking = await prisma.booking.findUnique({ where: { id } });
       if (!booking) {
         return res.status(404).json({ error: 'Booking not found.' });
       }
 
-      const updatedStatus = status.toUpperCase();
+      // Admins can set any status. A customer may only cancel their own booking
+      // while it is still pending/confirmed (before the job starts).
+      if (role !== 'admin') {
+        const requesterId = req.body?.requesterId ?? req.query?.requesterId;
+        const isOwner = requesterId && requesterId === booking.customerId;
+        const isCancellable = ['PENDING', 'CONFIRMED'].includes(booking.status);
+        if (!isOwner || updatedStatus !== 'CANCELLED' || !isCancellable) {
+          return res.status(403).json({ error: 'You are not allowed to update this booking.' });
+        }
+      }
       const newHistory = [...(booking.statusHistory || []), {
         status: updatedStatus,
         timestamp: new Date().toISOString(),
@@ -135,6 +166,16 @@ export const BookingController = {
         data: {
           status: updatedStatus,
           statusHistory: newHistory
+        },
+        include: {
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          provider: {
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
+          },
+          service: true,
+          payment: true
         }
       });
 
@@ -188,6 +229,16 @@ export const BookingController = {
         where: { id },
         data: {
           messages: [ ...(booking.messages || []), messageObj ]
+        },
+        include: {
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          provider: {
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
+          },
+          service: true,
+          payment: true
         }
       });
 
@@ -196,7 +247,7 @@ export const BookingController = {
         io.emit('chatMessageReceived', { bookingId: id, message: messageObj });
       }
 
-      res.status(201).json(messageObj);
+      res.status(201).json(updated);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
