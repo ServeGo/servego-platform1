@@ -3,7 +3,11 @@ import prisma from '../prisma/client.js';
 export const NotificationController = {
   getAll: async (req, res) => {
     try {
+      // When a userId is provided, scope notifications to that user so a
+      // signed-in customer/provider never receives another user's inbox.
+      const userId = req.query?.userId;
       const notifications = await prisma.notification.findMany({
+        where: userId ? { userId } : undefined,
         orderBy: { createdAt: 'desc' }
       });
       res.json(notifications);

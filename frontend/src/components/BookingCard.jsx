@@ -41,7 +41,7 @@ export default function BookingCard({
         <div className="md:col-span-5 space-y-2 text-xs font-semibold text-slate-500">
           <div className="flex gap-1.5 items-center">
             <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="text-slate-800">{booking.bookingDate} • {booking.bookingTimeSlot}</span>
+            <span className="text-slate-800">{booking.bookingDateLabel || booking.bookingDate} • {booking.bookingTimeSlot}</span>
           </div>
           <div className="flex gap-1.5 items-center">
             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -57,8 +57,8 @@ export default function BookingCard({
 
         <div className="md:col-span-3 text-left md:text-right flex flex-row md:flex-col justify-between md:justify-center items-center md:items-end gap-2">
           <div>
-            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest block leading-none">Total Paid</span>
-            <span className="text-lg font-extrabold text-indigo-600 block mt-1">₹{booking.totalAmount}</span>
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest block leading-none">Payment</span>
+            <span className="text-xs font-bold text-slate-700 block mt-1 capitalize">{booking.paymentMethod || 'On Completion'}</span>
           </div>
 
           {booking.status === 'completed' && (
@@ -114,9 +114,13 @@ export default function BookingCard({
           </button>
         )}
 
-        {booking.status === 'pending' && (
+        {['pending', 'confirmed'].includes(booking.status) && (
           <button 
-            onClick={() => onCancel(booking.id)}
+            onClick={() => {
+              if (window.confirm('Are you sure you want to cancel this booking?')) {
+                onCancel(booking.id, 'cancelled', 'Cancelled by customer');
+              }
+            }}
             className="px-4 py-2 border border-slate-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-600 rounded-lg text-xs font-bold transition-all"
           >
             Cancel Booking

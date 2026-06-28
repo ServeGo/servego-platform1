@@ -23,15 +23,15 @@ export default function BookingSuccess({ details, onDashboard, onBrowse }) {
           </div>
           <div className="flex justify-between text-slate-500">
             <span>Scheduled For:</span>
-            <span className="text-slate-900">{details.bookingDate}</span>
+            <span className="text-slate-900">{details.bookingDateLabel || details.bookingDate}</span>
           </div>
           <div className="flex justify-between text-slate-505">
-            <span>Time Slot:</span>
+            <span>Plan:</span>
             <span className="text-slate-900">{details.bookingTimeSlot}</span>
           </div>
           <div className="flex justify-between text-slate-550 pt-2 border-t border-slate-200">
-            <span>Total Payable:</span>
-            <span className="text-indigo-600 font-extrabold">₹{details.totalAmount}</span>
+            <span>Payment:</span>
+            <span className="text-slate-900 capitalize">{details.paymentMethod || 'On completion'}</span>
           </div>
         </div>
 

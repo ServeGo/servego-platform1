@@ -14,10 +14,8 @@ export default function BookingModal({
   address, setAddress, 
   instructions, setInstructions, 
   paymentMethod, setPaymentMethod,
-  applyReferralCredit, setApplyReferralCredit,
   billMetrics,
   loyaltyTier,
-  currentUser,
   onSubmit
 }) {
   return (
@@ -151,64 +149,28 @@ export default function BookingModal({
             )}
           </div>
 
-          {/* Billing Summary / Quote Notice */}
+          {/* Booking Summary */}
           <div className="md:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 self-start shadow-xs">
-            {bookingType === 'contract' ? (
-              <>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Itemized Bill</span>
-                <div className="space-y-2 pb-3 border-b border-slate-100 text-xs font-bold">
-                  <BillRow label="Duration" value={billMetrics.durationLabel} />
-                  <BillRow label="Base Labor Fees" value={`₹${billMetrics.base}`} />
-                  <BillRow label="Trust Insurance" value={`₹${billMetrics.fee}`} />
-                  <BillRow label="GST (18%)" value={`₹${billMetrics.tax}`} />
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Booking Summary</span>
+            <div className="space-y-2 pb-3 border-b border-slate-100 text-xs font-bold">
+              <BillRow label="Specialist" value={provider.name} />
+              <BillRow label="Plan" value={bookingType === 'contract' ? 'Contract' : 'Permanent'} />
+              <BillRow label="Duration" value={billMetrics.durationLabel} />
+              {bookingType === 'contract' && <BillRow label="Payment" value={paymentMethod} />}
+            </div>
 
-                  {billMetrics.loyaltyDiscount > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-extrabold pt-1 border-t border-dashed border-slate-100">
-                      <span>👑 Loyalty ({loyaltyTier.tier})</span>
-                      <span>-₹{billMetrics.loyaltyDiscount}</span>
-                    </div>
-                  )}
-
-                  {billMetrics.referralDiscount > 0 && (
-                    <div className="flex justify-between text-indigo-600 font-extrabold">
-                      <span>🤝 Referral Wallet</span>
-                      <span>-₹{billMetrics.referralDiscount}</span>
-                    </div>
-                  )}
-                </div>
-
-                {currentUser?.referralDiscountBalance > 0 && (
-                  <div className="my-3 bg-indigo-50/50 border border-indigo-100/60 rounded-xl p-3 text-xs">
-                    <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={applyReferralCredit}
-                        onChange={(e) => setApplyReferralCredit(e.target.checked)}
-                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                      />
-                      <span>Redeem Credits</span>
-                    </label>
-                    <div className="text-[11px] text-slate-500 mt-1 ml-6 flex justify-between">
-                      <span>Balance: ₹{currentUser.referralDiscountBalance}</span>
-                      {applyReferralCredit && <span className="text-indigo-650 font-bold">-₹{billMetrics.referralDiscount}</span>}
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-3 flex justify-between font-extrabold text-slate-900 text-sm mb-6">
-                  <span>Payable Total</span>
-                  <span className="text-lg text-indigo-600">₹{billMetrics.total}</span>
-                </div>
-              </>
-            ) : (
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 space-y-3">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Quote Request</span>
-                  <p className="font-semibold text-slate-900">Permanent service pricing is not fixed upfront.</p>
-                  <p>We’ll route this request to the provider and confirm the final quote once they verify availability.</p>
-                </div>
+            {loyaltyTier?.tier && (
+              <div className="my-3 bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs font-bold text-amber-700 flex items-center gap-2">
+                <span>👑</span>
+                <span>{loyaltyTier.tier} member perks applied</span>
               </div>
             )}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 font-medium leading-relaxed my-3">
+              {bookingType === 'contract'
+                ? 'Final charges are agreed directly with your specialist after the job is assessed.'
+                : 'We’ll route this request to the provider and confirm details once they verify availability.'}
+            </div>
 
             <button
               type="submit"

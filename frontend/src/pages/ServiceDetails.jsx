@@ -97,25 +97,13 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   const loyaltyTier = useMemo(() => getCustomerLoyaltyTier(customerCompletedBookingsCount), [customerCompletedBookingsCount, getCustomerLoyaltyTier]);
 
-  // Billing
+  // Booking summary (pricing is handled offline between customer and provider).
   const billMetrics = useMemo(() => {
-    if (!selectedProvider) return { base: 0, tax: 0, fee: 0, loyaltyDiscount: 0, referralDiscount: 0, total: 0, durationLabel: '1d 0h' };
-    const contractHoursTotal = Number(contractYears) * 8760 + Number(contractDays) * 24 + Number(contractHours);
-    const durationHours = Math.max(24, bookingType === 'contract' ? contractHoursTotal : 24);
-    const dayRate = selectedProvider.hourlyRate;
-    const hourlyEquivalent = dayRate / 24;
-    const rawBase = bookingType === 'contract' ? hourlyEquivalent * durationHours : hourlyEquivalent;
-    const base = Math.round(rawBase);
-    const fee = 20;
-    const tax = Math.round(base * 0.18);
-    const loyaltyDiscount = Math.round(base * (loyaltyTier.discountPercent / 100));
-    const maxDiscountWithReferral = Math.max(0, base + fee + tax - loyaltyDiscount);
-    const availableReferralBalance = currentUser?.referralDiscountBalance || 0;
-    const referralDiscount = applyReferralCredit ? Math.min(availableReferralBalance, maxDiscountWithReferral) : 0;
-    const total = Math.round(base + fee + tax - loyaltyDiscount - referralDiscount);
-    const durationLabel = bookingType === 'contract' ? `${contractYears}y ${contractDays}d ${contractHours}h` : '1d 0h';
-    return { base, tax, fee, loyaltyDiscount, referralDiscount, total, durationLabel };
-  }, [selectedProvider, loyaltyTier, currentUser, applyReferralCredit, bookingType, contractYears, contractDays, contractHours]);
+    const durationLabel = bookingType === 'contract'
+      ? `${contractYears}y ${contractDays}d ${contractHours}h`
+      : 'Ongoing';
+    return { durationLabel };
+  }, [bookingType, contractYears, contractDays, contractHours]);
 
   const handleStartBooking = (prov) => {
     if (!currentUser) {
@@ -165,19 +153,18 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
         bookingDate,
         bookingEndDate: null,
         bookingTimeSlot: bookingType === 'permanent' ? 'Permanent' : 'Contract',
-        bookingDuration: bookingType === 'contract' ? `${contractYears}y ${contractDays}d ${contractHours}h` : 'Ongoing',
+        bookingDuration: billMetrics.durationLabel,
         serviceDurationType: bookingType,
         locationAddress: address,
         city: 'Hyderabad',
         instructions,
-        totalAmount: billMetrics.total,
-        tax: billMetrics.tax,
-        serviceFee: billMetrics.fee,
-        appliedReferralDiscount: billMetrics.referralDiscount,
-        appliedLoyaltyDiscount: billMetrics.loyaltyDiscount,
-        paymentMethod,
-        rateBasis: 'day'
+        paymentMethod
       });
+      if (!created || created.error) {
+        setErrorText(created?.error || 'Could not complete the booking. Please try again.');
+        setBookingStep(1);
+        return;
+      }
       setConfirmedBookingDetails(created);
       setBookingStep(3);
     }, 1500);
