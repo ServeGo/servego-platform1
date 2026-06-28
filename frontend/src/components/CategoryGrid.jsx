@@ -4,6 +4,7 @@ import CategoryIcon from './CategoryIcon';
 
 export default function CategoryGrid({ categories, providers, onCategoryClick, onSeeAll }) {
   const safeProviders = Array.isArray(providers) ? providers : [];
+  const safeCategories = Array.isArray(categories) ? categories : [];
   return (
 
     <section className="py-12 px-4 max-w-6xl mx-auto">
@@ -23,8 +24,10 @@ export default function CategoryGrid({ categories, providers, onCategoryClick, o
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((cat) => {
-          const pCount = providers.filter(p => p.category.toLowerCase() === cat.name.toLowerCase() && p.isVerified).length;
+        {safeCategories.map((cat) => {
+          const pCount = safeProviders.filter(
+            (p) => (p.category || '').toLowerCase() === cat.name.toLowerCase() && p.isVerified
+          ).length;
           
           return (
             <div 

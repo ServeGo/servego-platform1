@@ -38,11 +38,7 @@ import {
 export function MainLayout() {
   const { currentUser, logout } = useApp();
 
-  const [currentPage, setCurrentPage] = useState(() => {
-    const rawHash = window.location.hash.replace('#', '');
-    const hash = rawHash.split('?')[0];
-    return hash || 'home';
-  });
+  const [currentPage, setCurrentPage] = useState('home');
   const [selectedCategoryDetail, setSelectedCategoryDetail] = useState('electrician');
 
   const [customerActiveTabExternal, setCustomerActiveTabExternal] = useState('bookings');
@@ -68,6 +64,13 @@ export function MainLayout() {
   };
 
   useEffect(() => {
+    // On initial load, ignore any stale hash from a previous session.
+    // Only force Home when user is logged out.
+    if (!currentUser) {
+      if (window.location.hash) window.location.hash = '';
+      setCurrentPage('home');
+    }
+
     const handleHash = () => {
       const rawHash = window.location.hash.replace('#', '');
       const hash = rawHash.split('?')[0];
@@ -87,6 +90,10 @@ export function MainLayout() {
     handleHash();
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
+
+  // Ensure we don't render anything based on a previous restricted hash.
+  // (hash parsing remains supported after login via hashchange listener)
+
 
   useEffect(() => {
     if (!currentUser && restrictedRoutes.includes(currentPage)) {

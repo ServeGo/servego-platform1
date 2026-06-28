@@ -8,11 +8,10 @@ export const AppProvider = ({ children }) => {
   // Database of users - purely for local dev fallback or admin view if needed
   const [users, setUsers] = useState([]);
 
-  // Initialization state from localStorage or seed fallback
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('servego_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // NOTE: Do NOT auto-rehydrate login state on app start.
+  // Persisting `servego_user` can cause users to be logged-in after closing/restarting the app.
+  // The app starts logged out; login must be performed explicitly.
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [providers, setProviders] = useState([]);
   const [services, setServices] = useState([]);
@@ -60,6 +59,7 @@ export const AppProvider = ({ children }) => {
   }, [favoriteProviders]);
 
   // Sync currentUser to local storage
+  // (Persistence is used for intra-session behavior only; we intentionally do NOT rehydrate on startup.)
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('servego_user', JSON.stringify(currentUser));
