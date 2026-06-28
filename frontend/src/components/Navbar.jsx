@@ -1,27 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { 
-  Menu, X, Bell, User, Briefcase, Shield, ChevronDown, LogOut, Heart
-} from 'lucide-react';
+import { Menu, X, Bell, User, ChevronDown, LogOut } from 'lucide-react';
 
-export default function Navbar({ 
-  onNavigate, 
-  currentPage, 
+export default function Navbar({
+  onNavigate,
+  currentPage,
   setSelectedCategoryDetail,
-  customerActiveTab, 
+  customerActiveTab,
   setCustomerActiveTab,
   providerActiveTab,
   setProviderActiveTab,
   adminActiveTab,
-  setAdminActiveTab
+  setAdminActiveTab,
 }) {
-  const { 
-    currentUser, 
-    notifications, 
-    markNotificationAsRead, 
-    clearNotifications, 
-    logout 
-  } = useApp();
+  const { currentUser, notifications, markNotificationAsRead, clearNotifications, logout } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -45,8 +37,8 @@ export default function Navbar({
     };
   }, [userDropdownOpen, notifDropdownOpen]);
 
-  const unreadNotifications = notifications.filter(
-    n => !n.read && (n.userId === currentUser?.id || n.role === currentUser?.role)
+  const unreadNotifications = (notifications || []).filter(
+    (n) => !n.read && (n.userId === currentUser?.id || n.role === currentUser?.role)
   );
 
   const handleSignOutAction = () => {
@@ -62,50 +54,81 @@ export default function Navbar({
     onNavigate(page, categoryId);
   };
 
+  const setAdminHashAndTab = (tabKey, hashValue) => {
+    setAdminActiveTab(tabKey);
+    window.location.hash = hashValue;
+  };
+
   // ----------------------------------------------------
-  // ADMIN HEADER
+  // ADMIN HEADER (only admin)
   // ----------------------------------------------------
   if (currentUser?.role === 'admin') {
     return (
-      <header id="admin-navbar-comp" className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white">
+      <header
+        id="admin-navbar-comp"
+        className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white"
+      >
+        {/* top row */}
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div onClick={() => handleLinkClick('admin')} className="flex items-center gap-2 cursor-pointer select-none">
+          <div
+            onClick={() => handleLinkClick('admin')}
+            className="flex items-center gap-2 cursor-pointer select-none"
+          >
             <div className="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center text-white font-extrabold text-sm shadow-md">
               A⚙
             </div>
             <span className="font-extrabold text-white text-base tracking-tight">Admin System</span>
           </div>
 
+          {/* desktop tabs */}
           <nav className="hidden md:flex items-center gap-6 text-xs font-bold uppercase tracking-wider text-slate-350">
-<button 
-              onClick={() => setAdminActiveTab('dashboard')} 
-              className={`hover:text-white cursor-pointer ${adminActiveTab === 'dashboard' ? 'text-teal-400 border-b-2 border-teal-400' : ''}`}
+            <button
+              onClick={() => setAdminHashAndTab('dashboard', 'admin/dashboard')}
+              className={`hover:text-white cursor-pointer ${
+                adminActiveTab === 'dashboard' ? 'text-teal-400 border-b-2 border-teal-400' : ''
+              }`}
             >
               Control Dashboard
             </button>
-<button 
-              onClick={() => setAdminActiveTab('providers')} 
-              className={`hover:text-white cursor-pointer ${adminActiveTab === 'providers' ? 'text-teal-400 border-b-2 border-teal-400' : ''}`}
+            <button
+              onClick={() => setAdminHashAndTab('providers', 'admin/providers')}
+              className={`hover:text-white cursor-pointer ${
+                adminActiveTab === 'providers' ? 'text-teal-400 border-b-2 border-teal-400' : ''
+              }`}
             >
               Verify Partners
             </button>
-<button 
-              onClick={() => setAdminActiveTab('bookings')} 
-              className={`hover:text-white cursor-pointer ${adminActiveTab === 'bookings' ? 'text-teal-400 border-b-2 border-teal-400' : ''}`}
+            <button
+              onClick={() => setAdminHashAndTab('bookings', 'admin/bookings')}
+              className={`hover:text-white cursor-pointer ${
+                adminActiveTab === 'bookings' ? 'text-teal-400 border-b-2 border-teal-400' : ''
+              }`}
             >
               Manage Orders
             </button>
-<button 
-              onClick={() => setAdminActiveTab('tickets')} 
-              className={`hover:text-white cursor-pointer ${adminActiveTab === 'tickets' ? 'text-teal-400 border-b-2 border-teal-400' : ''}`}
+            <button
+              onClick={() => setAdminHashAndTab('tickets', 'admin/tickets')}
+              className={`hover:text-white cursor-pointer ${
+                adminActiveTab === 'tickets' ? 'text-teal-400 border-b-2 border-teal-400' : ''
+              }`}
             >
               Support Tickets
             </button>
           </nav>
 
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleSignOutAction} 
+          {/* mobile: only hamburger on right */}
+          <button
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            className="md:hidden p-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white cursor-pointer"
+            aria-label="Toggle admin menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          {/* logout stays hidden on mobile (will show inside dropdown) */}
+          <div className="hidden md:flex">
+            <button
+              onClick={handleSignOutAction}
               className="flex items-center gap-1 bg-white/10 hover:bg-rose-500 hover:text-white text-slate-300 border border-white/10 rounded-xl px-3 py-1.5 text-xs font-bold transition-all"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -113,6 +136,69 @@ export default function Navbar({
             </button>
           </div>
         </div>
+
+        {/* mobile dropdown (logout + items centered) */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-slate-900/95 border-t border-slate-800 px-4 pb-4">
+            <div className="flex flex-col items-center text-xs font-bold uppercase tracking-wider text-slate-200">
+              <button
+                onClick={() => {
+                  setAdminHashAndTab('dashboard', 'admin/dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full py-3 px-1.5 text-center rounded ${
+                  adminActiveTab === 'dashboard' ? 'text-teal-400' : 'hover:text-white'
+                }`}
+              >
+                Control Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  setAdminHashAndTab('providers', 'admin/providers');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full py-3 px-1.5 text-center rounded ${
+                  adminActiveTab === 'providers' ? 'text-teal-400' : 'hover:text-white'
+                }`}
+              >
+                Verify Partners
+              </button>
+              <button
+                onClick={() => {
+                  setAdminHashAndTab('bookings', 'admin/bookings');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full py-3 px-1.5 text-center rounded ${
+                  adminActiveTab === 'bookings' ? 'text-teal-400' : 'hover:text-white'
+                }`}
+              >
+                Manage Orders
+              </button>
+              <button
+                onClick={() => {
+                  setAdminHashAndTab('tickets', 'admin/tickets');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full py-3 px-1.5 text-center rounded ${
+                  adminActiveTab === 'tickets' ? 'text-teal-400' : 'hover:text-white'
+                }`}
+              >
+                Support Tickets
+              </button>
+
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleSignOutAction();
+                }}
+                className="w-full mt-2 py-3 px-1.5 text-center text-rose-400 hover:text-white rounded font-bold flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout Admin
+              </button>
+            </div>
+          </div>
+        )}
       </header>
     );
   }
@@ -122,37 +208,43 @@ export default function Navbar({
   // ----------------------------------------------------
   if (currentUser?.role === 'provider') {
     return (
-      <header id="provider-navbar-comp" className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white">
+      <header
+        id="provider-navbar-comp"
+        className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white"
+      >
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer select-none">
             <div className="w-9 h-9 rounded-lg bg-indigo-650 flex items-center justify-center text-white font-extrabold text-sm tracking-tight shadow-md">
               P⚙
             </div>
-            <span className="font-extrabold text-white text-base tracking-tight">ServeGo Partner</span>
+            <span className="font-extrabold text-white text-base tracking-tight">
+              ServeGo Partner
+            </span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-xs font-extrabold uppercase tracking-wider text-slate-300">
-<button 
-              onClick={() => setProviderActiveTab('leads')} 
-              className={`hover:text-white cursor-pointer ${providerActiveTab === 'leads' ? 'text-indigo-400 border-b-2 border-indigo-400' : ''}`}
+            <button
+              onClick={() => setProviderActiveTab('leads')}
+              className={`hover:text-white cursor-pointer ${
+                providerActiveTab === 'leads' ? 'text-indigo-400 border-b-2 border-indigo-400' : ''
+              }`}
             >
               Dashboard
             </button>
-{/* Earnings tab disabled per request */}
-
-            <button 
+            <button
               onClick={() => setProviderActiveTab('reviews')}
-              className={`hover:text-white cursor-pointer ${providerActiveTab === 'reviews' ? 'text-indigo-400 border-b-2 border-indigo-400' : ''}`}
+              className={`hover:text-white cursor-pointer ${
+                providerActiveTab === 'reviews' ? 'text-indigo-400 border-b-2 border-indigo-400' : ''
+              }`}
             >
               Reviews
             </button>
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* Notifications */}
             <div className="relative text-slate-800" ref={notifDropdownRef}>
-              <button 
-                onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
+              <button
+                onClick={() => setNotifDropdownOpen((v) => !v)}
                 className="p-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 relative focus:outline-none"
               >
                 <Bell className="w-4.5 h-4.5" />
@@ -166,17 +258,31 @@ export default function Navbar({
               {notifDropdownOpen && (
                 <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
-                    <span className="font-extrabold text-slate-950 block uppercase text-[10px] tracking-wide">Notifications</span>
-                    <button onClick={() => { clearNotifications(); setNotifDropdownOpen(false); }} className="hover:underline text-[9px] text-teal-700 font-bold">Clear all</button>
+                    <span className="font-extrabold text-slate-950 block uppercase text-[10px] tracking-wide">
+                      Notifications
+                    </span>
+                    <button
+                      onClick={() => {
+                        clearNotifications();
+                        setNotifDropdownOpen(false);
+                      }}
+                      className="hover:underline text-[9px] text-teal-700 font-bold"
+                    >
+                      Clear all
+                    </button>
                   </div>
+
                   {unreadNotifications.length === 0 ? (
                     <p className="text-slate-400 italic text-center py-4 font-semibold">No unread alerts.</p>
                   ) : (
                     <div className="space-y-2">
-                      {unreadNotifications.map(n => (
-                        <div 
-                          key={n.id} 
-                          onClick={() => { markNotificationAsRead(n.id); setNotifDropdownOpen(false); }}
+                      {unreadNotifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            markNotificationAsRead(n.id);
+                            setNotifDropdownOpen(false);
+                          }}
                           className="p-2 bg-slate-50 border border-slate-100 rounded cursor-pointer transition-colors"
                         >
                           <h6 className="font-bold text-slate-950 text-[10px]">{n.title}</h6>
@@ -189,10 +295,9 @@ export default function Navbar({
               )}
             </div>
 
-            {/* Profile Dropdown */}
             <div className="relative text-slate-850" ref={userDropdownRef}>
               <button
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                onClick={() => setUserDropdownOpen((v) => !v)}
                 className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white border border-white/10 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all focus:outline-none"
               >
                 <span className="max-w-[100px] truncate">{currentUser?.name.split(' ')[0]}</span>
@@ -203,17 +308,41 @@ export default function Navbar({
                 <div className="absolute right-0 mt-3 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 text-xs space-y-2 text-left">
                   <div className="pb-2 border-b border-slate-100">
                     <span className="font-bold text-slate-950 block truncate leading-none">{currentUser?.name}</span>
-                    <span className="text-[10px] text-slate-400 block font-mono mt-1.5 truncate">{currentUser?.email}</span>
+                    <span className="text-[10px] text-slate-400 font-mono block mt-1 truncate">
+                      {currentUser?.email}
+                    </span>
                   </div>
 
                   <div className="space-y-1 font-semibold text-slate-700">
-                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('profile'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Profile</button>
-                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('availability'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Availability</button>
-                    {/* Earnings disabled per request */}
-                    {/* <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('earnings'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Earnings</button> */}
-                    <button onClick={() => { setUserDropdownOpen(false); setProviderActiveTab('support'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Support Center</button>
-                    <button 
-                      onClick={handleSignOutAction} 
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setProviderActiveTab('profile');
+                      }}
+                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
+                    >
+                      Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setProviderActiveTab('availability');
+                      }}
+                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
+                    >
+                      Availability
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setProviderActiveTab('support');
+                      }}
+                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
+                    >
+                      Support Center
+                    </button>
+                    <button
+                      onClick={handleSignOutAction}
                       className="w-full text-left py-1 px-1.5 hover:bg-rose-50 text-rose-600 rounded font-bold flex items-center gap-1.5 mt-1 transition-colors"
                     >
                       <LogOut className="w-3.5 h-3.5" />
@@ -236,30 +365,45 @@ export default function Navbar({
     return (
       <header id="customer-navbar-comp" className="sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div onClick={() => handleLinkClick('home')} className="flex items-center gap-2 cursor-pointer select-none">
+          <div
+            onClick={() => handleLinkClick('home')}
+            className="flex items-center gap-2 cursor-pointer select-none"
+          >
             <div className="w-9 h-9 rounded-lg bg-teal-800 flex items-center justify-center text-white font-extrabold text-sm tracking-tight shadow-xs">
               S⚙
             </div>
-            <span className="font-extrabold text-slate-900 text-lg tracking-tight font-sans block h-5 leading-none">ServeGo</span>
+            <span className="font-extrabold text-slate-900 text-lg tracking-tight font-sans block h-5 leading-none">
+              ServeGo
+            </span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-xs font-extrabold text-slate-650 uppercase tracking-wider">
-<button onClick={() => handleLinkClick('home')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'home' ? 'text-teal-750 border-b-2 border-teal-700' : ''}`}>Home</button>
-<button onClick={() => handleLinkClick('services')} className={`hover:text-teal-700 cursor-pointer py-1 ${['services', 'service-details'].includes(currentPage) ? 'text-teal-750 border-b-2 border-teal-700' : ''}`}>Services</button>
-<button 
+            <button
+              onClick={() => handleLinkClick('home')}
+              className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'home' ? 'text-teal-750 border-b-2 border-teal-700' : ''}`}
+            >
+              Home
+            </button>
+            <button
+              onClick={() => handleLinkClick('services')}
+              className={`hover:text-teal-700 cursor-pointer py-1 ${['services', 'service-details'].includes(currentPage) ? 'text-teal-750 border-b-2 border-teal-700' : ''}`}
+            >
+              Services
+            </button>
+            <button
               onClick={() => {
                 setCustomerActiveTab('bookings');
                 handleLinkClick('dashboard-customer');
-              }} 
+              }}
               className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'dashboard-customer' && customerActiveTab === 'bookings' ? 'text-teal-750 border-b-2 border-teal-700' : ''}`}
             >
               My Bookings
             </button>
-<button 
+            <button
               onClick={() => {
                 setCustomerActiveTab('tickets');
                 handleLinkClick('dashboard-customer');
-              }} 
+              }}
               className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'dashboard-customer' && customerActiveTab === 'tickets' ? 'text-teal-750 border-b-2 border-teal-700' : ''}`}
             >
               Support Issues
@@ -267,10 +411,9 @@ export default function Navbar({
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* Notification Bell */}
             <div className="relative" ref={notifDropdownRef}>
-              <button 
-                onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
+              <button
+                onClick={() => setNotifDropdownOpen((v) => !v)}
                 className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 relative focus:outline-none"
               >
                 <Bell className="w-4.5 h-4.5" />
@@ -287,14 +430,18 @@ export default function Navbar({
                     <span className="font-extrabold text-slate-900 block uppercase text-[10px] tracking-wide">Notifications alert</span>
                     <button onClick={() => clearNotifications()} className="hover:underline text-[9px] text-teal-700 font-bold">Clear all</button>
                   </div>
+
                   {unreadNotifications.length === 0 ? (
                     <p className="text-slate-400 italic text-center py-4">No unread alerts.</p>
                   ) : (
                     <div className="space-y-2">
-                      {unreadNotifications.map(n => (
-                        <div 
-                          key={n.id} 
-                          onClick={() => { markNotificationAsRead(n.id); setNotifDropdownOpen(false); }}
+                      {unreadNotifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            markNotificationAsRead(n.id);
+                            setNotifDropdownOpen(false);
+                          }}
                           className="p-2.5 rounded-lg bg-teal-50/40 hover:bg-teal-50 border border-teal-100/50 cursor-pointer transition-all"
                         >
                           <h6 className="font-bold text-teal-950 text-[10px]">{n.title}</h6>
@@ -307,10 +454,9 @@ export default function Navbar({
               )}
             </div>
 
-            {/* Profile Dropdown */}
             <div className="relative" ref={userDropdownRef}>
               <button
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                onClick={() => setUserDropdownOpen((v) => !v)}
                 className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-xs focus:outline-none"
               >
                 <span className="max-w-[100px] truncate">{currentUser?.name.split(' ')[0]}</span>
@@ -325,46 +471,13 @@ export default function Navbar({
                   </div>
 
                   <div className="space-y-1 font-semibold text-slate-700">
-                    <button 
-                      onClick={() => { setUserDropdownOpen(false); handleLinkClick('home'); }} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
-                    >
-                      Home
-                    </button>
-                    <button 
-                      onClick={() => { setUserDropdownOpen(false); handleLinkClick('services'); }} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
-                    >
-                      Services
-                    </button>
-                    <button 
-                      onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('bookings'); handleLinkClick('dashboard-customer'); }} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
-                    >
-                      Dashboard
-                    </button>
-                    <button 
-                      onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('profile'); handleLinkClick('dashboard-customer'); }} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
-                    >
-                      Profile Account
-                    </button>
-                    <button 
-                      onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('favorites'); handleLinkClick('dashboard-customer'); }} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
-                    >
-                      Saved Partners
-                    </button>
-                    <button 
-                      onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('settings'); handleLinkClick('dashboard-customer'); }} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block"
-                    >
-                      Settings
-                    </button>
-                    <button 
-                      onClick={handleSignOutAction} 
-                      className="w-full text-left py-1 px-1.5 hover:bg-rose-50 text-rose-600 rounded font-bold flex items-center gap-1 mt-1 transition-colors"
-                    >
+                    <button onClick={() => { setUserDropdownOpen(false); handleLinkClick('home'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Home</button>
+                    <button onClick={() => { setUserDropdownOpen(false); handleLinkClick('services'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Services</button>
+                    <button onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('bookings'); handleLinkClick('dashboard-customer'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Dashboard</button>
+                    <button onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('profile'); handleLinkClick('dashboard-customer'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Profile Account</button>
+                    <button onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('favorites'); handleLinkClick('dashboard-customer'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Saved Partners</button>
+                    <button onClick={() => { setUserDropdownOpen(false); setCustomerActiveTab('settings'); handleLinkClick('dashboard-customer'); }} className="w-full text-left py-1 px-1.5 hover:bg-slate-50 rounded block">Settings</button>
+                    <button onClick={handleSignOutAction} className="w-full text-left py-1 px-1.5 hover:bg-rose-50 text-rose-600 rounded font-bold flex items-center gap-1 mt-1 transition-colors">
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Logout</span>
                     </button>
@@ -379,15 +492,15 @@ export default function Navbar({
   }
 
   // ----------------------------------------------------
-  // PUBLIC VISITOR HEADER
+  // PUBLIC VISITOR HEADER (unchanged)
   // ----------------------------------------------------
   return (
-    <header id="public-navbar-comp" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+    <header
+      id="public-navbar-comp"
+      className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200"
+    >
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div 
-          onClick={() => handleLinkClick('home')}
-          className="flex items-center gap-2 cursor-pointer select-none"
-        >
+        <div onClick={() => handleLinkClick('home')} className="flex items-center gap-2 cursor-pointer select-none">
           <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-extrabold text-base tracking-tight shadow-xs">
             S⚙
           </div>
@@ -398,36 +511,33 @@ export default function Navbar({
         </div>
 
         <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-600 uppercase tracking-wider">
-<button onClick={() => handleLinkClick('home')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'home' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Home</button>
-<button onClick={() => handleLinkClick('services')} className={`hover:text-teal-700 cursor-pointer py-1 ${['services', 'service-details'].includes(currentPage) ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Services</button>
-<button onClick={() => handleLinkClick('partner')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'partner' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Become a Partner</button>
-<button onClick={() => handleLinkClick('about')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'about' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>About</button>
-<button onClick={() => handleLinkClick('contact')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'contact' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Contact</button>
+          <button onClick={() => handleLinkClick('home')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'home' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Home</button>
+          <button onClick={() => handleLinkClick('services')} className={`hover:text-teal-700 cursor-pointer py-1 ${['services', 'service-details'].includes(currentPage) ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Services</button>
+          <button onClick={() => handleLinkClick('partner')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'partner' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Become a Partner</button>
+          <button onClick={() => handleLinkClick('about')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'about' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>About</button>
+          <button onClick={() => handleLinkClick('contact')} className={`hover:text-teal-700 cursor-pointer py-1 ${currentPage === 'contact' ? 'text-teal-700 border-b-2 border-teal-700' : ''}`}>Contact</button>
         </nav>
 
         <div className="flex items-center gap-3">
-          <button onClick={() => handleLinkClick('services')} className="bg-teal-700 hover:bg-teal-850 text-white rounded-xl px-4 py-2 text-xs font-extrabold transition-all shadow-xs">
-            Book Service
-          </button>
+          <button onClick={() => handleLinkClick('services')} className="bg-teal-700 hover:bg-teal-850 text-white rounded-xl px-4 py-2 text-xs font-extrabold transition-all shadow-xs">Book Service</button>
           <button onClick={() => handleLinkClick('login')} className="hidden sm:flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl px-4 py-2 text-xs font-bold transition-all border border-slate-250">
             <User className="w-3.5 h-3.5" />
             <span>Login</span>
           </button>
-<button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-1 px-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 cursor-pointer">
+          <button onClick={() => setMobileMenuOpen((v) => !v)} className="md:hidden p-1 px-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 cursor-pointer">
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-<div className="md:hidden bg-white border-t border-slate-200 py-4 px-4 flex flex-col justify-between items-center text-xs font-bold text-slate-600 uppercase tracking-wider z-25 relative shadow-md w-full overflow-hidden">
-<button onClick={() => handleLinkClick('home')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Home</button>
-<button onClick={() => handleLinkClick('services')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Services</button>
-<button onClick={() => handleLinkClick('partner')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Become a Partner</button>
-<button onClick={() => handleLinkClick('about')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">About</button>
-<button onClick={() => handleLinkClick('contact')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Contact</button>
-<button onClick={() => handleLinkClick('login')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full flex items-center justify-center gap-1">
+        <div className="md:hidden bg-white border-t border-slate-200 py-4 px-4 flex flex-col justify-between items-center text-xs font-bold text-slate-600 uppercase tracking-wider z-25 relative shadow-md w-full overflow-hidden">
+          <button onClick={() => handleLinkClick('home')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Home</button>
+          <button onClick={() => handleLinkClick('services')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Services</button>
+          <button onClick={() => handleLinkClick('partner')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Become a Partner</button>
+          <button onClick={() => handleLinkClick('about')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">About</button>
+          <button onClick={() => handleLinkClick('contact')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full border-b border-slate-100">Contact</button>
+          <button onClick={() => handleLinkClick('login')} className="hover:text-teal-700 cursor-pointer text-center py-1.5 w-full flex items-center justify-center gap-1">
             <User className="w-3.5 h-3.5" /> Login
           </button>
         </div>
@@ -435,3 +545,4 @@ export default function Navbar({
     </header>
   );
 }
+

@@ -20,13 +20,15 @@ export default function AdminOtherServicesRequestsPanel() {
     } finally {
       setLoading(false);
     }
-
   };
 
+  // Optimization: avoid refetch-on-mount.
+  // AppContext already handles initial admin fetches on role change; this tab should
+  // only refresh deterministically after mutations (approve/deny).
   useEffect(() => {
-    loadNow();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // no-op
   }, []);
+
 
   return (
     <div className="space-y-6">

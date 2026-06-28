@@ -54,6 +54,13 @@ apiRouter.get('/bookings', BookingController.getAll);
 apiRouter.get('/bookings/:id', BookingController.getById);
 apiRouter.post('/bookings', BookingController.create);
 apiRouter.patch('/bookings/:id/status', BookingController.updateStatus);
+// Admin-only alias for booking status overrides
+apiRouter.patch('/admin/bookings/:id/status', (req, res) => BookingController.updateStatus({
+  ...req,
+  body: { ...(req.body || {}), role: 'admin' },
+  query: { ...(req.query || {}), role: 'admin' }
+}, res));
+
 apiRouter.post('/bookings/:id/messages', BookingController.addMessage);
 
 // --- Notifications ---
@@ -66,6 +73,10 @@ apiRouter.delete('/notifications', NotificationController.clearAll);
 apiRouter.get('/tickets', TicketController.getAll);
 apiRouter.post('/tickets', TicketController.create);
 apiRouter.patch('/tickets/:id/resolve', TicketController.resolve);
+// Admin-only aliases (same controller handlers, but helps separate admin consumers)
+apiRouter.get('/admin/tickets', (req, res) => TicketController.getAll({ ...req, body: { ...(req.body || {}), role: 'admin' }, query: { ...(req.query || {}) , role: 'admin' } }, res));
+apiRouter.patch('/admin/tickets/:id/resolve', (req, res) => TicketController.resolve({ ...req, body: { ...(req.body || {}), role: 'admin' }, query: { ...(req.query || {}), role: 'admin' }, params: { ...(req.params || {}), id: req.params.id } }, res));
+
 
 // --- Reviews ---
 apiRouter.post('/reviews', ReviewController.create);

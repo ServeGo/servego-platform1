@@ -8,10 +8,17 @@ export const AppProvider = ({ children }) => {
   // Database of users - purely for local dev fallback or admin view if needed
   const [users, setUsers] = useState([]);
 
-  // NOTE: Do NOT auto-rehydrate login state on app start.
-  // Persisting `servego_user` can cause users to be logged-in after closing/restarting the app.
-  // The app starts logged out; login must be performed explicitly.
-  const [currentUser, setCurrentUser] = useState(null);
+  // Rehydrate login state on refresh so users don't get logged out.
+  // This matches the existing persistence logic below.
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('servego_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
 
   const [providers, setProviders] = useState([]);
   const [services, setServices] = useState([]);
@@ -136,13 +143,21 @@ export const AppProvider = ({ children }) => {
 
   const fetchTickets = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/tickets`);
+      // Backend admin protection expects role in body/query.
+      // Use admin alias endpoint to keep responses consistent.
+      const res = await fetch(`${API_BASE_URL}/admin/tickets?role=admin`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'admin' }),
+      });
       const data = await res.json();
-      setTickets(data);
+      setTickets(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch tickets:', err);
+      setTickets([]);
     }
   };
+
 
   const fetchUsers = async () => {
     try {
@@ -466,10 +481,11 @@ export const AppProvider = ({ children }) => {
 
   const respondToTicket = async (ticketId, responseText) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/tickets/${ticketId}/resolve`, {
+      const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: responseText })
+        body: JSON.stringify({ role: 'admin', response: responseText }),
+
       });
       const data = await res.json();
       if (data.id) {
@@ -479,6 +495,7 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to respond to ticket:', err);
     }
   };
+
 
   const markNotificationAsRead = async (id) => {
     try {

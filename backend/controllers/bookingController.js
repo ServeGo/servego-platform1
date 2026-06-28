@@ -106,8 +106,13 @@ export const BookingController = {
 
   updateStatus: async (req, res) => {
     try {
+      const role = req.body?.role ?? req.query?.role;
+      if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+
       const { id } = req.params;
       const { status, note } = req.body;
+
+
 
       if (!status) {
         return res.status(400).json({ error: 'A valid service status string is required.' });

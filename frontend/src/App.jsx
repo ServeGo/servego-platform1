@@ -71,6 +71,30 @@ export function MainLayout() {
       setCurrentPage('home');
     }
 
+    const getAdminTabFromHash = (hashValue) => {
+      // Expected: admin/<tab>
+      const parts = hashValue.split('/');
+      if (parts.length < 2) return 'dashboard';
+      const tab = parts[1];
+
+      // Map optional/legacy sidebar items to actual tab keys used by AdminPanelTabsRouter
+      // (AdminPanelTabsRouter supports dashboard/customers/providers/providerServiceRequests/services/bookings/tickets/analytics/settings)
+      if (tab === 'dashboard') return 'dashboard';
+      if (tab === 'customers') return 'customers';
+      if (tab === 'providers') return 'providers';
+      if (tab === 'service-requests' || tab === 'providerServiceRequests') return 'providerServiceRequests';
+      if (tab === 'services') return 'services';
+      if (tab === 'bookings') return 'bookings';
+      if (tab === 'payments') return 'payments'; // will fallback inside router
+      if (tab === 'reviews') return 'reviews'; // will fallback inside router
+      if (tab === 'tickets') return 'tickets';
+      if (tab === 'analytics') return 'analytics';
+      if (tab === 'reports') return 'reports'; // will fallback inside router
+      if (tab === 'settings') return 'settings';
+
+      return 'dashboard';
+    };
+
     const handleHash = () => {
       const rawHash = window.location.hash.replace('#', '');
       const hash = rawHash.split('?')[0];
@@ -80,9 +104,22 @@ export function MainLayout() {
           const catId = hash.split('/')[1];
           setSelectedCategoryDetail(catId);
           setCurrentPage('service-details');
-        } else {
-          setCurrentPage(hash);
+          return;
         }
+
+        if (hash === 'admin') {
+          setCurrentPage('admin');
+          setAdminActiveTabExternal('dashboard');
+          return;
+        }
+
+        if (hash.startsWith('admin/')) {
+          setCurrentPage('admin');
+          setAdminActiveTabExternal(getAdminTabFromHash(hash));
+          return;
+        }
+
+        setCurrentPage(hash);
       }
     };
 
@@ -90,6 +127,7 @@ export function MainLayout() {
     handleHash();
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
+
 
   // Ensure we don't render anything based on a previous restricted hash.
   // (hash parsing remains supported after login via hashchange listener)
@@ -218,146 +256,194 @@ export function MainLayout() {
                 Operations ledger
               </span>
               <button
-                onClick={() => setAdminActiveTabExternal('dashboard')}
+                onClick={() => {
+                  setAdminActiveTabExternal('dashboard');
+                  window.location.hash = 'admin/dashboard';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'dashboard'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <LayoutDashboard className="w-4 h-4 shrink-0" />
                 <span>Dashboard</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('customers')}
+                onClick={() => {
+                  setAdminActiveTabExternal('customers');
+                  window.location.hash = 'admin/customers';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'customers'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <Users className="w-4 h-4 shrink-0" />
                 <span>Customers</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('providers')}
+                onClick={() => {
+                  setAdminActiveTabExternal('providers');
+                  window.location.hash = 'admin/providers';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'providers'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <Briefcase className="w-4 h-4 shrink-0" />
                 <span>Providers</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('services')}
+                onClick={() => {
+                  setAdminActiveTabExternal('services');
+                  window.location.hash = 'admin/services';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'services'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <Activity className="w-4 h-4 shrink-0" />
                 <span>Services</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('providerServiceRequests')}
+                onClick={() => {
+                  setAdminActiveTabExternal('providerServiceRequests');
+                  window.location.hash = 'admin/providerServiceRequests';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'providerServiceRequests'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <ShieldCheck className="w-4 h-4 shrink-0" />
                 <span>Service Requests</span>
               </button>
 
 
               <button
-                onClick={() => setAdminActiveTabExternal('bookings')}
+                onClick={() => {
+                  setAdminActiveTabExternal('bookings');
+                  window.location.hash = 'admin/bookings';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'bookings'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <History className="w-4 h-4 shrink-0" />
                 <span>Bookings</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('payments')}
+                onClick={() => {
+                  setAdminActiveTabExternal('payments');
+                  window.location.hash = 'admin/payments';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'payments'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <CreditCard className="w-4 h-4 shrink-0" />
                 <span>Payments</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('reviews')}
+                onClick={() => {
+                  setAdminActiveTabExternal('reviews');
+                  window.location.hash = 'admin/reviews';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'reviews'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <Star className="w-4 h-4 shrink-0" />
                 <span>Reviews</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('tickets')}
+                onClick={() => {
+                  setAdminActiveTabExternal('tickets');
+                  window.location.hash = 'admin/tickets';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'tickets'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <MessageSquare className="w-4 h-4 shrink-0" />
                 <span>Support Tickets</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('analytics')}
+                onClick={() => {
+                  setAdminActiveTabExternal('analytics');
+                  window.location.hash = 'admin/analytics';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'analytics'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <BarChart3 className="w-4 h-4 shrink-0" />
                 <span>Analytics</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('reports')}
+                onClick={() => {
+                  setAdminActiveTabExternal('reports');
+                  window.location.hash = 'admin/reports';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'reports'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <FileText className="w-4 h-4 shrink-0" />
                 <span>Reports</span>
               </button>
 
               <button
-                onClick={() => setAdminActiveTabExternal('settings')}
+                onClick={() => {
+                  setAdminActiveTabExternal('settings');
+                  window.location.hash = 'admin/settings';
+                }}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
                   adminActiveTabExternal === 'settings'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
                 }`}
               >
+
                 <Settings className="w-4 h-4 shrink-0" />
                 <span>Settings</span>
               </button>
