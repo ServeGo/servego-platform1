@@ -1,0 +1,373 @@
+{
+  "backend/controllers/adminProviderServiceController.js": [
+    "backend/prisma/client.js",
+    "backend/services/providerReputationService.js"
+  ],
+  "backend/controllers/adminProviderServiceItemsController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/bookingController.js": [
+    "backend/prisma/client.js",
+    "backend/services/providerReputationService.js"
+  ],
+  "backend/controllers/notificationController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/paymentController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/providerController.js": [
+    "backend/prisma/client.js",
+    "backend/services/providerReputationService.js"
+  ],
+  "backend/controllers/providerServiceDiscoveryController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/referralsController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/reviewController.js": [
+    "backend/prisma/client.js",
+    "backend/services/providerReputationService.js"
+  ],
+  "backend/controllers/serviceController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/ticketController.js": [
+    "backend/prisma/client.js"
+  ],
+  "backend/controllers/userController.js": [
+    "bcryptjs",
+    "backend/prisma/client.js"
+  ],
+  "backend/prisma/client.js": [
+    "@prisma/client"
+  ],
+  "backend/prisma/seed.js": [
+    "bcryptjs",
+    "backend/prisma/client.js"
+  ],
+  "backend/routes/api.js": [
+    "express",
+    "backend/controllers/userController.js",
+    "backend/controllers/providerController.js",
+    "backend/controllers/bookingController.js",
+    "backend/controllers/ticketController.js",
+    "backend/controllers/notificationController.js",
+    "backend/controllers/reviewController.js",
+    "backend/controllers/serviceController.js",
+    "backend/controllers/paymentController.js",
+    "backend/controllers/adminProviderServiceController.js",
+    "backend/controllers/adminProviderServiceItemsController.js",
+    "backend/controllers/referralsController.js",
+    "backend/controllers/providerServiceDiscoveryController.js"
+  ],
+  "backend/seeders/servicesSeed.js": [
+    "backend/prisma/client.js",
+    "frontend/src/data.js"
+  ],
+  "backend/server.js": [
+    "express",
+    "http",
+    "socket.io",
+    "cors",
+    "dotenv",
+    "path",
+    "url",
+    "backend/routes/api.js"
+  ],
+  "backend/services/providerReputationService.js": [
+    "backend/prisma/client.js"
+  ],
+  "frontend/build/static/js/main.633bcb91.js": [],
+  "frontend/src/App.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/pages/Home.jsx",
+    "frontend/src/pages/About.jsx",
+    "frontend/src/pages/Services.jsx",
+    "frontend/src/pages/ServiceDetails.jsx",
+    "frontend/src/pages/BecomePartner.jsx",
+    "frontend/src/pages/Contact.jsx",
+    "frontend/src/pages/FAQ.jsx",
+    "frontend/src/pages/CustomerDashboard.jsx",
+    "frontend/src/pages/ProviderDashboard.jsx",
+    "frontend/src/pages/AdminPanel.jsx",
+    "frontend/src/pages/Login.jsx",
+    "frontend/src/pages/Signup.jsx",
+    "frontend/src/components/Navbar.jsx",
+    "frontend/src/components/Footer.jsx",
+    "lucide-react"
+  ],
+  "frontend/src/components/AdminOtherServicesRequestsPanel.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx"
+  ],
+  "frontend/src/components/AppPromo.jsx": [
+    "react"
+  ],
+  "frontend/src/components/AvailabilityForm.jsx": [
+    "react"
+  ],
+  "frontend/src/components/BookingCard.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/components/LiveTrackingMap.jsx",
+    "frontend/src/components/ChatPanel.jsx"
+  ],
+  "frontend/src/components/BookingModal.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/BookingSuccess.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/CategoryGrid.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/components/CategoryIcon.jsx"
+  ],
+  "frontend/src/components/CategoryIcon.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/ChatPanel.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/DashboardHeader.jsx": [
+    "react"
+  ],
+  "frontend/src/components/EarningsChart.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/FavoritesView.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/FilterPanel.jsx": [
+    "react",
+    "frontend/src/data.js"
+  ],
+  "frontend/src/components/Footer.jsx": [
+    "react"
+  ],
+  "frontend/src/components/Hero.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/data.js"
+  ],
+  "frontend/src/components/HowItWorks.jsx": [
+    "react"
+  ],
+  "frontend/src/components/InvoiceModal.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/LeadCard.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/components/ChatPanel.jsx"
+  ],
+  "frontend/src/components/LiveTrackingMap.jsx": [
+    "react",
+    "motion/react",
+    "lucide-react"
+  ],
+  "frontend/src/components/Navbar.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "lucide-react"
+  ],
+  "frontend/src/components/NotificationsView.jsx": [
+    "react"
+  ],
+  "frontend/src/components/PartnerCTA.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/ProfileView.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ProviderAvailability.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx"
+  ],
+  "frontend/src/components/ProviderHeader.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/components/ProviderReputation.jsx"
+  ],
+  "frontend/src/components/ProviderListItem.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/components/ProviderReputation.jsx"
+  ],
+  "frontend/src/components/ProviderProfileView.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/components/ProviderReputation.jsx"
+  ],
+  "frontend/src/components/ProviderReferrals.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ProviderReputation.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/ProviderReviews.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ProviderServicesPanel.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/ProviderSupport.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ReferralsView.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ReviewModal.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ServiceCard.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/components/CategoryIcon.jsx"
+  ],
+  "frontend/src/components/ServiceDetailHeader.jsx": [
+    "react"
+  ],
+  "frontend/src/components/ServiceHeader.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/SettingsView.jsx": [
+    "react"
+  ],
+  "frontend/src/components/SupportBanner.jsx": [
+    "react"
+  ],
+  "frontend/src/components/TicketsView.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/components/TrustBanner.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/context/AppContext.jsx": [
+    "react"
+  ],
+  "frontend/src/data.js": [],
+  "frontend/src/index.js": [
+    "react",
+    "react-dom/client",
+    "frontend/src/App.jsx"
+  ],
+  "frontend/src/pages/About.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/data.js"
+  ],
+  "frontend/src/pages/AdminPanel.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/data.js",
+    "frontend/src/components/AdminOtherServicesRequestsPanel.jsx"
+  ],
+  "frontend/src/pages/BecomePartner.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/data.js"
+  ],
+  "frontend/src/pages/Contact.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/context/AppContext.jsx"
+  ],
+  "frontend/src/pages/CustomerDashboard.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/components/DashboardHeader.jsx",
+    "frontend/src/components/BookingCard.jsx",
+    "frontend/src/components/FavoritesView.jsx",
+    "frontend/src/components/TicketsView.jsx",
+    "frontend/src/components/NotificationsView.jsx",
+    "frontend/src/components/ProfileView.jsx",
+    "frontend/src/components/ReferralsView.jsx",
+    "frontend/src/components/SettingsView.jsx",
+    "frontend/src/components/ReviewModal.jsx",
+    "frontend/src/components/InvoiceModal.jsx"
+  ],
+  "frontend/src/pages/FAQ.jsx": [
+    "react",
+    "lucide-react"
+  ],
+  "frontend/src/pages/Home.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/data.js",
+    "frontend/src/components/Hero.jsx",
+    "frontend/src/components/CategoryGrid.jsx",
+    "frontend/src/components/TrustBanner.jsx",
+    "frontend/src/components/HowItWorks.jsx",
+    "frontend/src/components/AppPromo.jsx",
+    "frontend/src/components/PartnerCTA.jsx"
+  ],
+  "frontend/src/pages/Login.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "lucide-react"
+  ],
+  "frontend/src/pages/ProviderDashboard.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/components/ProviderHeader.jsx",
+    "frontend/src/components/LeadCard.jsx",
+    "frontend/src/components/EarningsChart.jsx",
+    "frontend/src/components/ProviderServicesPanel.jsx",
+    "frontend/src/components/ProviderReviews.jsx",
+    "frontend/src/components/ProviderSupport.jsx",
+    "frontend/src/components/ProviderReferrals.jsx",
+    "frontend/src/components/ProviderProfileView.jsx",
+    "frontend/src/components/ProviderAvailability.jsx"
+  ],
+  "frontend/src/pages/ServiceDetails.jsx": [
+    "react",
+    "lucide-react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/data.js",
+    "frontend/src/components/ServiceDetailHeader.jsx",
+    "frontend/src/components/FilterPanel.jsx",
+    "frontend/src/components/ProviderListItem.jsx",
+    "frontend/src/components/BookingModal.jsx",
+    "frontend/src/components/BookingSuccess.jsx"
+  ],
+  "frontend/src/pages/Services.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "frontend/src/components/ServiceHeader.jsx",
+    "frontend/src/components/ServiceCard.jsx",
+    "frontend/src/components/SupportBanner.jsx"
+  ],
+  "frontend/src/pages/Signup.jsx": [
+    "react",
+    "frontend/src/context/AppContext.jsx",
+    "lucide-react"
+  ],
+  "patch-register.cjs": [
+    "fs",
+    "path"
+  ],
+  "tools/generate-callgraph.js": [
+    "fs",
+    "path"
+  ]
+}
