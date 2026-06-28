@@ -166,6 +166,16 @@ export const BookingController = {
         data: {
           status: updatedStatus,
           statusHistory: newHistory
+        },
+        include: {
+          customer: { select: { id: true, name: true, email: true, phone: true } },
+          provider: {
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
+          },
+          service: true,
+          payment: true
         }
       });
 
