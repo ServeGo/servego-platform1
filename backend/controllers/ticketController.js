@@ -3,12 +3,18 @@ import prisma from '../prisma/client.js';
 export const TicketController = {
   getAll: async (req, res) => {
     try {
+      // Public/non-admin endpoints should not be able to read tickets.
+      // Keep backward compatibility: require explicit admin role.
+      const role = req.body?.role ?? req.query?.role;
+      if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+
       const tickets = await prisma.ticket.findMany({ orderBy: { createdAt: 'desc' } });
       res.json(tickets);
     } catch (err) {
       res.status(500).json({ error: 'Failed to retrieve support tickets', details: err.message });
     }
   },
+
 
   create: async (req, res) => {
     try {
@@ -34,6 +40,9 @@ export const TicketController = {
 
   resolve: async (req, res) => {
     try {
+      const role = req.body?.role ?? req.query?.role;
+      if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+
       const { id } = req.params;
       const { response } = req.body;
 
@@ -58,3 +67,4 @@ export const TicketController = {
     }
   }
 };
+
