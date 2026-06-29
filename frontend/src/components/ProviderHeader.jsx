@@ -12,7 +12,7 @@ function ServiceChip({ name }) {
   );
 }
 
-export default function ProviderHeader({ provider, earnings }) {
+export default function ProviderHeader({ provider, completedJobs = 0 }) {
   const { currentUser } = useApp();
   const providerId = provider?.id;
 
@@ -131,8 +131,8 @@ export default function ProviderHeader({ provider, earnings }) {
             <span className="text-base sm:text-lg font-bold text-slate-100 block">{provider.jobsCompleted}</span>
           </div>
           <div>
-            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Lifetime Net</span>
-            <span className="text-base sm:text-lg font-bold text-indigo-400 block">₹{earnings || provider.earnings}</span>
+            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Completed</span>
+            <span className="text-base sm:text-lg font-bold text-indigo-400 block">{completedJobs}</span>
           </div>
         </div>
       </div>

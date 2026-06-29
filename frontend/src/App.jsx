@@ -17,6 +17,7 @@ import { Signup } from './pages/Signup';
 
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import CustomerBottomNav from './components/CustomerBottomNav';
 
 import {
   LayoutDashboard,
@@ -36,7 +37,11 @@ import {
 
 
 export function MainLayout() {
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout, notifications } = useApp();
+
+  const unreadNotifications = (notifications || []).filter(
+    (n) => n.userId === currentUser?.id && !n.read
+  ).length;
 
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedCategoryDetail, setSelectedCategoryDetail] = useState('electrician');
@@ -250,9 +255,9 @@ export function MainLayout() {
         />
 
         <div className="flex-1 flex flex-col md:flex-row">
-          <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 text-slate-300 py-6 px-4 flex flex-col justify-between shrink-0 space-y-6">
-            <div className="space-y-1.5">
-              <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block px-2 mb-2">
+          <aside className="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 text-slate-300 py-3 md:py-6 px-3 md:px-4 flex flex-col md:justify-between shrink-0 gap-4 md:gap-0 md:space-y-6 md:min-h-0">
+            <div className="flex md:block gap-1.5 md:gap-0 md:space-y-1.5 overflow-x-auto md:overflow-visible pb-1 md:pb-0">
+              <span className="hidden md:block text-[9px] uppercase font-bold text-slate-500 tracking-wider px-2 mb-2">
                 Operations ledger
               </span>
               <button
@@ -260,7 +265,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('dashboard');
                   window.location.hash = 'admin/dashboard';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'dashboard'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -276,7 +281,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('customers');
                   window.location.hash = 'admin/customers';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'customers'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -292,7 +297,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('providers');
                   window.location.hash = 'admin/providers';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'providers'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -308,7 +313,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('services');
                   window.location.hash = 'admin/services';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'services'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -324,7 +329,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('providerServiceRequests');
                   window.location.hash = 'admin/providerServiceRequests';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'providerServiceRequests'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -341,7 +346,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('bookings');
                   window.location.hash = 'admin/bookings';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'bookings'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -357,7 +362,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('payments');
                   window.location.hash = 'admin/payments';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'payments'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -373,7 +378,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('reviews');
                   window.location.hash = 'admin/reviews';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'reviews'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -389,7 +394,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('tickets');
                   window.location.hash = 'admin/tickets';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'tickets'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -405,7 +410,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('analytics');
                   window.location.hash = 'admin/analytics';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'analytics'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -421,7 +426,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('reports');
                   window.location.hash = 'admin/reports';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'reports'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -437,7 +442,7 @@ export function MainLayout() {
                   setAdminActiveTabExternal('settings');
                   window.location.hash = 'admin/settings';
                 }}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left ${
+                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
                   adminActiveTabExternal === 'settings'
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'hover:bg-white/5 text-slate-305'
@@ -480,7 +485,20 @@ export function MainLayout() {
 
       {/* Footer only for public pages and customer dashboard (usually) */}
       {(!currentUser || currentUser.role === 'customer') && (
-        <Footer onNavigate={handlePageTransition} />
+        <div className={currentUser?.role === 'customer' ? 'pb-16 md:pb-0' : ''}>
+          <Footer onNavigate={handlePageTransition} />
+        </div>
+      )}
+
+      {/* Mobile sticky bottom navigation for the customer role (native-app feel) */}
+      {currentUser?.role === 'customer' && (
+        <CustomerBottomNav
+          currentPage={currentPage}
+          activeTab={customerActiveTabExternal}
+          onNavigate={handlePageTransition}
+          setCustomerActiveTab={setCustomerActiveTabExternal}
+          notificationsCount={unreadNotifications}
+        />
       )}
     </div>
   );

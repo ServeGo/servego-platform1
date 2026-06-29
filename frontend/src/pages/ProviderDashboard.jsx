@@ -78,7 +78,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   const allocatedBookings = useMemo(() => bookings.filter(b => b.providerId === activeProvider?.id), [bookings, activeProvider]);
   const activeLeads = useMemo(() => allocatedBookings.filter(b => ['pending', 'confirmed', 'en_route', 'ongoing'].includes(b.status)), [allocatedBookings]);
   const completedJobs = useMemo(() => allocatedBookings.filter(b => b.status === 'completed'), [allocatedBookings]);
-  const lifetimeEarnings = useMemo(() => completedJobs.reduce((sum, j) => sum + (j.totalAmount - j.serviceFee - j.tax), 0), [completedJobs]);
+  const completedCount = completedJobs.length;
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
@@ -123,7 +123,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         {isPending && <PendingBanner />}
 
         {!isPending && activeProvider && (
-          <ProviderHeader provider={activeProvider} earnings={lifetimeEarnings} />
+          <ProviderHeader provider={activeProvider} completedJobs={completedCount} />
         )}
 
         <TabList activeTab={activeTab} setActiveTab={setActiveTab} leadsCount={activeLeads.length} reviewsCount={activeProvider?.reviews?.length || 0} />

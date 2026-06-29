@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import apiRouter from './routes/api.js';
+import { seedServicesIfEmpty } from './seeders/servicesSeed.js';
 
 dotenv.config();
 
@@ -51,6 +52,13 @@ async function bootstrap() {
       console.log(`🔌 Live WebSocket Link Cut: ${socket.id}`);
     });
   });
+
+  // Ensure the core service catalog always exists (no-op when already seeded).
+  try {
+    await seedServicesIfEmpty();
+  } catch (seedErr) {
+    console.error('Service catalog seed skipped:', seedErr.message);
+  }
 
   const PORT = process.env.PORT || 4000;
   httpServer.listen(PORT, '0.0.0.0', () => {
