@@ -26,6 +26,8 @@ export function normalizeBooking(booking) {
       booking.providerName || providerUser.name || booking.provider?.name || 'Assigned Specialist',
     providerAvatar:
       booking.providerAvatar || booking.provider?.photo || providerUser.avatar || null,
+    // serviceCategory must come from the booking record itself, never from provider.category
+    serviceCategory: booking.serviceCategory || '',
     customerName: booking.customerName || booking.customer?.name || '',
     customerEmail: booking.customerEmail || booking.customer?.email || '',
     bookingDateLabel: formatDate(booking.bookingDate),

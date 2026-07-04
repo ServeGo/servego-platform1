@@ -1,5 +1,7 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
+import { notifyReviewPublished } from '../services/notificationService.js';
+import { sendApiError } from '../utils/response.js';
 
 export const ReviewController = {
   create: async (req, res) => {
@@ -69,15 +71,7 @@ export const ReviewController = {
 
       await refreshProviderReputation(providerId);
 
-      await prisma.notification.create({
-        data: {
-          userId: reviewerId,
-          title: 'Review Published',
-          message: 'Thank you for sharing your feedback. It helps other customers choose trusted providers.',
-          type: 'REVIEW',
-          isRead: false
-        }
-      });
+      await notifyReviewPublished(reviewerId);
 
       res.status(201).json({ success: true, review });
     } catch (err) {

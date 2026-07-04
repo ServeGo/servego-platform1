@@ -1,33 +1,37 @@
 import prisma from '../prisma/client.js';
 import { normalizePaymentStatus } from '../utils/workflow.js';
-import { canPerformAction } from '../utils/permissions.js';
+import { notifyPaymentReceived } from '../services/notificationService.js';
+import { sendApiError } from '../utils/response.js';
 
 export const PaymentController = {
   getAll: async (req, res) => {
     try {
-      const payments = await prisma.payment.findMany({
-        include: { booking: true, user: true }
-      });
+      const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
+      const payments = await prisma.payment.findMany({ where, include: { booking: true, user: true } });
       res.json(payments);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch payments', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch payments', err.message);
     }
   },
 
   create: async (req, res) => {
     try {
-      const { bookingId, userId, paymentMethod, status = 'PENDING', transactionId, role = 'customer' } = req.body;
-      if (!bookingId || !userId || !paymentMethod) {
-        return res.status(400).json({ error: 'Missing required payment fields.' });
+      const { bookingId, paymentMethod, status = 'PENDING', transactionId } = req.body;
+      const userId = req.user.id;
+      const role = req.user.role;
+
+      if (!bookingId || !paymentMethod) {
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required fields: bookingId, paymentMethod.');
+      }
+      if (role !== 'customer' && role !== 'admin') {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You are not allowed to process this payment.');
       }
 
-      if (!canPerformAction({ role, action: 'create_booking' })) {
-        return res.status(403).json({ error: 'You are not allowed to process this payment.' });
-      }
+      const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
 
-      const exists = await prisma.booking.findUnique({ where: { id: bookingId } });
-      if (!exists) {
-        return res.status(404).json({ error: 'Booking not found.' });
+      if (role === 'customer' && booking.customerId !== userId) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only pay for your own bookings.');
       }
 
       const normalizedStatus = normalizePaymentStatus(status);
@@ -44,27 +48,16 @@ export const PaymentController = {
 
       await prisma.booking.update({
         where: { id: bookingId },
-        data: {
-          paymentStatus: normalizedStatus,
-          paymentMethod
-        }
+        data: { paymentStatus: normalizedStatus, paymentMethod }
       });
 
       if (normalizedStatus === 'PAID') {
-        await prisma.notification.create({
-          data: {
-            userId,
-            title: 'Payment Received',
-            message: `Payment for booking ${bookingId} was received successfully.`,
-            type: 'PAYMENT',
-            isRead: false
-          }
-        });
+        await notifyPaymentReceived(userId, bookingId);
       }
 
       res.status(201).json(payment);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to create payment record', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create payment record', err.message);
     }
   }
 };
