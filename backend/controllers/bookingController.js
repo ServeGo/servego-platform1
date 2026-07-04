@@ -1,6 +1,7 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
 import { buildStatusHistory, isValidBookingTransition, normalizeBookingStatus, normalizePaymentStatus } from '../utils/workflow.js';
+import { canPerformAction } from '../utils/permissions.js';
 
 export const BookingController = {
   getAll: async (req, res) => {
@@ -51,8 +52,25 @@ export const BookingController = {
   create: async (req, res) => {
     try {
       const bookingData = req.body;
-      if (!bookingData.customerId || !bookingData.providerId || !bookingData.serviceCategory) {
-        return res.status(400).json({ error: 'Missing critical booking components (customerId, providerId, serviceCategory)' });
+      const actorId = req.user?.id;
+      const actorRole = req.user?.role;
+
+      if (!actorId) {
+        return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Authentication required.' });
+      }
+      if (actorRole !== 'customer' && actorRole !== 'admin') {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Only customers can create bookings.' });
+      }
+      if (actorRole === 'customer' && bookingData.customerId && bookingData.customerId !== actorId) {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You can only create bookings for yourself.' });
+      }
+      if (!bookingData.providerId || !bookingData.serviceCategory) {
+        return res.status(400).json({ error: 'Missing critical booking components (providerId, serviceCategory)' });
+      }
+
+      const customerId = actorRole === 'customer' ? actorId : bookingData.customerId;
+      if (!customerId) {
+        return res.status(400).json({ error: 'Missing critical booking components (customerId)' });
       }
 
       const parsedBookingDate = new Date(bookingData.bookingDate);
@@ -60,7 +78,7 @@ export const BookingController = {
         return res.status(400).json({ error: 'A valid booking date is required.' });
       }
 
-      const customer = await prisma.user.findUnique({ where: { id: bookingData.customerId }, select: { id: true, name: true } });
+      const customer = await prisma.user.findUnique({ where: { id: customerId }, select: { id: true, name: true } });
       const provider = await prisma.provider.findUnique({ where: { id: bookingData.providerId }, include: { user: { select: { id: true, name: true } } } });
       if (!customer || !provider) {
         return res.status(404).json({ error: 'Customer or provider not found.' });
@@ -73,7 +91,7 @@ export const BookingController = {
       const result = await prisma.booking.create({
         data: {
           id: bookingId,
-          customerId: bookingData.customerId,
+          customerId,
           providerId: bookingData.providerId,
           serviceCategory: bookingData.serviceCategory,
           bookingDate: parsedBookingDate,
@@ -148,7 +166,12 @@ export const BookingController = {
 
   updateStatus: async (req, res) => {
     try {
-      const role = req.body?.role ?? req.query?.role;
+      if (!req.user) {
+        return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Authentication required.' });
+      }
+
+      const role = req.user.role;
+      const requesterId = req.user.id;
       const { id } = req.params;
       const { status, note } = req.body;
 
@@ -163,25 +186,26 @@ export const BookingController = {
         return res.status(404).json({ error: 'Booking not found.' });
       }
 
-      if (role !== 'admin') {
-        const requesterId = req.body?.requesterId ?? req.query?.requesterId;
-        const currentStatus = normalizeBookingStatus(booking.status);
+      const currentStatus = normalizeBookingStatus(booking.status);
+      const provider = await prisma.provider.findUnique({
+        where: { id: booking.providerId },
+        select: { userId: true }
+      });
 
-        if (role === 'provider') {
-          const provider = await prisma.provider.findUnique({
-            where: { id: booking.providerId },
-            select: { userId: true }
-          });
-          const isAssignedProvider = !!provider && !!requesterId && provider.userId === requesterId;
-          if (!isAssignedProvider || !isValidBookingTransition(currentStatus, updatedStatus)) {
-            return res.status(403).json({ error: 'You are not allowed to update this booking.' });
-          }
-        } else {
-          const isOwner = requesterId && requesterId === booking.customerId;
-          if (!isOwner || !isValidBookingTransition(currentStatus, updatedStatus) || updatedStatus !== 'CANCELLED') {
-            return res.status(403).json({ error: 'You are not allowed to update this booking.' });
-          }
+      const canUpdate = canPerformAction({
+        role,
+        action: 'update_booking_status',
+        context: {
+          requesterId,
+          assignedProviderUserId: provider?.userId,
+          customerId: booking.customerId,
+          currentStatus,
+          nextStatus: updatedStatus
         }
+      }) && isValidBookingTransition(currentStatus, updatedStatus);
+
+      if (!canUpdate) {
+        return res.status(403).json({ error: 'You are not allowed to update this booking.' });
       }
 
       const newHistory = buildStatusHistory(booking.statusHistory, updatedStatus, note);
@@ -244,7 +268,8 @@ export const BookingController = {
   addMessage: async (req, res) => {
     try {
       const { id } = req.params;
-      const { senderId, senderName, senderRole, text } = req.body;
+      const { senderName, senderRole, text } = req.body;
+      const senderId = req.user?.id;
 
       if (!senderId || !text) {
         return res.status(400).json({ error: 'Sender details and message contents are required.' });

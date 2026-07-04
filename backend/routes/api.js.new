@@ -13,28 +13,9 @@ import { ReferralsController } from '../controllers/referralsController.js';
 import { ProviderServiceDiscoveryController } from '../controllers/providerServiceDiscoveryController.js';
 import { requireAuth, requireRole } from '../utils/auth.js';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const apiRouter = Router();
 
-
-
 // --- Authentication & Users ---
-
-
 apiRouter.post('/auth/register', UserController.register);
 apiRouter.post('/auth/login', UserController.login);
 apiRouter.get('/users', requireAuth, requireRole('admin'), UserController.getUsers);
@@ -56,7 +37,6 @@ apiRouter.get('/bookings/:id', requireAuth, BookingController.getById);
 apiRouter.post('/bookings', requireAuth, BookingController.create);
 apiRouter.patch('/bookings/:id/status', requireAuth, BookingController.updateStatus);
 apiRouter.patch('/admin/bookings/:id/status', requireAuth, requireRole('admin'), BookingController.updateStatus);
-
 apiRouter.post('/bookings/:id/messages', requireAuth, BookingController.addMessage);
 
 // --- Notifications ---
@@ -71,7 +51,6 @@ apiRouter.post('/tickets', TicketController.create);
 apiRouter.patch('/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
 apiRouter.get('/admin/tickets', requireAuth, requireRole('admin'), TicketController.getAll);
 apiRouter.patch('/admin/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
-
 
 // --- Reviews ---
 apiRouter.post('/reviews', requireAuth, ReviewController.create);
@@ -91,27 +70,11 @@ apiRouter.delete('/services/:id', requireAuth, requireRole('admin'), ServiceCont
 apiRouter.patch('/services/:id', requireAuth, requireRole('admin'), ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', requireAuth, requireRole('admin'), ServiceController.hideOne);
 
-
 // --- Admin: provider service items (pending requests + approved registrations) ---
 apiRouter.get('/admin/provider-service-items', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceItemsController.getAll(req, res));
-
-
-
-// Backward compatible: pending requests only
 apiRouter.get('/admin/provider-service-requests', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.getPendingRequests(req, res));
-
-
 apiRouter.patch('/admin/provider-service-requests/:id/approve', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.approveService(req, res));
 apiRouter.patch('/admin/provider-service-requests/:id/deny', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.denyService(req, res));
 apiRouter.post('/admin/providers/reputation/refresh', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.refreshReputation(req, res));
 
-// --- Customer: approved providers by service name (sector listing) ---
-apiRouter.get('/providers/by-approved-service', (req, res) => ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res));
-
 export default apiRouter;
-
-
-
-
-
-

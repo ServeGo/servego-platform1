@@ -12,13 +12,38 @@ import {
 const AppContext = createContext(undefined);
 
 const API_BASE_URL = 'http://localhost:4000/api';
+const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
+  ? window.fetch.bind(window)
+  : fetch;
+
+const getStoredAuthToken = () => {
+  try {
+    return localStorage.getItem('servego_token');
+  } catch {
+    return null;
+  }
+};
+
+const apiFetch = async (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  const token = getStoredAuthToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData) && !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  return baseFetch(url, { ...options, headers });
+};
+
+const fetch = (url, options) => apiFetch(url, options);
 
 export const AppProvider = ({ children }) => {
   // Database of users - purely for local dev fallback or admin view if needed
   const [users, setUsers] = useState([]);
 
-  // Rehydrate login state on refresh so users don't get logged out.
-  // This matches the existing persistence logic below.
+  // Restore a previously authenticated session on refresh, but clear it on explicit logout.
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const raw = localStorage.getItem('servego_user');
@@ -27,6 +52,14 @@ export const AppProvider = ({ children }) => {
       return null;
     }
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('servego_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('servego_user');
+    }
+  }, [currentUser]);
 
 
   const [providers, setProviders] = useState([]);
@@ -74,16 +107,6 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('servego_favorites', JSON.stringify(favoriteProviders));
   }, [favoriteProviders]);
 
-  // Sync currentUser to local storage
-  // (Persistence is used for intra-session behavior only; we intentionally do NOT rehydrate on startup.)
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('servego_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('servego_user');
-    }
-  }, [currentUser]);
-
   const fetchProviders = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/providers`);
@@ -105,7 +128,7 @@ export const AppProvider = ({ children }) => {
   };
 
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     if (!currentUser?.id) {
       setBookings([]);
       return;
@@ -118,25 +141,30 @@ export const AppProvider = ({ children }) => {
 
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
-      } else if (currentUser?.role === 'provider') {
-        const providerMatch = providers.find((p) => {
-          return p.id === currentUser?.providerId || p.userId === currentUser?.id || p.id === currentUser?.id;
-        });
+        return;
+      }
+
+      if (currentUser?.role === 'provider') {
+        const providerIds = [currentUser?.providerId, currentUser?.id].filter(Boolean);
+        const providerMatch = providers.find((p) => providerIds.includes(p.id) || providerIds.includes(p.userId));
         const providerId = providerMatch?.id || currentUser?.providerId || currentUser?.id;
+        const matchedIds = [providerId, currentUser?.providerId, currentUser?.id].filter(Boolean);
+
         setBookings(
           bookingsArray.filter((b) => {
-            const bookingProviderId = b.providerId || b.provider?.id;
-            return bookingProviderId === providerId || bookingProviderId === currentUser?.providerId || bookingProviderId === currentUser?.id;
+            const bookingProviderId = b.providerId || b.provider?.id || b.provider?.userId;
+            return matchedIds.includes(bookingProviderId);
           })
         );
-      } else {
-        setBookings(bookingsArray.filter((b) => b.customerId === currentUser.id));
+        return;
       }
+
+      setBookings(bookingsArray.filter((b) => b.customerId === currentUser.id));
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
       setBookings([]);
     }
-  };
+  }, [currentUser?.id, currentUser?.providerId, currentUser?.role, providers]);
 
   const fetchNotifications = async () => {
     try {
@@ -181,37 +209,6 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to fetch users:', err);
     }
   };
-
-  // Fetch initial data from backend
-  useEffect(() => {
-    fetchProviders();
-    fetchServices();
-    fetchNotifications();
-
-    if (currentUser) {
-      fetchBookings();
-      fetchTickets();
-    }
-    if (currentUser?.role === 'admin') {
-      fetchUsers();
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!currentUser?.id) return undefined;
-
-    const refreshData = () => {
-      fetchBookings();
-      fetchNotifications();
-      if (currentUser?.role === 'admin') {
-        fetchUsers();
-      }
-    };
-
-    refreshData();
-    const intervalId = window.setInterval(refreshData, 10000);
-    return () => window.clearInterval(intervalId);
-  }, [currentUser?.id, currentUser?.role]);
 
   const createService = async (payload) => {
     try {
@@ -296,6 +293,8 @@ export const AppProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      localStorage.removeItem('servego_user');
+      localStorage.removeItem('servego_token');
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -303,6 +302,9 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem('servego_token', data.token);
+        }
         setCurrentUser(data.user);
         return { success: true, role: data.user.role };
       } else {
@@ -321,6 +323,8 @@ export const AppProvider = ({ children }) => {
 
   const registerUser = async (payload) => {
     try {
+      localStorage.removeItem('servego_user');
+      localStorage.removeItem('servego_token');
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -336,6 +340,9 @@ export const AppProvider = ({ children }) => {
       }
 
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem('servego_token', data.token);
+        }
         setCurrentUser(data.user);
         return { success: true };
       }
@@ -348,6 +355,16 @@ export const AppProvider = ({ children }) => {
   };
 
   const logout = () => {
+    try {
+      localStorage.removeItem('servego_user');
+      localStorage.removeItem('servego_token');
+    } catch {
+      // Ignore storage errors.
+    }
+    // Fail-fast: clear protected state immediately.
+    setBookings([]);
+    setNotifications([]);
+    setTickets([]);
     setCurrentUser(null);
   };
 
@@ -364,6 +381,53 @@ export const AppProvider = ({ children }) => {
   const setCategory = (cat) => {
     setSelectedCategory(cat);
   };
+
+  useEffect(() => {
+    // Never expose provider/service catalog details unless authenticated.
+    if (currentUser?.id) {
+      fetchProviders();
+      fetchServices();
+
+      fetchNotifications();
+      fetchBookings();
+      fetchTickets();
+    } else {
+      setNotifications([]);
+      setBookings([]);
+      setTickets([]);
+
+      // Optional privacy: clear any previously loaded catalog data.
+      setProviders([]);
+      setServices([]);
+      setProvidersByApprovedService([]);
+    }
+
+    if (currentUser?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+
+    const refreshData = () => {
+      // Hard-stop at tick-time: never call protected endpoints if logged out.
+      const userIdAtTick = currentUser?.id;
+      if (!userIdAtTick) return;
+
+      fetchBookings();
+      fetchNotifications();
+
+      if (currentUser?.role === 'admin') {
+        fetchUsers();
+      }
+    };
+
+    refreshData();
+    const intervalId = window.setInterval(refreshData, 10000);
+    return () => window.clearInterval(intervalId);
+  }, [currentUser?.id, currentUser?.role, fetchBookings]);
 
   const createBooking = async (bookingData) => {
     try {
