@@ -145,14 +145,29 @@ export const BookingController = {
         return res.status(404).json({ error: 'Booking not found.' });
       }
 
-      // Admins can set any status. A customer may only cancel their own booking
-      // while it is still pending/confirmed (before the job starts).
+      // Admins can set any status. The provider assigned to the booking may move
+      // it through the service lifecycle (accept/start/complete) or decline it.
+      // A customer may only cancel their own booking while it is still
+      // pending/confirmed (before the job starts).
       if (role !== 'admin') {
         const requesterId = req.body?.requesterId ?? req.query?.requesterId;
-        const isOwner = requesterId && requesterId === booking.customerId;
-        const isCancellable = ['PENDING', 'CONFIRMED'].includes(booking.status);
-        if (!isOwner || updatedStatus !== 'CANCELLED' || !isCancellable) {
-          return res.status(403).json({ error: 'You are not allowed to update this booking.' });
+
+        if (role === 'provider') {
+          const provider = await prisma.provider.findUnique({
+            where: { id: booking.providerId },
+            select: { userId: true }
+          });
+          const isAssignedProvider = !!provider && !!requesterId && provider.userId === requesterId;
+          const providerStatuses = ['CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED'];
+          if (!isAssignedProvider || !providerStatuses.includes(updatedStatus)) {
+            return res.status(403).json({ error: 'You are not allowed to update this booking.' });
+          }
+        } else {
+          const isOwner = requesterId && requesterId === booking.customerId;
+          const isCancellable = ['PENDING', 'CONFIRMED'].includes(booking.status);
+          if (!isOwner || updatedStatus !== 'CANCELLED' || !isCancellable) {
+            return res.status(403).json({ error: 'You are not allowed to update this booking.' });
+          }
         }
       }
       const newHistory = [...(booking.statusHistory || []), {

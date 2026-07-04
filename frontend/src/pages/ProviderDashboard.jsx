@@ -139,7 +139,6 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
             setChatInput={setChatInput}
             onAccept={(id) => updateBookingStatus(id, 'confirmed', 'Accepted.')}
             onReject={(id) => updateBookingStatus(id, 'cancelled', 'Rejected.')}
-            onTravel={(id) => updateBookingStatus(id, 'en_route', 'En-route.')}
             onStartWork={(id) => updateBookingStatus(id, 'ongoing', 'Work started.')}
             onFinishWork={(id) => updateBookingStatus(id, 'completed', 'Completed.')}
             onSendMessage={sendChatMessage}
@@ -255,7 +254,6 @@ function LeadsPage({
   setChatInput,
   onAccept,
   onReject,
-  onTravel,
   onStartWork,
   onFinishWork,
   onSendMessage
@@ -375,7 +373,6 @@ function LeadsPage({
               lead={bk}
               onAccept={onAccept}
               onReject={onReject}
-              onTravel={onTravel}
               onStartWork={onStartWork}
               onFinishWork={onFinishWork}
               chatOpen={openChatBookingId === bk.id}

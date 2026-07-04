@@ -15,8 +15,6 @@ export default function LeadCard({
   setChatInput,
   onSendMessage
 }) {
-  const netPayout = lead.totalAmount - lead.serviceFee - lead.tax;
-
   return (
     <div className="bg-white rounded-2xl border-2 border-indigo-100 overflow-hidden shadow-xs p-6 relative text-left">
       <div className="absolute top-6 right-6 text-right">
@@ -31,7 +29,7 @@ export default function LeadCard({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 font-bold text-xs text-slate-500 my-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
         <div>
           <span className="text-[10px] text-slate-400 uppercase block mb-1">Schedule</span>
-          <span className="text-slate-800">{lead.bookingDate} • {lead.bookingTimeSlot}</span>
+          <span className="text-slate-800">{lead.bookingDateLabel || lead.bookingDate} • {lead.bookingTimeSlot}</span>
         </div>
         
         <div>
@@ -40,8 +38,8 @@ export default function LeadCard({
         </div>
 
         <div>
-          <span className="text-[10px] text-slate-400 uppercase block mb-1">Net Payout</span>
-          <span className="text-indigo-600 font-black text-sm">₹{netPayout}</span>
+          <span className="text-[10px] text-slate-400 uppercase block mb-1">Payment</span>
+          <span className="text-indigo-600 font-black text-sm">{lead.paymentMethod || 'On completion'}</span>
         </div>
       </div>
 
@@ -55,15 +53,14 @@ export default function LeadCard({
       <div className="mb-6">
         <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Status Timeline</span>
         <div className="flex flex-wrap gap-2">
-          {['pending', 'confirmed', 'en_route', 'ongoing', 'completed'].map(s => {
+          {['pending', 'confirmed', 'ongoing', 'completed'].map(s => {
             const labels = {
               pending: 'Offer',
               confirmed: 'Accepted',
-              en_route: 'En-route',
               ongoing: 'Work',
               completed: 'Done'
             };
-            const order = ['pending', 'confirmed', 'en_route', 'ongoing', 'completed'];
+            const order = ['pending', 'confirmed', 'ongoing', 'completed'];
             const currentIdx = order.indexOf(lead.status);
             const sIdx = order.indexOf(s);
             const isDone = sIdx <= currentIdx && currentIdx !== -1;
@@ -115,10 +112,6 @@ export default function LeadCard({
 
 
         {lead.status === 'confirmed' && (
-          <button onClick={() => onTravel(lead.id)} className="bg-indigo-600 hover:bg-indigo-750 text-white px-6 py-2.5 text-xs font-bold rounded-xl transition-all">🚚 Mark En-Route</button>
-        )}
-
-        {lead.status === 'en_route' && (
           <button onClick={() => onStartWork(lead.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 text-xs font-bold rounded-xl transition-all">🛠 Start Work</button>
         )}
 
