@@ -306,8 +306,8 @@ Requested: {new Date(sv.createdAt).toLocaleString()}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-semibold text-slate-700">
           <ol className="list-decimal list-inside space-y-2">
             <li>Select a service from the list.</li>
-            <li>Add your experience years.</li>
-            <li>Click Register. Your service will appear in this page.</li>
+            <li>Add your experience years and a short description.</li>
+            <li>Submit for review. Admin approval will move it to the approved list.</li>
           </ol>
         </div>
       </div>

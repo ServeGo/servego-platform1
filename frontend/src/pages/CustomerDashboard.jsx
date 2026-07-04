@@ -54,7 +54,7 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
   // Loyalty progression based on completed bookings.
   const completedCount = useMemo(
-    () => userBookings.filter(b => b.status === 'completed').length,
+    () => userBookings.filter(b => ['completed', 'reviewed'].includes(b.status)).length,
     [userBookings]
   );
   const loyaltyProgress = useMemo(() => {

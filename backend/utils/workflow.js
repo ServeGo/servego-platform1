@@ -1,0 +1,48 @@
+const BOOKING_TRANSITIONS = {
+  PENDING: ['CONFIRMED', 'CANCELLED', 'REJECTED'],
+  CONFIRMED: ['ONGOING', 'CANCELLED'],
+  ONGOING: ['COMPLETED', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+  REJECTED: []
+};
+
+const STATUS_ALIASES = {
+  PENDING: ['PENDING', 'NEW', 'OPEN'],
+  CONFIRMED: ['CONFIRMED', 'ACCEPTED', 'APPROVED'],
+  ONGOING: ['ONGOING', 'IN_PROGRESS', 'EN_ROUTE', 'WORK_IN_PROGRESS'],
+  COMPLETED: ['COMPLETED', 'DONE', 'FINISHED', 'REVIEWED'],
+  CANCELLED: ['CANCELLED', 'CANCELED', 'REJECTED', 'DECLINED'],
+  REJECTED: ['REJECTED', 'DECLINED']
+};
+
+export function normalizeBookingStatus(status) {
+  const value = String(status || '').trim().toUpperCase();
+  if (value in BOOKING_TRANSITIONS) return value;
+
+  const matched = Object.entries(STATUS_ALIASES).find(([, aliases]) => aliases.includes(value));
+  return matched ? matched[0] : 'PENDING';
+}
+
+export function normalizePaymentStatus(status) {
+  const value = String(status || '').trim().toUpperCase();
+  return ['PENDING', 'UNPAID', 'PAID', 'FAILED'].includes(value) ? value : 'PENDING';
+}
+
+export function isValidBookingTransition(currentStatus, nextStatus) {
+  const from = normalizeBookingStatus(currentStatus);
+  const to = normalizeBookingStatus(nextStatus);
+  return BOOKING_TRANSITIONS[from]?.includes(to) || false;
+}
+
+export function buildStatusHistory(previousHistory, nextStatus, note) {
+  const history = Array.isArray(previousHistory) ? previousHistory : [];
+  return [
+    ...history,
+    {
+      status: normalizeBookingStatus(nextStatus),
+      timestamp: new Date().toISOString(),
+      note: note || `Status changed to ${normalizeBookingStatus(nextStatus)}`
+    }
+  ];
+}

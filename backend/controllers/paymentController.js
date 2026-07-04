@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { normalizePaymentStatus } from '../utils/workflow.js';
 
 export const PaymentController = {
   getAll: async (req, res) => {
@@ -19,31 +20,42 @@ export const PaymentController = {
         return res.status(400).json({ error: 'Missing required payment fields.' });
       }
 
-
       const exists = await prisma.booking.findUnique({ where: { id: bookingId } });
       if (!exists) {
         return res.status(404).json({ error: 'Booking not found.' });
       }
 
+      const normalizedStatus = normalizePaymentStatus(status);
       const payment = await prisma.payment.create({
         data: {
           bookingId,
           userId,
           paymentMethod,
-          status,
+          status: normalizedStatus,
           transactionId,
-          paidAt: status === 'PAID' ? new Date() : null
+          paidAt: normalizedStatus === 'PAID' ? new Date() : null
         }
       });
-
 
       await prisma.booking.update({
         where: { id: bookingId },
         data: {
-          paymentStatus: status,
+          paymentStatus: normalizedStatus,
           paymentMethod
         }
       });
+
+      if (normalizedStatus === 'PAID') {
+        await prisma.notification.create({
+          data: {
+            userId,
+            title: 'Payment Received',
+            message: `Payment for booking ${bookingId} was received successfully.`,
+            type: 'PAYMENT',
+            isRead: false
+          }
+        });
+      }
 
       res.status(201).json(payment);
     } catch (err) {

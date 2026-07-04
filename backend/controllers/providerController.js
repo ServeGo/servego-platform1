@@ -204,7 +204,7 @@ export const ProviderController = {
   updateProfile: async (req, res) => {
     try {
       const { id } = req.params;
-      const { bio, specialties, serviceAreas } = req.body;
+      const { bio, specialties, serviceAreas, experienceYears, phone, isVerified } = req.body;
 
       const existing = await prisma.provider.findUnique({ where: { id } });
       if (!existing) {
@@ -214,9 +214,11 @@ export const ProviderController = {
       const updated = await prisma.provider.update({
         where: { id },
         data: {
-          bio,
+          bio: bio ?? existing.bio,
           specialties: Array.isArray(specialties) ? specialties : existing.specialties,
-          serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas
+          serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas,
+          experienceYears: Number.isFinite(Number(experienceYears)) ? Number(experienceYears) : existing.experienceYears,
+          isVerified: typeof isVerified === 'boolean' ? isVerified : existing.isVerified
         },
         include: { reviews: true }
       });
