@@ -29,12 +29,18 @@ export const ReviewController = {
       if (bookingId) {
         const booking = await prisma.booking.findUnique({
           where: { id: bookingId },
-          select: { id: true, providerId: true }
+          select: { id: true, providerId: true, customerId: true, status: true }
         });
 
         if (!booking) return res.status(400).json({ error: 'Invalid bookingId' });
         if (booking.providerId !== providerId) {
           return res.status(400).json({ error: 'bookingId does not belong to the given providerId' });
+        }
+        if (booking.customerId !== reviewerId) {
+          return res.status(403).json({ error: 'Only the customer who booked the service can leave a review.' });
+        }
+        if (!['COMPLETED', 'REVIEWED'].includes(booking.status)) {
+          return res.status(409).json({ error: 'Reviews can only be submitted after the booking is completed.' });
         }
       }
 
@@ -62,6 +68,16 @@ export const ReviewController = {
       }
 
       await refreshProviderReputation(providerId);
+
+      await prisma.notification.create({
+        data: {
+          userId: reviewerId,
+          title: 'Review Published',
+          message: 'Thank you for sharing your feedback. It helps other customers choose trusted providers.',
+          type: 'REVIEW',
+          isRead: false
+        }
+      });
 
       res.status(201).json({ success: true, review });
     } catch (err) {

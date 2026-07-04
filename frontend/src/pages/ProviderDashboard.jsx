@@ -76,8 +76,8 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   }, [activeProvider]);
 
   const allocatedBookings = useMemo(() => bookings.filter(b => b.providerId === activeProvider?.id), [bookings, activeProvider]);
-  const activeLeads = useMemo(() => allocatedBookings.filter(b => ['pending', 'confirmed', 'en_route', 'ongoing'].includes(b.status)), [allocatedBookings]);
-  const completedJobs = useMemo(() => allocatedBookings.filter(b => b.status === 'completed'), [allocatedBookings]);
+  const activeLeads = useMemo(() => allocatedBookings.filter(b => ['pending', 'confirmed', 'in_progress', 'en_route', 'ongoing'].includes(b.status)), [allocatedBookings]);
+  const completedJobs = useMemo(() => allocatedBookings.filter(b => ['completed', 'reviewed'].includes(b.status)), [allocatedBookings]);
   const completedCount = completedJobs.length;
 
   const handleSaveSettings = (e) => {
@@ -270,7 +270,7 @@ function LeadsPage({
     if (statusFilter === 'pending') {
       arr = arr.filter(b => b.status === 'pending');
     } else if (statusFilter === 'active') {
-      arr = arr.filter(b => ['confirmed', 'en_route', 'ongoing'].includes(b.status));
+      arr = arr.filter(b => ['confirmed', 'in_progress', 'en_route', 'ongoing'].includes(b.status));
     }
 
     if (q) {

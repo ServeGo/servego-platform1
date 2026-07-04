@@ -84,21 +84,6 @@ export const AppProvider = ({ children }) => {
     }
   }, [currentUser]);
 
-  // Fetch initial data from backend
-  useEffect(() => {
-    fetchProviders();
-    fetchServices();
-    fetchNotifications();
-
-    if (currentUser) {
-      fetchBookings();
-      fetchTickets();
-    }
-    if (currentUser?.role === 'admin') {
-      fetchUsers();
-    }
-  }, [currentUser]);
-
   const fetchProviders = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/providers`);
@@ -121,18 +106,31 @@ export const AppProvider = ({ children }) => {
 
 
   const fetchBookings = async () => {
+    if (!currentUser?.id) {
+      setBookings([]);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/bookings`);
       const data = await res.json();
       const bookingsArray = normalizeBookings(data);
-      // Filter for current user if not admin
+
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
       } else if (currentUser?.role === 'provider') {
-        const providerId = currentUser.providerId || currentUser.id;
-        setBookings(bookingsArray.filter(b => b.providerId === providerId));
+        const providerMatch = providers.find((p) => {
+          return p.id === currentUser?.providerId || p.userId === currentUser?.id || p.id === currentUser?.id;
+        });
+        const providerId = providerMatch?.id || currentUser?.providerId || currentUser?.id;
+        setBookings(
+          bookingsArray.filter((b) => {
+            const bookingProviderId = b.providerId || b.provider?.id;
+            return bookingProviderId === providerId || bookingProviderId === currentUser?.providerId || bookingProviderId === currentUser?.id;
+          })
+        );
       } else {
-        setBookings(bookingsArray.filter(b => b.customerId === currentUser.id));
+        setBookings(bookingsArray.filter((b) => b.customerId === currentUser.id));
       }
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
@@ -183,6 +181,37 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to fetch users:', err);
     }
   };
+
+  // Fetch initial data from backend
+  useEffect(() => {
+    fetchProviders();
+    fetchServices();
+    fetchNotifications();
+
+    if (currentUser) {
+      fetchBookings();
+      fetchTickets();
+    }
+    if (currentUser?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+
+    const refreshData = () => {
+      fetchBookings();
+      fetchNotifications();
+      if (currentUser?.role === 'admin') {
+        fetchUsers();
+      }
+    };
+
+    refreshData();
+    const intervalId = window.setInterval(refreshData, 10000);
+    return () => window.clearInterval(intervalId);
+  }, [currentUser?.id, currentUser?.role]);
 
   const createService = async (payload) => {
     try {
@@ -353,7 +382,12 @@ export const AppProvider = ({ children }) => {
       if (data.id) {
         const normalized = normalizeBooking(data);
         setBookings(prev => [normalized, ...prev]);
+        fetchBookings();
+        fetchNotifications();
         return normalized;
+      }
+      if (data.error) {
+        return { error: data.error };
       }
       return data;
     } catch (err) {
@@ -379,6 +413,9 @@ export const AppProvider = ({ children }) => {
         const normalized = normalizeBooking(data);
         setBookings(prev => prev.map(bk => bk.id === bookingId ? normalized : bk));
         return normalized;
+      }
+      if (data.error) {
+        return { error: data.error };
       }
       return data;
     } catch (err) {

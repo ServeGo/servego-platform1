@@ -111,19 +111,19 @@ export default function AdminDashboardPanel({
                     {bk.bookingDate} • {bk.bookingTimeSlot}
                   </div>
                   <div>
-                    {bk.status === 'pending' && (
+                    {['pending', 'new'].includes(bk.status) && (
                       <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Pending</span>
                     )}
-                    {bk.status === 'confirmed' && (
+                    {['confirmed', 'accepted'].includes(bk.status) && (
                       <span className="bg-indigo-100 text-indigo-850 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Confirmed</span>
                     )}
-                    {bk.status === 'ongoing' && (
+                    {['ongoing', 'in_progress', 'en_route'].includes(bk.status) && (
                       <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Ongoing</span>
                     )}
-                    {bk.status === 'completed' && (
+                    {['completed', 'reviewed'].includes(bk.status) && (
                       <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Completed</span>
                     )}
-                    {bk.status === 'cancelled' && (
+                    {['cancelled', 'canceled', 'rejected'].includes(bk.status) && (
                       <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded text-[9px] font-extrabold uppercase">Cancelled</span>
                     )}
                   </div>

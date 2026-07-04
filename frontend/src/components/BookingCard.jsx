@@ -74,7 +74,7 @@ export default function BookingCard({
       </div>
 
       {/* Live Tracking Map */}
-      {(booking.status === 'en_route' || booking.status === 'ongoing') && (
+      {['ongoing', 'in_progress', 'en_route'].includes(booking.status) && (
         <div className="mb-6 rounded-xl overflow-hidden border border-slate-200">
           <LiveTrackingMap booking={booking} />
         </div>
@@ -103,7 +103,7 @@ export default function BookingCard({
 
       {/* Action buttons */}
       <div className="flex justify-end gap-2">
-        {['pending', 'confirmed', 'en_route', 'ongoing'].includes(booking.status) && (
+        {['pending', 'confirmed', 'in_progress', 'en_route', 'ongoing'].includes(booking.status) && (
           <button 
             type="button"
             onClick={onToggleChat}
@@ -127,7 +127,7 @@ export default function BookingCard({
           </button>
         )}
 
-        {booking.status === 'completed' && !booking.reviewed && (
+        {['completed', 'reviewed'].includes(booking.status) && !booking.reviewed && (
           <button 
             onClick={() => onReview(booking)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-bold rounded-lg text-xs transition-colors border border-indigo-500/10 shadow-sm"
@@ -136,7 +136,7 @@ export default function BookingCard({
           </button>
         )}
         
-        {booking.status === 'completed' && booking.reviewed && (
+        {['completed', 'reviewed'].includes(booking.status) && booking.reviewed && (
           <span className="bg-slate-50 text-slate-500 font-bold text-[10px] uppercase px-4 py-2 rounded-xl border border-slate-200 tracking-wide">
             Verified Review Shared
           </span>

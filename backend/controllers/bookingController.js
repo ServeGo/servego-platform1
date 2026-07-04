@@ -1,5 +1,6 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
+import { buildStatusHistory, isValidBookingTransition, normalizeBookingStatus, normalizePaymentStatus } from '../utils/workflow.js';
 
 export const BookingController = {
   getAll: async (req, res) => {
@@ -59,8 +60,15 @@ export const BookingController = {
         return res.status(400).json({ error: 'A valid booking date is required.' });
       }
 
+      const customer = await prisma.user.findUnique({ where: { id: bookingData.customerId }, select: { id: true, name: true } });
+      const provider = await prisma.provider.findUnique({ where: { id: bookingData.providerId }, include: { user: { select: { id: true, name: true } } } });
+      if (!customer || !provider) {
+        return res.status(404).json({ error: 'Customer or provider not found.' });
+      }
+
       const timestamp = new Date();
       const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
+      const initialStatus = 'PENDING';
 
       const result = await prisma.booking.create({
         data: {
@@ -70,19 +78,17 @@ export const BookingController = {
           serviceCategory: bookingData.serviceCategory,
           bookingDate: parsedBookingDate,
           bookingTimeSlot: bookingData.bookingTimeSlot || 'Flexible',
-          status: 'PENDING',
-          paymentStatus: bookingData.paymentStatus?.toUpperCase() || 'UNPAID',
+          status: initialStatus,
+          paymentStatus: normalizePaymentStatus(bookingData.paymentStatus),
           paymentMethod: bookingData.paymentMethod || null,
-          locationAddress: bookingData.locationAddress,
+          locationAddress: bookingData.locationAddress || '',
           city: bookingData.city || 'Hyderabad',
           instructions: bookingData.instructions || '',
           bookingTime: timestamp,
-
           messages: [],
-
           reviewed: false,
           statusHistory: [
-            { status: 'PENDING', timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
+            { status: initialStatus, timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
           ]
         },
         include: {
@@ -98,16 +104,14 @@ export const BookingController = {
       });
 
 
-      // Notifications are keyed by User id; map the provider to its owning user.
-      // Never let a notification failure roll back a successful booking.
-      const providerUserId = result.provider?.userId || result.provider?.user?.id;
+      const providerUserId = provider?.user?.id;
       if (providerUserId) {
         try {
           await prisma.notification.create({
             data: {
               userId: providerUserId,
-              title: 'New Service Job Request',
-              message: `You have received a new ${bookingData.serviceCategory} request from ${bookingData.customerName || 'a customer'}.`,
+              title: 'New Service Request',
+              message: `You have a new ${bookingData.serviceCategory} request from ${customer?.name || 'a customer'}.`,
               type: 'BOOKING',
               isRead: false
             }
@@ -115,6 +119,20 @@ export const BookingController = {
         } catch (notifyErr) {
           console.error('Failed to create provider notification for booking:', notifyErr.message);
         }
+      }
+
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: customer.id,
+            title: 'Booking Received',
+            message: `Your ${bookingData.serviceCategory} booking is pending confirmation.`,
+            type: 'BOOKING',
+            isRead: false
+          }
+        });
+      } catch (notifyErr) {
+        console.error('Failed to create customer notification for booking:', notifyErr.message);
       }
 
       const io = req.app.get('socketio');
@@ -138,19 +156,16 @@ export const BookingController = {
         return res.status(400).json({ error: 'A valid service status string is required.' });
       }
 
-      const updatedStatus = String(status).toUpperCase();
+      const updatedStatus = normalizeBookingStatus(status);
 
       const booking = await prisma.booking.findUnique({ where: { id } });
       if (!booking) {
         return res.status(404).json({ error: 'Booking not found.' });
       }
 
-      // Admins can set any status. The provider assigned to the booking may move
-      // it through the service lifecycle (accept/start/complete) or decline it.
-      // A customer may only cancel their own booking while it is still
-      // pending/confirmed (before the job starts).
       if (role !== 'admin') {
         const requesterId = req.body?.requesterId ?? req.query?.requesterId;
+        const currentStatus = normalizeBookingStatus(booking.status);
 
         if (role === 'provider') {
           const provider = await prisma.provider.findUnique({
@@ -158,29 +173,25 @@ export const BookingController = {
             select: { userId: true }
           });
           const isAssignedProvider = !!provider && !!requesterId && provider.userId === requesterId;
-          const providerStatuses = ['CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED'];
-          if (!isAssignedProvider || !providerStatuses.includes(updatedStatus)) {
+          if (!isAssignedProvider || !isValidBookingTransition(currentStatus, updatedStatus)) {
             return res.status(403).json({ error: 'You are not allowed to update this booking.' });
           }
         } else {
           const isOwner = requesterId && requesterId === booking.customerId;
-          const isCancellable = ['PENDING', 'CONFIRMED'].includes(booking.status);
-          if (!isOwner || updatedStatus !== 'CANCELLED' || !isCancellable) {
+          if (!isOwner || !isValidBookingTransition(currentStatus, updatedStatus) || updatedStatus !== 'CANCELLED') {
             return res.status(403).json({ error: 'You are not allowed to update this booking.' });
           }
         }
       }
-      const newHistory = [...(booking.statusHistory || []), {
-        status: updatedStatus,
-        timestamp: new Date().toISOString(),
-        note: note || `Status changed to ${updatedStatus}`
-      }];
+
+      const newHistory = buildStatusHistory(booking.statusHistory, updatedStatus, note);
 
       const updated = await prisma.booking.update({
         where: { id },
         data: {
           status: updatedStatus,
-          statusHistory: newHistory
+          statusHistory: newHistory,
+          paymentStatus: updatedStatus === 'COMPLETED' ? 'PAID' : booking.paymentStatus
         },
         include: {
           customer: { select: { id: true, name: true, email: true, phone: true } },
@@ -205,6 +216,19 @@ export const BookingController = {
           isRead: false
         }
       });
+
+      const providerUser = await prisma.provider.findUnique({ where: { id: booking.providerId }, select: { userId: true } });
+      if (providerUser?.userId) {
+        await prisma.notification.create({
+          data: {
+            userId: providerUser.userId,
+            title: 'Booking Update',
+            message: `Booking ${booking.id} changed to ${updatedStatus}.`,
+            type: 'BOOKING',
+            isRead: false
+          }
+        });
+      }
 
       const io = req.app.get('socketio');
       if (io) {

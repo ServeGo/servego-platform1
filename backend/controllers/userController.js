@@ -76,11 +76,15 @@ export const UserController = {
         if (!serviceInterested) {
           return res.status(400).json({ error: 'Service interested is required for provider signup.' });
         }
+        if (!/^[A-Za-z\s]+$/.test(String(serviceInterested).trim())) {
+          return res.status(400).json({ error: 'Please choose a valid service category.' });
+        }
       } else {
         return res.status(400).json({ error: 'Signup role must be either customer or provider.' });
       }
 
-      const existingUser = await prisma.user.findUnique({ where: { email } });
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
       if (existingUser) {
         return res.status(400).json({ error: 'An account with this email address already exists. Please choose another email.' });
       }
@@ -92,7 +96,7 @@ export const UserController = {
       const newUser = await prisma.user.create({
         data: {
           name,
-          email,
+          email: normalizedEmail,
           phone,
           role,
           password: hashedPassword,
@@ -187,8 +191,9 @@ export const UserController = {
         return res.status(400).json({ error: 'Please enter both your email address and password.' });
       }
 
+      const normalizedEmail = String(email).trim().toLowerCase();
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         include: {
           customerProfile: true,
           providerProfile: true
@@ -197,7 +202,7 @@ export const UserController = {
       if (!user || !(await bcrypt.compare(password, user.password))) {
         await prisma.authEvent.create({
           data: {
-            email,
+            email: normalizedEmail,
             eventType: 'LOGIN',
             success: false
           }
