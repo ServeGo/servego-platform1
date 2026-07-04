@@ -61,7 +61,7 @@ export default function ServiceCard({
         </div>
 
         <button 
-          onClick={() => onSelect(category.id)}
+          onClick={() => onSelect(category.name)}
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2 px-3 rounded-lg text-xs transition-all flex items-center gap-1 group shadow-xs focus:outline-none"
         >
           <span>Book Now</span>

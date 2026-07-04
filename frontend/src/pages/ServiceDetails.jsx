@@ -26,9 +26,18 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   const [applyReferralCredit, setApplyReferralCredit] = useState(true);
 
-  // Metadata
+  // Metadata — try static lookup first, fall back to a synthetic entry built
+  // from the catId itself (for DB-driven services like 'dhobi', 'cook', etc.)
   const categoryMeta = useMemo(() => {
-    return SERVICE_CATEGORIES.find(c => c.id === catId) || SERVICE_CATEGORIES[0];
+    const found = SERVICE_CATEGORIES.find(
+      c => c.name.toLowerCase() === String(catId).toLowerCase()
+    );
+    if (found) return found;
+    // Build a minimal meta object from the service name
+    const displayName = catId
+      ? String(catId).charAt(0).toUpperCase() + String(catId).slice(1)
+      : 'Service';
+    return { id: catId, name: displayName, description: '', popularIssues: [] };
   }, [catId]);
 
   // UI state
@@ -160,11 +169,20 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
         instructions,
         paymentMethod
       });
+
       if (!created || created.error) {
         setErrorText(created?.error || 'Could not complete the booking. Please try again.');
         setBookingStep(1);
         return;
       }
+
+      // Only proceed to success if we have a real booking id
+      if (!created.id) {
+        setErrorText('Could not complete the booking. Please try again.');
+        setBookingStep(1);
+        return;
+      }
+
       setConfirmedBookingDetails(created);
       setBookingStep(3);
     }, 1500);

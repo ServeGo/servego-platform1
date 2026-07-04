@@ -266,8 +266,11 @@ Key state slices:
 - UI filters: city/area/search/category
 
 Core customer data retrieval:
-- Providers list: `GET /api/providers`
-- Services catalog: `GET /api/services`
+- **Authentication-aware provider/service catalog loading (privacy)**:
+  - When **logged in** (`currentUser?.id` exists):
+    - Providers list: `GET /api/providers`
+    - Services catalog: `GET /api/services`
+  - When **logged out**: the frontend does **not** call the above endpoints and clears catalog state (`providers`, `services`, `providersByApprovedService`).
 - Notifications (scoped):
   - if logged in: `GET /api/notifications?userId=<currentUser.id>`
   - fallback: `GET /api/notifications`
@@ -279,6 +282,7 @@ Bookings retrieval is role-aware:
 - admin: loads all bookings from `GET /api/bookings`
 - provider: filters bookings by providerId/userId
 - customer: filters bookings by `customerId === currentUser.id`
+
 
 ### 5.2 Customer actions (API actions invoked by AppContext)
 Provider discovery:

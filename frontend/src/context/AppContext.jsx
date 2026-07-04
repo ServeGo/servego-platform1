@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { io } from 'socket.io-client';
 import {
   normalizeBooking,
   normalizeBookings,
@@ -12,6 +13,7 @@ import {
 const AppContext = createContext(undefined);
 
 const API_BASE_URL = 'http://localhost:4000/api';
+const SOCKET_URL = 'http://localhost:4000';
 const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
   ? window.fetch.bind(window)
   : fetch;
@@ -80,6 +82,8 @@ export const AppProvider = ({ children }) => {
   const [selectedArea, setSelectedArea] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const socketRef = useRef(null);
 
   const fetchProvidersByApprovedServiceName = useCallback(async (serviceName) => {
     if (!serviceName) return [];
@@ -168,11 +172,7 @@ export const AppProvider = ({ children }) => {
 
   const fetchNotifications = async () => {
     try {
-      // Scope to the signed-in user so customers never receive another inbox.
-      const url = currentUser?.id
-        ? `${API_BASE_URL}/notifications?userId=${encodeURIComponent(currentUser.id)}`
-        : `${API_BASE_URL}/notifications`;
-      const res = await fetch(url);
+      const res = await fetch(`${API_BASE_URL}/notifications`);
       const data = await res.json();
       setNotifications(normalizeNotifications(data));
     } catch (err) {
@@ -182,15 +182,10 @@ export const AppProvider = ({ children }) => {
 
   const fetchTickets = async () => {
     try {
-      // Admins read every ticket; customers/providers read only their own,
-      // scoped by email. A GET request must never carry a body.
       const url = currentUser?.role === 'admin'
-        ? `${API_BASE_URL}/admin/tickets?role=admin`
-        : `${API_BASE_URL}/tickets?requesterEmail=${encodeURIComponent(currentUser?.email || '')}`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+        ? `${API_BASE_URL}/admin/tickets`
+        : `${API_BASE_URL}/tickets`;
+      const res = await fetch(url);
       const data = await res.json();
       setTickets(normalizeTickets(data));
     } catch (err) {
@@ -248,12 +243,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const deleteService = async (id, payload = { role: 'admin' }) => {
+  const deleteService = async (id) => {
     try {
       const res = await fetch(`${API_BASE_URL}/services/${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
       if (res.ok) {
@@ -272,7 +266,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/services/${id}/hide`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin', isHidden })
+        body: JSON.stringify({ isHidden })
       });
       const data = await res.json();
       if (res.ok) {
@@ -411,22 +405,32 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (!currentUser?.id) return undefined;
 
-    const refreshData = () => {
-      // Hard-stop at tick-time: never call protected endpoints if logged out.
-      const userIdAtTick = currentUser?.id;
-      if (!userIdAtTick) return;
+    // Connect socket once per session
+    const socket = io(SOCKET_URL, { transports: ['websocket'] });
+    socketRef.current = socket;
 
-      fetchBookings();
-      fetchNotifications();
-
-      if (currentUser?.role === 'admin') {
-        fetchUsers();
+    // Real-time notification updates via socket — no polling needed
+    socket.on('newJobLead', () => fetchBookings());
+    socket.on('bookingUpdated', () => fetchBookings());
+    socket.on('notification', (notif) => {
+      if (notif.userId === currentUser.id) {
+        setNotifications(prev => [normalizeNotification(notif), ...prev]);
       }
-    };
+    });
 
-    refreshData();
-    const intervalId = window.setInterval(refreshData, 10000);
-    return () => window.clearInterval(intervalId);
+    // Poll bookings every 30s (reduced from 10s), no notification polling
+    fetchBookings();
+    const intervalId = window.setInterval(() => {
+      if (currentUser?.id) fetchBookings();
+    }, 30000);
+
+    if (currentUser?.role === 'admin') fetchUsers();
+
+    return () => {
+      window.clearInterval(intervalId);
+      socket.disconnect();
+      socketRef.current = null;
+    };
   }, [currentUser?.id, currentUser?.role, fetchBookings]);
 
   const createBooking = async (bookingData) => {
@@ -443,17 +447,16 @@ export const AppProvider = ({ children }) => {
         })
       });
       const data = await res.json();
+      if (!res.ok) {
+        return { error: data.message || data.error || 'Booking failed.' };
+      }
       if (data.id) {
         const normalized = normalizeBooking(data);
         setBookings(prev => [normalized, ...prev]);
         fetchBookings();
-        fetchNotifications();
         return normalized;
       }
-      if (data.error) {
-        return { error: data.error };
-      }
-      return data;
+      return { error: 'Booking failed.' };
     } catch (err) {
       console.error('Failed to create booking:', err);
       return { error: 'Network error' };
@@ -465,12 +468,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status,
-          note,
-          role: currentUser?.role,
-          requesterId: currentUser?.id
-        })
+        body: JSON.stringify({ status, note })
       });
       const data = await res.json();
       if (data.id) {
@@ -614,8 +612,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin', response: responseText }),
-
+        body: JSON.stringify({ response: responseText })
       });
       const data = await res.json();
       if (data.id) {
@@ -739,10 +736,7 @@ export const AppProvider = ({ children }) => {
   const fetchProviderServiceRequests = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests?role=admin`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests`);
 
       const data = await res.json();
       if (res.ok) {
@@ -758,10 +752,7 @@ export const AppProvider = ({ children }) => {
   const fetchProviderServiceItems = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-items?role=admin`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-items`);
       const data = await res.json();
       if (res.ok) {
         setProviderServiceItems(Array.isArray(data) ? data : []);
@@ -792,9 +783,7 @@ export const AppProvider = ({ children }) => {
     if (currentUser?.role !== 'admin') return { error: 'Admin access required' };
     try {
       const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/approve`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin' })
+        method: 'PATCH'
       });
       const data = await res.json();
       if (res.ok) {
@@ -816,7 +805,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/deny`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin', reason })
+        body: JSON.stringify({ reason })
       });
       const data = await res.json();
       if (res.ok) {

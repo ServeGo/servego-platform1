@@ -1,6 +1,8 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
 import { canPerformAction } from '../utils/permissions.js';
+import { writeAuditLog } from '../services/auditLogService.js';
+import { sendApiError } from '../utils/response.js';
 
 export const ProviderController = {
   getProviderServices: async (req, res) => {
@@ -266,16 +268,26 @@ export const ProviderController = {
       const { id } = req.params;
       const { isVerified } = req.body;
 
-      await prisma.provider.update({
-        where: { id },
-        data: {
-          isVerified: Boolean(isVerified)
-        }
-      });
+      const existing = await prisma.provider.findUnique({ where: { id }, select: { isVerified: true } });
+      if (!existing) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
+
+      await prisma.provider.update({ where: { id }, data: { isVerified: Boolean(isVerified) } });
       const updated = await refreshProviderReputation(id);
+
+      await writeAuditLog({
+        actorId: req.user.id,
+        actorRole: req.user.role,
+        action: isVerified ? 'VERIFY_PROVIDER' : 'UNVERIFY_PROVIDER',
+        targetType: 'Provider',
+        targetId: id,
+        oldValue: { isVerified: existing.isVerified },
+        newValue: { isVerified: Boolean(isVerified) },
+        ip: req.ip
+      });
+
       res.json(updated);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to verify provider credentials', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to verify provider credentials', err.message);
     }
   }
 };

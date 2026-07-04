@@ -9,6 +9,7 @@ import { ServiceController } from '../controllers/serviceController.js';
 import { PaymentController } from '../controllers/paymentController.js';
 import { AdminProviderServiceController } from '../controllers/adminProviderServiceController.js';
 import { AdminProviderServiceItemsController } from '../controllers/adminProviderServiceItemsController.js';
+import { AdminDashboardController } from '../controllers/adminDashboardController.js';
 import { ReferralsController } from '../controllers/referralsController.js';
 import { ProviderServiceDiscoveryController } from '../controllers/providerServiceDiscoveryController.js';
 import { requireAuth, requireRole } from '../utils/auth.js';
@@ -91,6 +92,9 @@ apiRouter.delete('/services/:id', requireAuth, requireRole('admin'), ServiceCont
 apiRouter.patch('/services/:id', requireAuth, requireRole('admin'), ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', requireAuth, requireRole('admin'), ServiceController.hideOne);
 
+
+// --- Admin: Dashboard ---
+apiRouter.get('/admin/dashboard', requireAuth, requireRole('admin'), AdminDashboardController.getSummary);
 
 // --- Admin: provider service items (pending requests + approved registrations) ---
 apiRouter.get('/admin/provider-service-items', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceItemsController.getAll(req, res));

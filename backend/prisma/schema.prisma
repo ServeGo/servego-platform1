@@ -298,3 +298,16 @@ enum BadgeType {
   ELITE_PROVIDER
 }
 
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String
+  action     String
+  targetType String
+  targetId   String
+  oldValue   Json?
+  newValue   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+}
+
