@@ -1,5 +1,6 @@
 import prisma from '../prisma/client.js';
 import { normalizePaymentStatus } from '../utils/workflow.js';
+import { canPerformAction } from '../utils/permissions.js';
 
 export const PaymentController = {
   getAll: async (req, res) => {
@@ -15,9 +16,13 @@ export const PaymentController = {
 
   create: async (req, res) => {
     try {
-      const { bookingId, userId, paymentMethod, status = 'PENDING', transactionId } = req.body;
+      const { bookingId, userId, paymentMethod, status = 'PENDING', transactionId, role = 'customer' } = req.body;
       if (!bookingId || !userId || !paymentMethod) {
         return res.status(400).json({ error: 'Missing required payment fields.' });
+      }
+
+      if (!canPerformAction({ role, action: 'create_booking' })) {
+        return res.status(403).json({ error: 'You are not allowed to process this payment.' });
       }
 
       const exists = await prisma.booking.findUnique({ where: { id: bookingId } });

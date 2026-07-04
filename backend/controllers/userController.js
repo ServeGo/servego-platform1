@@ -1,9 +1,14 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma/client.js';
+import { generateAuthToken } from '../utils/auth.js';
 
 export const UserController = {
   getUsers: async (req, res) => {
     try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Admin access required.' });
+      }
+
       const users = await prisma.user.findMany({
         select: {
           id: true,
@@ -177,7 +182,7 @@ export const UserController = {
         updatedAt: newUser.updatedAt
       };
 
-      res.status(201).json({ success: true, user: safeUser });
+      res.status(201).json({ success: true, user: safeUser, token: generateAuthToken(newUser) });
     } catch (err) {
       console.error('Signup registration error:', err);
       res.status(500).json({ error: 'Server signup registration failed', details: err.message });
@@ -232,7 +237,7 @@ export const UserController = {
       });
 
       const { password: _, ...safeUser } = user;
-      res.json({ success: true, user: safeUser });
+      res.json({ success: true, user: safeUser, token: generateAuthToken(user) });
     } catch (err) {
       console.error('Login error:', err);
       res.status(500).json({ error: 'Server authentication login failed', details: err.message });
@@ -243,6 +248,10 @@ export const UserController = {
     try {
       const { id } = req.params;
       const { name, phone, address, pincode } = req.body;
+      if (req.user?.role !== 'admin' && req.user?.id !== id) {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You can only update your own profile.' });
+      }
+
       const user = await prisma.user.findUnique({ where: { id }, include: { customerProfile: true } });
       if (!user) {
         return res.status(404).json({ error: 'User not found' });

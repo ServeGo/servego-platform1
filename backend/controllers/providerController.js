@@ -1,5 +1,6 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
+import { canPerformAction } from '../utils/permissions.js';
 
 export const ProviderController = {
   getProviderServices: async (req, res) => {
@@ -73,6 +74,15 @@ export const ProviderController = {
     try {
       const { id } = req.params;
       const { serviceName, description, popularIssues, experienceYears } = req.body || {};
+      const role = req.user?.role || req.body?.role || 'provider';
+
+      if (!req.user?.id && role !== 'admin') {
+        return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Authentication required.' });
+      }
+
+      if (role !== 'provider' && role !== 'admin') {
+        return res.status(403).json({ error: 'You are not allowed to register a provider service.' });
+      }
 
       if (!serviceName) {
         return res.status(400).json({ error: 'Missing required field: serviceName' });
@@ -83,6 +93,9 @@ export const ProviderController = {
 
       const provider = await prisma.provider.findUnique({ where: { id } });
       if (!provider) return res.status(404).json({ error: 'Service provider not found' });
+      if (role !== 'admin' && provider.userId !== req.user?.id) {
+        return res.status(403).json({ error: 'You can only manage your own provider profile.' });
+      }
 
       const requestedService = String(serviceName).trim();
 

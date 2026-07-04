@@ -256,19 +256,60 @@ Customer UI (pages/components):
   - `ReferralsView.jsx`, `FavoritesView.jsx`
   - `LiveTrackingMap.jsx`
 
-Customer-facing data sources (backend endpoints used by the route list):
-- Provider discovery by service:
-  - `GET /api/providers/by-approved-service`
-- Booking lifecycle:
-  - `POST /api/bookings`, `GET /api/bookings`, `PATCH /api/bookings/:id/status`
-- Messaging:
-  - `POST /api/bookings/:id/messages`
-- Payments:
-  - `POST /api/payments`
-- Reviews:
-  - `POST /api/reviews`
-- Support:
-  - `POST /api/tickets`, `PATCH /api/tickets/:id/resolve`
+Customer-facing architecture is implemented via `frontend/src/context/AppContext.jsx` (single app data/store + API actions).
+
+### 5.1 Shared data orchestration: `frontend/src/context/AppContext.jsx`
+Key state slices:
+- `providers`, `services`, `providersByApprovedService`
+- `bookings`, `notifications`, `tickets`
+- `favoriteProviders` (persisted to `localStorage`)
+- UI filters: city/area/search/category
+
+Core customer data retrieval:
+- Providers list: `GET /api/providers`
+- Services catalog: `GET /api/services`
+- Notifications (scoped):
+  - if logged in: `GET /api/notifications?userId=<currentUser.id>`
+  - fallback: `GET /api/notifications`
+- Tickets (role-aware):
+  - admin: `GET /api/admin/tickets?role=admin`
+  - non-admin: `GET /api/tickets?requesterEmail=<currentUser.email>`
+
+Bookings retrieval is role-aware:
+- admin: loads all bookings from `GET /api/bookings`
+- provider: filters bookings by providerId/userId
+- customer: filters bookings by `customerId === currentUser.id`
+
+### 5.2 Customer actions (API actions invoked by AppContext)
+Provider discovery:
+- `fetchProvidersByApprovedServiceName(serviceName)`
+  - `GET /api/providers/by-approved-service?serviceName=...`
+
+Booking creation & lifecycle:
+- Create booking: `POST /api/bookings`
+- Update booking status: `PATCH /api/bookings/:id/status`
+  - sends `{ role, requesterId, status, note }` in body
+- Booking messaging (chat): `POST /api/bookings/:id/messages`
+
+Reviews:
+- Submit review: `POST /api/reviews`
+  - payload includes `{ bookingId, providerId, reviewerId, reviewerName, rating, comment }`
+  - on success: refresh providers + bookings
+
+Support tickets:
+- Submit ticket: `POST /api/tickets`
+- Admin resolution: `PATCH /api/admin/tickets/:id/resolve`
+
+Referrals / ambassador:
+- Apply referral: `POST /api/referrals/apply`
+
+Favorites:
+- Local-only toggle backed by `favoriteProviders` state (not an API call)
+
+### 5.3 Loyalty tier (customer logic)
+`getCustomerLoyaltyTier(completedCount)` computes discount tiers in the frontend (no backend endpoint in this repo snapshot).
+
+
 
 ---
 
