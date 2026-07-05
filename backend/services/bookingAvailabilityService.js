@@ -1,7 +1,12 @@
 import prisma from '../prisma/client.js';
 
 // Generic slot labels that are not real time slots — skip conflict check for these.
-const GENERIC_SLOTS = new Set(['flexible', 'contract', 'permanent', 'ongoing']);
+// These labels must be treated as real blocking slots for the
+// real-time booking behavior (so the provider becomes busy immediately).
+// If you keep a label here, the backend will allow multiple bookings
+// for that label.
+const GENERIC_SLOTS = new Set(['flexible', 'ongoing']);
+
 
 /**
  * Returns true if the provider already has an active booking

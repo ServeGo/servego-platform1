@@ -42,6 +42,17 @@ const apiFetch = async (url, options = {}) => {
 const fetch = (url, options) => apiFetch(url, options);
 
 export const AppProvider = ({ children }) => {
+  const fetchProviderAvailability = async (providerId, dateYYYYMMDD) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/availability?date=${encodeURIComponent(dateYYYYMMDD)}`);
+      const data = await res.json();
+      if (!res.ok) return { error: data?.error || data?.message || 'Failed to fetch availability' };
+      return data;
+    } catch (err) {
+      return { error: 'Network error' };
+    }
+  };
+
   // Database of users - purely for local dev fallback or admin view if needed
   const [users, setUsers] = useState([]);
 
@@ -409,9 +420,11 @@ export const AppProvider = ({ children }) => {
     const socket = io(SOCKET_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
-    // Real-time notification updates via socket — no polling needed
-    socket.on('newJobLead', () => fetchBookings());
-    socket.on('bookingUpdated', () => fetchBookings());
+      // Real-time booking + notification updates
+      socket.on('newJobLead', () => fetchBookings());
+      socket.on('bookingUpdated', () => fetchBookings());
+      socket.on('bookingStatusChanged', () => fetchBookings());
+
     socket.on('notification', (notif) => {
       if (notif.userId === currentUser.id) {
         setNotifications(prev => [normalizeNotification(notif), ...prev]);
@@ -733,6 +746,32 @@ export const AppProvider = ({ children }) => {
   const [providerServiceRequests, setProviderServiceRequests] = useState([]);
   const [providerServiceItems, setProviderServiceItems] = useState([]);
 
+  // Global async action spinner (for booking/admin/provider actions)
+  const [actionSpinner, setActionSpinner] = useState({ isOpen: false, message: '' });
+  const runWithActionSpinner = async (asyncFn, { message = 'Processing...' } = {}) => {
+    setActionSpinner({ isOpen: true, message });
+    try {
+      const result = await asyncFn();
+      return result;
+    } finally {
+      setActionSpinner({ isOpen: false, message: '' });
+    }
+  };
+
+
+  const fetchProviderAnalytics = async (providerId, range = '90d') => {
+    if (!providerId) return null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/analytics?range=${encodeURIComponent(range)}`);
+      const data = await res.json();
+      if (!res.ok) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  };
+
+
   const fetchProviderServiceRequests = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
@@ -865,6 +904,8 @@ export const AppProvider = ({ children }) => {
       updateService,
       deleteService,
       hideService,
+      fetchProviderAnalytics,
+
       // admin provider service request approvals
       providerServiceRequests,
       providerServiceItems,
@@ -872,11 +913,15 @@ export const AppProvider = ({ children }) => {
       fetchProviderServiceItems,
       approveProviderServiceRequest,
       denyProviderServiceRequest,
-      fetchProvidersByApprovedServiceName
+      fetchProvidersByApprovedServiceName,
+      fetchProviderAvailability,
 
-
-
+      // global async action spinner
+      actionSpinner,
+      runWithActionSpinner
     }}>
+
+
 
 
 

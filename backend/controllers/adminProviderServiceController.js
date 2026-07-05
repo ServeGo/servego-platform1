@@ -14,7 +14,9 @@ export const AdminProviderServiceController = {
         orderBy: { createdAt: 'desc' },
         include: {
           provider: {
-            include: { user: { select: { id: true, name: true, email: true, phone: true, avatar: true } } }
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+            }
           }
         }
       });
@@ -38,30 +40,47 @@ export const AdminProviderServiceController = {
       const requestedName = request.requestedServiceName;
       const nameNormalized = normalize(requestedName);
 
-      let service = await prisma.service.findUnique({ where: { nameNormalized } });
-      if (!service) {
-        service = await prisma.service.create({
-          data: {
-            name: requestedName,
-            nameNormalized,
-            description: request.description,
-            popularIssues: Array.isArray(request.popularIssues) ? request.popularIssues : [],
-            isHidden: false
-          }
-        });
-      }
+      // Prevent duplicate Service creation during approval.
 
-      const existingLink = await prisma.providerService.findFirst({
-        where: {
-          OR: [
-            { providerServiceRequestId: request.id },
-            { providerId: request.providerId, serviceId: service.id }
-          ]
-        }
+
+      // Expected flow: approval should only create/update ProviderService links,
+      // while the Service row must already exist.
+      const service = await prisma.service.findUnique({
+        where: { nameNormalized },
+        select: { id: true }
       });
 
-      const link = existingLink || await prisma.providerService.create({
-        data: {
+      if (!service) {
+        return sendApiError(
+          res,
+          400,
+          'SERVICE_NOT_FOUND',
+          `Service '${requestedName}' was not found. Admin must approve against an existing Service.`
+        );
+      }
+
+
+
+
+
+
+      const link = await prisma.providerService.upsert({
+
+
+        where: {
+          // ProviderService has @@unique([providerId, serviceId])
+
+          providerId_serviceId: {
+            providerId: request.providerId,
+            serviceId: service.id
+          }
+        },
+        update: {
+          description: request.description,
+          // keep request link if it already exists; otherwise set it
+          providerServiceRequestId: request.id
+        },
+        create: {
           providerId: request.providerId,
           serviceId: service.id,
           description: request.description,

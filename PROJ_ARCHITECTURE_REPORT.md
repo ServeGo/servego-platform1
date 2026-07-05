@@ -26,7 +26,7 @@
 - Design style:
   - Express router mounts `/api` (see server.js)
   - Each functional area is handled by a dedicated controller in `backend/controllers/*`
-  - Socket.io is initialized in `server.js` and stored on `app` as `socketio`.
+  - Socket.io is initialized in `server.js` and stored on `app` as `socketio`
 
 ### 1.3 Database (Prisma)
 - Location: `backend/prisma/`
@@ -36,7 +36,7 @@
 
 ### 1.4 Service catalog seeding
 - `backend/seeders/servicesSeed.js`
-- Called during server boot in `backend/server.js` via `seedServicesIfEmpty()`.
+- Called during server boot in `backend/server.js` via `seedServicesIfEmpty()`
 
 ---
 
@@ -100,6 +100,9 @@ Router file: `backend/routes/api.js`
 - `PATCH /api/services/:id` → `ServiceController.updateOne`
 - `PATCH /api/services/:id/hide` → `ServiceController.hideOne`
 
+### 2.10 Admin: dashboard
+- `GET /api/admin/dashboard` → `AdminDashboardController.getSummary`
+
 ---
 
 ## 3) Admin architecture & workflows
@@ -124,52 +127,52 @@ Admin router endpoints:
 
 #### 3.1.1 Pending requests listing
 Controller: `backend/controllers/adminProviderServiceController.js` → `getPendingRequests`
-- Role gating: `req.body.role` or `req.query.role` must be `admin`.
-- Fetches `ProviderServiceRequest` where `status = PENDING`.
-- Includes provider and provider.user.
+- Route protection: `requireAuth` / `requireRole('admin')` (JWT Bearer token via `Authorization: Bearer <token>`)
+- Role gating inside controller: `req.body.role` or `req.query.role` is also referenced
+- Fetches `ProviderServiceRequest` where `status = PENDING`
+- Includes provider and provider.user
+
 
 #### 3.1.2 Approve request
 Controller: `approveService`
-- Role gating: `admin` required.
-- Loads `ProviderServiceRequest` by id with provider + provider.user.
-- Ensures a global `Service` exists using normalized name (`nameNormalized`):
-  - If missing, creates it using request’s `requestedServiceName` and request fields.
+- Role gating: `admin` required
+- Ensures a global `Service` exists using normalized name (`nameNormalized`)
 - Creates/ensures a `ProviderService` link:
   - Associates `providerId` + `serviceId`
   - Copies `description`
-  - Stores `providerServiceRequestId`.
-- Updates request status → `APPROVED`.
-- Triggers reputation refresh via `refreshProviderReputation(request.providerId)`.
-- Creates a `Notification` to provider (SERVICE_APPROVAL).
+  - Stores `providerServiceRequestId`
+- Updates request status → `APPROVED`
+- Triggers reputation refresh via `refreshProviderReputation(request.providerId)`
+- Creates a `Notification` to provider (SERVICE_APPROVAL)
 
 #### 3.1.3 Deny request
 Controller: `denyService`
-- Role gating: `admin` required.
-- Requires `reason` in body.
-- Updates request status → `DENIED` and stores `denialReason`.
-- Creates `Notification` for provider (SERVICE_DENIAL).
+- Role gating: `admin` required
+- Requires `reason` in body
+- Updates request status → `DENIED` and stores `denialReason`
+- Creates `Notification` for provider (SERVICE_DENIAL)
 
 #### 3.1.4 Combined “items” listing (pending + approved)
 Controller: `AdminProviderServiceItemsController.getAll`
-- Role gating: `admin` required.
+- Role gating: `admin` required
 - Parallel fetch:
   - pending `ProviderServiceRequest` records
   - approved `ProviderService` links including provider.user and `service`
-- Maps them into a unified list with:
+- Maps them into a unified list:
   - pending: `{ type: 'PENDING', approvalStatus: r.status, ... }`
-  - approved: `{ type: 'APPROVED', approvalStatus: 'APPROVED', id: 'APP-<providerServiceId>' ... }`
-- Sorts newest first.
+  - approved: `{ type: 'APPROVED', approvalStatus: 'APPROVED', ... }`
+- Sorts newest first
 
 ### 3.2 Admin: provider verification refresh
 Provider verification endpoint:
 - `PATCH /api/providers/:id/verify` → `ProviderController.verify`
 
 Behavior:
-- Updates `Provider.isVerified`.
-- Calls `refreshProviderReputation(id)` (same reputation engine used elsewhere).
+- Updates `Provider.isVerified`
+- Calls `refreshProviderReputation(id)`
 
 Admin also has manual reputation refresh:
-- `POST /api/admin/providers/reputation/refresh` → `refreshAllProviderReputations()`.
+- `POST /api/admin/providers/reputation/refresh` → `refreshAllProviderReputations()`
 
 ---
 
@@ -177,31 +180,17 @@ Admin also has manual reputation refresh:
 
 Provider UI:
 - Main page: `frontend/src/pages/ProviderDashboard.jsx`
-- Provider pages/components include:
-  - `ProviderHeader.jsx`, `ProviderServicesPanel.jsx`, `ProviderReviews.jsx`, `ProviderAvailability.jsx`, `ProviderReferrals.jsx`, etc.
 
 ### 4.1 Provider: “My Services” (approved + pending/denied requests)
 Backend:
 - `GET /api/providers/:id/services` → `ProviderController.getProviderServices`
 
 Controller behavior (high level):
-1. Fetches approved links from `ProviderService` (includes `service`).
-2. Fetches non-approved requests from `ProviderServiceRequest` (status != APPROVED).
-3. Deduplicates approved links by `serviceId`.
-4. Filters requests that collide with approved service names to avoid duplicates in UI.
-5. Combines and sorts by `createdAt` descending.
-
-Provider submits new service request:
-- `POST /api/providers/:id/services/register` → `ProviderController.registerProviderService`
-
-Key behaviors:
-- Validates required fields: `serviceName`, `description`, `basePricePerDay` (via request payload checks inside the controller).
-- Prevents duplicates:
-  - returns 409 if service already approved for that provider
-  - returns 409 if pending for same provider + service
-  - returns 409 if any request exists and is not `DENIED` (only denied allows resubmission)
-- Creates `ProviderServiceRequest` with status `PENDING`.
-- Optionally updates provider `experienceYears` if provided.
+1. Fetches approved links from `ProviderService` (includes `service`)
+2. Fetches non-approved requests from `ProviderServiceRequest` (status != APPROVED)
+3. Deduplicates approved links by `serviceId`
+4. Filters requests that collide with approved service names to avoid duplicates in UI
+5. Combines and sorts by `createdAt` descending
 
 ### 4.2 Provider: profile update
 - `PATCH /api/providers/:id/profile` → `ProviderController.updateProfile`
@@ -209,7 +198,6 @@ Key behaviors:
 Updates:
 - `bio`, `specialties` (Json array), `serviceAreas` (Json array)
 - numeric fields such as `experienceYears`
-- `isVerified` can also be passed through this controller based on current code.
 
 ### 4.3 Provider: availability schedule
 - `PATCH /api/providers/:id/availability` → `ProviderController.updateAvailability`
@@ -218,30 +206,12 @@ Updates:
 - `availableDays` (Json array)
 - `timeSlots` (Json array)
 
-### 4.4 Provider: verification toggle (admin/ops)
+### 4.4 Provider: verification toggle
 - `PATCH /api/providers/:id/verify` → `ProviderController.verify`
 
 Behavior:
-- Sets `Provider.isVerified`.
-- Recomputes reputation with `refreshProviderReputation`.
-
-### 4.5 Provider reputation engine impact (trust + badges)
-Reputation module:
-- `backend/services/providerReputationService.js`
-
-Triggers (from analyzed controllers):
-- after booking status changes (BookingController)
-- after review creation (ReviewController)
-- after provider verification changes (ProviderController.verify)
-- after admin service approval (AdminProviderServiceController.approveService)
-
-The engine recomputes:
-- trust/verification level (`Provider.verificationLevel`)
-- badge set (`ProviderBadge` rows)
-
-Provider views:
-- `frontend/src/components/ProviderReputation.jsx`
-- `frontend/src/components/ProviderHeader.jsx` (shows trust level and badges)
+- Sets `Provider.isVerified`
+- Recomputes reputation with `refreshProviderReputation`
 
 ---
 
@@ -249,71 +219,30 @@ Provider views:
 
 Customer UI (pages/components):
 - `frontend/src/pages/CustomerDashboard.jsx`
-- Components such as:
-  - `BookingCard.jsx`, `BookingModal.jsx`, `BookingSuccess.jsx`
-  - `NotificationsView.jsx`
-  - `TicketsView.jsx`
-  - `ReferralsView.jsx`, `FavoritesView.jsx`
-  - `LiveTrackingMap.jsx`
 
-Customer-facing architecture is implemented via `frontend/src/context/AppContext.jsx` (single app data/store + API actions).
+Customer-facing architecture is implemented via:
+- `frontend/src/context/AppContext.jsx` (single app data/store + API actions)
 
-### 5.1 Shared data orchestration: `frontend/src/context/AppContext.jsx`
+### 5.1 Shared data orchestration: `AppContext.jsx`
 Key state slices:
 - `providers`, `services`, `providersByApprovedService`
 - `bookings`, `notifications`, `tickets`
 - `favoriteProviders` (persisted to `localStorage`)
-- UI filters: city/area/search/category
 
-Core customer data retrieval:
-- **Authentication-aware provider/service catalog loading (privacy)**:
-  - When **logged in** (`currentUser?.id` exists):
-    - Providers list: `GET /api/providers`
-    - Services catalog: `GET /api/services`
-  - When **logged out**: the frontend does **not** call the above endpoints and clears catalog state (`providers`, `services`, `providersByApprovedService`).
-- Notifications (scoped):
-  - if logged in: `GET /api/notifications?userId=<currentUser.id>`
-  - fallback: `GET /api/notifications`
-- Tickets (role-aware):
-  - admin: `GET /api/admin/tickets?role=admin`
-  - non-admin: `GET /api/tickets?requesterEmail=<currentUser.email>`
-
-Bookings retrieval is role-aware:
-- admin: loads all bookings from `GET /api/bookings`
-- provider: filters bookings by providerId/userId
-- customer: filters bookings by `customerId === currentUser.id`
-
-
-### 5.2 Customer actions (API actions invoked by AppContext)
-Provider discovery:
-- `fetchProvidersByApprovedServiceName(serviceName)`
-  - `GET /api/providers/by-approved-service?serviceName=...`
-
-Booking creation & lifecycle:
+### 5.2 Customer booking lifecycle
+Backend endpoints:
 - Create booking: `POST /api/bookings`
 - Update booking status: `PATCH /api/bookings/:id/status`
-  - sends `{ role, requesterId, status, note }` in body
 - Booking messaging (chat): `POST /api/bookings/:id/messages`
 
-Reviews:
-- Submit review: `POST /api/reviews`
-  - payload includes `{ bookingId, providerId, reviewerId, reviewerName, rating, comment }`
-  - on success: refresh providers + bookings
-
-Support tickets:
-- Submit ticket: `POST /api/tickets`
-- Admin resolution: `PATCH /api/admin/tickets/:id/resolve`
-
-Referrals / ambassador:
-- Apply referral: `POST /api/referrals/apply`
-
-Favorites:
-- Local-only toggle backed by `favoriteProviders` state (not an API call)
-
-### 5.3 Loyalty tier (customer logic)
-`getCustomerLoyaltyTier(completedCount)` computes discount tiers in the frontend (no backend endpoint in this repo snapshot).
-
-
+### 5.3 Updated booking rule: same provider + same service only
+In `backend/controllers/bookingController.js` (`BookingController.create`):
+- Availability conflict still blocks double-booking the same **provider + date/time slot**.
+- Additional “active booking” rule is now:
+  - Block only when an existing booking is **PENDING**
+  - AND matches **same providerId + same service**
+  - Matching prefers `serviceId` when present; otherwise falls back to `serviceCategory`.
+- This allows booking the **same provider** for a **different service**, even if there is another pending booking.
 
 ---
 
@@ -321,21 +250,14 @@ Favorites:
 
 Prisma schema: `backend/prisma/schema.prisma`
 
-This workspace contains many migrations; the report is intended to reflect the active schema relationships used by controllers (not every field’s semantics is documented in this report due to schema-reading not performed line-by-line).
-
 ### 6.1 Core models used by the provider service workflow
 - `Provider`
-  - has provider profile fields (rating, verificationLevel, experienceYears, availability schedule, etc.)
-- `ProviderService`
-  - approved service mapping: provider ↔ service
-- `ProviderServiceRequest`
-  - pending/denied requests: provider ↔ requestedServiceName (+ request metadata)
-- `Service`
-  - global catalog entries (nameNormalized for normalization)
+- `ProviderService` (approved provider ↔ service mapping)
+- `ProviderServiceRequest` (pending/denied provider service requests)
+- `Service` (global catalog)
 
-### 6.2 Provider reputation models
+### 6.2 Provider reputation
 - `ProviderBadge`
-  - earned achievements
 
 ### 6.3 Other models linked to provider performance
 - `Booking`
@@ -350,12 +272,12 @@ This workspace contains many migrations; the report is intended to reflect the a
 Implementation locations:
 - `backend/services/providerReputationService.js`
 
-The system conceptually separates:
-- **Approved Services**: what a provider is allowed to offer (ProviderService)
-- **Trust / Verification Level**: rank assigned by reputation engine (Provider.verificationLevel)
-- **Badges**: achievements earned by reputation engine (ProviderBadge rows)
+Conceptual separation:
+- Approved services: `ProviderService`
+- Trust/verification: `Provider.verificationLevel`
+- Badges: `ProviderBadge`
 
-Refresh runs after key business events, ensuring UI stays consistent.
+Refresh triggers are invoked from controllers/services after key business events.
 
 ---
 
@@ -363,15 +285,14 @@ Refresh runs after key business events, ensuring UI stays consistent.
 
 Backend boot:
 - `backend/server.js`
-  - sets up Express app
-  - initializes socket.io with CORS all origins
-  - registers JSON parser
-  - mounts API router under `/api`
-  - health endpoint: `/api/health`
+  - Express + JSON parser
+  - Socket.io initialization (CORS all origins)
+  - Mounts API router under `/api`
+  - Health endpoint: `/api/health`
   - seeds service catalog on boot with `seedServicesIfEmpty()`
 
 Realtime:
-- socket.io `io.on('connection')` logs connect/disconnect (actual event handlers are not shown in the reviewed snippet).
+- Socket.io `io.on('connection')` logs connect/disconnect (handlers exist for chat/notifications in controllers/services that emit events).
 
 ---
 
@@ -379,10 +300,7 @@ Realtime:
 
 1. Admin role gating in some controllers relies on `req.body.role` or `req.query.role`.
 2. Provider service registration prevents resubmission unless prior request status is `DENIED`.
-3. Admin service approval ensures a global Service exists using `nameNormalized` normalization.
-4. Provider “My Services” list performs both:
-   - dedupe for approved items by serviceId
-   - collision filtering by normalized service names between approved and requests
+3. Admin service approval ensures a global Service exists using `nameNormalized`.
 
 ---
 
@@ -391,36 +309,16 @@ Realtime:
 ### Backend
 - `backend/server.js`
 - `backend/routes/api.js`
-- `backend/controllers/userController.js`
-- `backend/controllers/providerController.js`
-- `backend/controllers/adminProviderServiceController.js`
-- `backend/controllers/adminProviderServiceItemsController.js`
-- `backend/controllers/bookingController.js`
-- `backend/controllers/reviewController.js`
-- `backend/controllers/paymentController.js`
-- `backend/controllers/referralsController.js`
-- `backend/controllers/serviceController.js`
-- `backend/controllers/ticketController.js`
-- `backend/controllers/notificationController.js`
-- `backend/controllers/providerServiceDiscoveryController.js`
+- `backend/controllers/*`
 - `backend/services/providerReputationService.js`
+- `backend/services/notificationService.js`
+- `backend/services/bookingAvailabilityService.js`
+- `backend/prisma/schema.prisma`
 
 ### Frontend
-- `frontend/src/pages/CustomerDashboard.jsx`
-- `frontend/src/pages/ProviderDashboard.jsx`
-- `frontend/src/pages/AdminPanel.jsx`
-- `frontend/src/pages/admin/AdminPanelTabsRouter.jsx`
-- `frontend/src/hooks/useAdminPanelController.js`
 - `frontend/src/context/AppContext.jsx`
-- `frontend/src/components/*` (role panels and cards)
+- `frontend/src/pages/*`
+- `frontend/src/pages/admin/*`
+- `frontend/src/components/*`
 
----
-
-## Notes on completeness
-Some parts of the repository (notably the full Prisma schema details and all frontend components’ internal API calls) were not line-by-line extracted during the automated generation step, so the report is accurate for the routes/controllers and the provider service approval flow, and high-level for remaining UI modules.
-
-If you want the report to be fully exhaustive down to every frontend component’s exact API calls and every Prisma field/enum, the next pass is to read:
-- `backend/prisma/schema.prisma`
-- all admin/customers/provider components (and any axios/fetch calls)
-- remaining controllers (booking, review, payment, tickets, notifications, referrals, service discovery)
 

@@ -21,8 +21,10 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     favoriteProviders,
     selectedArea,
     bookings,
-    getCustomerLoyaltyTier
+    getCustomerLoyaltyTier,
+    fetchProviderAvailability
   } = useApp();
+
 
   const [applyReferralCredit, setApplyReferralCredit] = useState(true);
 
@@ -49,6 +51,8 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
   // Form fields
   const [bookingDate, setBookingDate] = useState('');
   const [bookingType, setBookingType] = useState('contract');
+  const [availabilityBusyError, setAvailabilityBusyError] = useState('');
+
   const [bookingEndDate, setBookingEndDate] = useState('');
   const [contractYears, setContractYears] = useState('0');
   const [contractDays, setContractDays] = useState('1');
@@ -121,11 +125,12 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     }
     setSelectedProvider(prov);
     setBookingStep(1);
-    
+
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const defaultDate = tomorrow.toISOString().split('T')[0];
     setBookingDate(defaultDate);
+
     setBookingType('contract');
     setBookingEndDate('');
     setContractYears('0');
@@ -137,11 +142,17 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
   };
 
   const handleCompleteCheckout = async (e) => {
+    
+    // booking spinner is already rendered by the existing UI step-2 overlay.
+
     e.preventDefault();
+    setAvailabilityBusyError('');
     if (!bookingDate || !address.trim()) {
       setErrorText('Please complete all required fields');
       return;
     }
+
+
 
     if (bookingType === 'contract') {
       const durationTotal = Number(contractYears) * 8760 + Number(contractDays) * 24 + Number(contractHours);
@@ -151,27 +162,62 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
       }
     }
 
-    setBookingStep(2); // Loading simulation
-    
-    setTimeout(async () => {
-      const created = await createBooking({
-        providerId: selectedProvider.id,
-        providerName: selectedProvider.name,
-        providerAvatar: selectedProvider.avatar,
-        serviceCategory: categoryMeta.name,
-        bookingDate,
-        bookingEndDate: null,
-        bookingTimeSlot: bookingType === 'permanent' ? 'Permanent' : 'Contract',
-        bookingDuration: billMetrics.durationLabel,
-        serviceDurationType: bookingType,
-        locationAddress: address,
-        city: 'Hyderabad',
-        instructions,
-        paymentMethod
-      });
+    setBookingStep(2); // still keep UI step for continuity
+
+    let dayStr = bookingDate;
+    let desiredSlotLabel = bookingType === 'permanent' ? 'Permanent' : 'Contract';
+
+    // Show correct global action spinner while we validate + create booking
+    // (We keep the step-2 UI too, but the message comes from the overlay.)
+    // Note: AppContext provides runWithActionSpinner.
+
+    try {
+      // If availability endpoint fails, do not block booking creation.
+      const avail = await fetchProviderAvailability(selectedProvider.id, dayStr);
+
+      // If provider is not working that day, show busy-like error.
+      if (!avail?.isWorkingDay) {
+        setAvailabilityBusyError('Provider is not available on selected day.');
+        setBookingStep(1);
+        return;
+      }
+
+      const slotInfo = Array.isArray(avail?.slots)
+        ? avail.slots.find(s => String(s.slot).toLowerCase() === String(desiredSlotLabel).toLowerCase())
+        : null;
+      if (slotInfo?.busy) {
+        setAvailabilityBusyError('Provider is busy for that day/slot. Please pick another date.');
+        setBookingStep(1);
+        return;
+      }
+    } catch (err) {
+      // ignore
+    }
+
+    // If backend rejects due to slot/service already pending, show it immediately.
+    // This prevents UI from allowing duplicate bookings when status is PENDING/CONFIRMED/ONGOING.
+    let created;
+    created = await createBooking({
+      providerId: selectedProvider.id,
+      providerName: selectedProvider.name,
+      providerAvatar: selectedProvider.avatar,
+      serviceCategory: categoryMeta.name,
+      bookingDate,
+      bookingEndDate: null,
+      bookingTimeSlot: desiredSlotLabel,
+      bookingDuration: billMetrics.durationLabel,
+      serviceDurationType: bookingType,
+      locationAddress: address,
+      city: 'Hyderabad',
+      instructions,
+      paymentMethod
+    });
+
+      // If createBooking fails, it returns an error object.
 
       if (!created || created.error) {
         setErrorText(created?.error || 'Could not complete the booking. Please try again.');
+
         setBookingStep(1);
         return;
       }
@@ -183,9 +229,8 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
         return;
       }
 
-      setConfirmedBookingDetails(created);
-      setBookingStep(3);
-    }, 1500);
+    setConfirmedBookingDetails(created);
+    setBookingStep(3);
   };
 
   return (
@@ -201,9 +246,12 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
         </button>
 
         {bookingStep === 1 && selectedProvider && (
-          <BookingModal 
-            provider={selectedProvider}
-            onClose={() => setBookingStep(0)}
+            <BookingModal 
+              provider={selectedProvider}
+
+              onClose={() => setBookingStep(0)}
+              availabilityBusyError={availabilityBusyError}
+
             errorText={errorText}
             bookingDate={bookingDate} setBookingDate={setBookingDate}
             bookingType={bookingType} setBookingType={setBookingType}
