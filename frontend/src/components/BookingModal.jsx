@@ -5,6 +5,8 @@ export default function BookingModal({
   provider, 
   onClose, 
   errorText, 
+  availabilityBusyError,
+
   bookingDate, setBookingDate, 
   bookingType, setBookingType,
   bookingEndDate, setBookingEndDate,
@@ -35,12 +37,20 @@ export default function BookingModal({
           </button>
         </div>
 
+        {availabilityBusyError && (
+          <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs flex items-center gap-2 font-semibold">
+            <AlertCircle className="w-4 h-4" />
+            <span>{availabilityBusyError}</span>
+          </div>
+        )}
+
         {errorText && (
           <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs flex items-center gap-2 font-semibold">
             <AlertCircle className="w-4 h-4" />
             <span>{errorText}</span>
           </div>
         )}
+
 
         <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Form area */}

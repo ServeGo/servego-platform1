@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { UserController } from '../controllers/userController.js';
 import { ProviderController } from '../controllers/providerController.js';
+import { ProviderAvailabilityController } from '../controllers/providerAvailabilityController.js';
+
 import { BookingController } from '../controllers/bookingController.js';
 import { TicketController } from '../controllers/ticketController.js';
 import { NotificationController } from '../controllers/notificationController.js';
@@ -12,7 +14,9 @@ import { AdminProviderServiceItemsController } from '../controllers/adminProvide
 import { AdminDashboardController } from '../controllers/adminDashboardController.js';
 import { ReferralsController } from '../controllers/referralsController.js';
 import { ProviderServiceDiscoveryController } from '../controllers/providerServiceDiscoveryController.js';
+import { ProviderAnalyticsController } from '../controllers/providerAnalyticsController.js';
 import { requireAuth, requireRole } from '../utils/auth.js';
+
 
 
 
@@ -46,6 +50,8 @@ apiRouter.get('/providers', ProviderController.getAll);
 apiRouter.get('/providers/by-approved-service', (req, res) => ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res));
 apiRouter.get('/providers/:id', ProviderController.getById);
 apiRouter.get('/providers/:id/services', ProviderController.getProviderServices);
+apiRouter.get('/providers/:id/availability', ProviderAvailabilityController.getAvailabilityForDate);
+
 apiRouter.post('/providers/:id/services/register', requireAuth, ProviderController.registerProviderService);
 apiRouter.patch('/providers/:id/profile', requireAuth, ProviderController.updateProfile);
 apiRouter.patch('/providers/:id/availability', requireAuth, ProviderController.updateAvailability);
@@ -94,8 +100,12 @@ apiRouter.patch('/services/:id', requireAuth, requireRole('admin'), ServiceContr
 apiRouter.patch('/services/:id/hide', requireAuth, requireRole('admin'), ServiceController.hideOne);
 
 
+// --- Provider Analytics ---
+apiRouter.get('/providers/:id/analytics', requireAuth, requireRole('provider'), ProviderAnalyticsController.getProviderAnalytics);
+
 // --- Admin: Dashboard ---
 apiRouter.get('/admin/dashboard', requireAuth, requireRole('admin'), AdminDashboardController.getSummary);
+
 
 // --- Admin: provider service items (pending requests + approved registrations) ---
 apiRouter.get('/admin/provider-service-items', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceItemsController.getAll(req, res));

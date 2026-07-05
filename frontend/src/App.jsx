@@ -18,6 +18,8 @@ import { Signup } from './pages/Signup';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CustomerBottomNav from './components/CustomerBottomNav';
+import ActionSpinnerOverlay from './components/ActionSpinnerOverlay';
+
 
 import {
   LayoutDashboard,
@@ -37,7 +39,8 @@ import {
 
 
 export function MainLayout() {
-  const { currentUser, logout, notifications } = useApp();
+  const { currentUser, logout, notifications, actionSpinner } = useApp();
+
 
   const unreadNotifications = (notifications || []).filter(
     (n) => n.userId === currentUser?.id && !n.read
@@ -471,7 +474,9 @@ export function MainLayout() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <ActionSpinnerOverlay isOpen={!!actionSpinner?.isOpen} message={actionSpinner?.message} />
       <Navbar
+
         onNavigate={handlePageTransition}
         currentPage={currentPage}
         setSelectedCategoryDetail={setSelectedCategoryDetail}

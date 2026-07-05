@@ -7,13 +7,15 @@ import { useApp } from '../context/AppContext';
 import ProviderHeader from '../components/ProviderHeader';
 import LeadCard from '../components/LeadCard';
 import EarningsChart from '../components/EarningsChart';
+// (EarningsChart used in older UI flows)
+
 import ProviderServicesPanel from '../components/ProviderServicesPanel';
 import ProviderReviews from '../components/ProviderReviews';
 import ProviderSupport from '../components/ProviderSupport';
 import ProviderReferrals from '../components/ProviderReferrals';
 import ProviderProfileView from '../components/ProviderProfileView';
 import ProviderAvailability from '../components/ProviderAvailability';
-
+import ProviderAnalyticsDashboard from '../components/ProviderAnalyticsDashboard';
 
 
 export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setActiveTabExternal }) => {
@@ -154,7 +156,15 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
           />
         )}
 
+        {activeTab === 'analytics' && activeProvider && (
+          <ProviderAnalyticsDashboard
+            providerId={activeProvider.id}
+          />
+        )}
+
+
         {activeTab === 'reviews' && <ProviderReviews rating={activeProvider?.rating} reviews={activeProvider?.reviews} />}
+
 
         {activeTab === 'support' && (
           <ProviderSupport 
@@ -214,6 +224,7 @@ function TabList({ activeTab, setActiveTab, leadsCount, reviewsCount }) {
   const tabs = [
     { id: 'leads', label: `Leads (${leadsCount})` },
     { id: 'services', label: 'My Services' },
+    { id: 'analytics', label: 'Analytics' },
     { id: 'reviews', label: `Reviews (${reviewsCount})` },
     { id: 'support', label: 'Support' },
     { id: 'referrals', label: '🤝 Ambassador' },
