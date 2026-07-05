@@ -31,7 +31,6 @@ export function Signup({ onNavigate }) {
 
   // Provider fields
   const [photoDataUrl, setPhotoDataUrl] = useState(''); // base64 data URL
-  const [serviceInterested, setServiceInterested] = useState('');
 
   // Password fields
   const [password, setPassword] = useState('');
@@ -83,11 +82,7 @@ export function Signup({ onNavigate }) {
     return null;
   };
 
-  const validateProvider = () => {
-    if (signupType !== 'provider') return null;
-    if (!serviceInterested.trim()) return 'Please select what service you are interested in.';
-    return null;
-  };
+  const validateProvider = () => null;
 
 
 
@@ -111,17 +106,6 @@ export function Signup({ onNavigate }) {
         return;
       }
     }
-
-    if (signupType === 'provider') {
-      const providerError = validateProvider();
-      if (providerError) {
-        setErrorMsg(providerError);
-        return;
-      }
-    }
-
-    // normalize final serviceInterested in state is handled before payload creation
-    // setProviderServiceError removed (no longer used)
 
     setIsLoading(true);
 
@@ -147,7 +131,6 @@ export function Signup({ onNavigate }) {
             password,
             confirmPassword,
             photo: photoDataUrl || null,
-            serviceInterested: serviceInterested.trim(),
             acceptedTerms
           };
 
@@ -357,28 +340,7 @@ export function Signup({ onNavigate }) {
                 )}
               </div>
 
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1 font-sans">service interested *</label>
 
-                <select
-                  required
-                  value={serviceInterested}
-                  onChange={(e) => {
-                    setServiceInterested(e.target.value);
-                  }}
-                  className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
-                >
-                  <option value="">Select service</option>
-                  {Array.isArray(services) &&
-                    services.filter(s => !s.isHidden).map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                </select>
-
-
-              </div>
             </div>
           )}
 

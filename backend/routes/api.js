@@ -75,6 +75,7 @@ apiRouter.patch('/admin/tickets/:id/resolve', requireAuth, requireRole('admin'),
 
 
 // --- Reviews ---
+apiRouter.get('/reviews', requireAuth, requireRole('admin'), ReviewController.getAll);
 apiRouter.post('/reviews', requireAuth, ReviewController.create);
 
 // --- Payments ---

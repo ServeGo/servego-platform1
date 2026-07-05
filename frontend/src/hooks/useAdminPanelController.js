@@ -43,18 +43,14 @@ export function useAdminPanelController() {
   const [editServiceId, setEditServiceId] = useState(null);
 
   const [newServiceForm, setNewServiceForm] = useState({
-    id: '',
     name: '',
     description: '',
-    basePrice: '',
     popularIssuesText: '',
   });
 
   const [editServiceForm, setEditServiceForm] = useState({
-    id: '',
     name: '',
     description: '',
-    basePrice: '',
     popularIssuesText: '',
   });
 
@@ -121,7 +117,7 @@ export function useAdminPanelController() {
   const openAddService = () => {
     setServiceAddError('');
     setServiceAddSuccess('');
-    setNewServiceForm({ id: '', name: '', description: '', basePrice: '', popularIssuesText: '' });
+    setNewServiceForm({ name: '', description: '', popularIssuesText: '' });
     setIsAddingService(true);
   };
 
@@ -136,10 +132,8 @@ export function useAdminPanelController() {
     setServiceEditSuccess('');
     setEditServiceId(cat.id);
     setEditServiceForm({
-      id: cat.id || '',
       name: cat.name || '',
       description: cat.description || '',
-      basePrice: cat.basePrice === undefined || cat.basePrice === null ? '' : String(cat.basePrice),
       popularIssuesText: Array.isArray(cat.popularIssues) ? cat.popularIssues.join(', ') : '',
     });
     setIsEditingService(true);
@@ -150,7 +144,7 @@ export function useAdminPanelController() {
     setEditServiceId(null);
     setServiceEditError('');
     setServiceEditSuccess('');
-    setEditServiceForm({ id: '', name: '', description: '', basePrice: '', popularIssuesText: '' });
+    setEditServiceForm({ name: '', description: '', popularIssuesText: '' });
   };
 
   const submitNewService = async (e) => {
@@ -158,10 +152,10 @@ export function useAdminPanelController() {
     setServiceAddError('');
     setServiceAddSuccess('');
 
-    const { id, name, description, basePrice, popularIssuesText } = newServiceForm;
+    const { name, description, popularIssuesText } = newServiceForm;
 
-    if (!id.trim() || !name.trim()) {
-      setServiceAddError('Service id and name are required.');
+    if (!name.trim()) {
+      setServiceAddError('Service name is required.');
       return;
     }
 
@@ -172,10 +166,8 @@ export function useAdminPanelController() {
 
     const payload = {
       role: 'admin',
-      id: id.trim(),
       name: name.trim(),
       description: (description || '').trim(),
-      basePrice: basePrice === '' ? 0 : Number(basePrice),
       popularIssues,
     };
 
@@ -188,7 +180,7 @@ export function useAdminPanelController() {
 
     setServiceAddSuccess('Service added successfully.');
     setIsAddingService(false);
-    setNewServiceForm({ id: '', name: '', description: '', basePrice: '', popularIssuesText: '' });
+    setNewServiceForm({ name: '', description: '', popularIssuesText: '' });
   };
 
   return {

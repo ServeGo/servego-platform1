@@ -4,6 +4,21 @@ import { notifyReviewPublished } from '../services/notificationService.js';
 import { sendApiError } from '../utils/response.js';
 
 export const ReviewController = {
+  getAll: async (req, res) => {
+    try {
+      const reviews = await prisma.review.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          provider: { select: { id: true, user: { select: { name: true } } } },
+          reviewer: { select: { name: true, email: true } }
+        }
+      });
+      res.json(reviews);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch reviews', details: err.message });
+    }
+  },
+
   create: async (req, res) => {
     try {
       const { reviewerId, reviewerName, rating, comment, serviceCategory, providerId, bookingId } = req.body;
