@@ -82,23 +82,45 @@ export const BookingController = {
 
       // One-active-booking-per-provider rule: a customer cannot book the same
       // provider again until their existing booking is completed/cancelled/denied.
-      const activeBookingWithProvider = await prisma.booking.findFirst({
+      // Only block re-booking the *same provider + same service* while the existing booking is pending.
+      const activePendingBookingForSameService = await prisma.booking.findFirst({
         where: {
           customerId,
           providerId: bookingData.providerId,
-          status: { in: ['PENDING', 'CONFIRMED', 'ONGOING'] }
+          serviceId: bookingData.serviceId || undefined,
+          serviceCategory: bookingData.serviceCategory,
+          status: 'PENDING'
         },
         select: { id: true, serviceCategory: true, status: true }
       });
-      if (activeBookingWithProvider) {
+
+      // If serviceId is not supplied (legacy flow), fall back to matching by serviceCategory.
+      const shouldFallbackToCategoryOnly = !bookingData.serviceId;
+      const blockingBooking = activePendingBookingForSameService || (shouldFallbackToCategoryOnly
+        ? await prisma.booking.findFirst({
+            where: {
+              customerId,
+              providerId: bookingData.providerId,
+              serviceCategory: bookingData.serviceCategory,
+              status: 'PENDING'
+            },
+            select: { id: true, serviceCategory: true, status: true }
+          })
+        : null);
+
+      if (blockingBooking) {
         return sendApiError(
-          res, 409, 'PROVIDER_ALREADY_BOOKED',
-          `You already have an active booking (${activeBookingWithProvider.id}) with this provider for "${activeBookingWithProvider.serviceCategory}". Please wait until it is completed or cancelled before booking again.`
+          res,
+          409,
+          'SERVICE_ALREADY_PENDING',
+          `You already have a pending booking (${blockingBooking.id}) with this provider for "${blockingBooking.serviceCategory}". Please wait until it is confirmed/ongoing/completed or cancelled before booking again.`
         );
       }
 
+
       const timestamp = new Date();
-      const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
+      const bookingCount = await prisma.booking.count();
+      const bookingId = `BID-${bookingCount + 1}`;
       const initialStatus = 'PENDING';
 
       // Transaction: create booking atomically
@@ -133,6 +155,7 @@ export const BookingController = {
 
       res.status(201).json(result);
     } catch (err) {
+      console.error('[BookingController.create] Error:', err.message, err.stack);
       sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create booking.', err.message);
     }
   },

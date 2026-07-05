@@ -14,25 +14,28 @@ export const ServiceController = {
 
   create: async (req, res) => {
     try {
-      const role = req.body?.role;
-      if (role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
-      }
-
       const { name, description, popularIssues } = req.body;
       if (!name) {
         return res.status(400).json({ error: 'Missing required field: name' });
       }
 
+      // Generate SID-101, SID-102, ... by finding the highest existing SID-xxx id
+      const existing = await prisma.service.findMany({ select: { id: true } });
+      const maxNum = existing.reduce((max, s) => {
+        const m = s.id.match(/^SID-(\d+)$/);
+        return m ? Math.max(max, parseInt(m[1], 10)) : max;
+      }, 0);
+      const newId = `SID-${maxNum + 1}`;
+
       const created = await prisma.service.create({
         data: {
+          id: newId,
           name,
           nameNormalized: normalize(name),
           description: description || '',
           popularIssues: Array.isArray(popularIssues) ? popularIssues : []
         }
       });
-
 
       res.status(201).json(created);
     } catch (err) {
@@ -42,11 +45,6 @@ export const ServiceController = {
 
   deleteOne: async (req, res) => {
     try {
-      const role = req.body?.role;
-      if (role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
-      }
-
       const { id } = req.params;
       if (!id) return res.status(400).json({ error: 'Missing service id' });
 
@@ -62,11 +60,6 @@ export const ServiceController = {
 
   updateOne: async (req, res) => {
     try {
-      const role = req.body?.role;
-      if (role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
-      }
-
       const { id } = req.params;
       if (!id) return res.status(400).json({ error: 'Missing service id' });
 
@@ -95,11 +88,6 @@ export const ServiceController = {
 
   hideOne: async (req, res) => {
     try {
-      const role = req.body?.role;
-      if (role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
-      }
-
       const { id } = req.params;
       if (!id) return res.status(400).json({ error: 'Missing service id' });
 

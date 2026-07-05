@@ -78,12 +78,7 @@ export const UserController = {
           return res.status(400).json({ error: 'Invalid pincode. Expected 5-6 digits.' });
         }
       } else if (role === 'provider') {
-        if (!serviceInterested) {
-          return res.status(400).json({ error: 'Service interested is required for provider signup.' });
-        }
-        if (!/^[A-Za-z\s]+$/.test(String(serviceInterested).trim())) {
-          return res.status(400).json({ error: 'Please choose a valid service category.' });
-        }
+        // serviceInterested is no longer required at signup — provider registers services after login
       } else {
         return res.status(400).json({ error: 'Signup role must be either customer or provider.' });
       }
@@ -133,12 +128,11 @@ export const UserController = {
         providerProfile = await prisma.provider.create({
           data: {
             userId: newUser.id,
-            category: serviceInterested,
-            bio: `Experienced specialist offering high-quality professional home servicing in ${serviceInterested}.`,
-            specialties: [`Emergency ${serviceInterested} Repair`, `Residential Installation`, `Routine Maintenance`],
+            category: 'General',
+            bio: 'Experienced specialist offering high-quality professional home servicing.',
+            specialties: ['Residential Services', 'Routine Maintenance'],
             serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills'],
             photo: photo || null,
-            serviceInterested,
             isVerified: true,
             isFeatured: false,
             availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],

@@ -84,27 +84,6 @@ export default function ProviderListItem({
           </div>
         </div>
       </div>
-
-      {/* Reviews Snippet */}
-      {provider.reviews && provider.reviews.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-slate-100 bg-slate-50/50 p-4 rounded-xl">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-3 leading-none">Verified Client Feedback ({provider.reviews.length})</span>
-          <div className="space-y-3">
-            {provider.reviews.slice(0, 2).map((rev, idx) => (
-              <div key={idx} className="text-xs">
-                <div className="flex items-center justify-between text-slate-500 font-semibold">
-                  <span className="text-slate-800">{rev.reviewerName}</span>
-                  <span className="font-mono text-[9px]">{rev.date}</span>
-                </div>
-                <div className="flex text-amber-400 text-[10px] my-0.5">
-                  {Array.from({ length: Math.round(rev.rating) }).map((_, i) => <span key={i}>★</span>)}
-                </div>
-                <p className="text-slate-600 italic font-medium leading-relaxed">"{rev.comment}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -132,7 +132,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
           <LeadsPage
 
-            activeLeads={activeLeads}
+            activeLeads={allocatedBookings}
             openChatBookingId={openChatBookingId}
             onToggleChat={(id) => setOpenChatBookingId(openChatBookingId === id ? null : id)}
             chatInput={chatInput}
@@ -271,7 +271,10 @@ function LeadsPage({
       arr = arr.filter(b => b.status === 'pending');
     } else if (statusFilter === 'active') {
       arr = arr.filter(b => ['confirmed', 'in_progress', 'en_route', 'ongoing'].includes(b.status));
+    } else if (statusFilter === 'completed') {
+      arr = arr.filter(b => ['completed', 'reviewed', 'cancelled'].includes(b.status));
     }
+    // 'all' — no filter
 
     if (q) {
       arr = arr.filter(b => {

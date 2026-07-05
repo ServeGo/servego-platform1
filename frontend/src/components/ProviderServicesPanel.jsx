@@ -165,15 +165,19 @@ export default function ProviderServicesPanel({ provider }) {
     setServicesError('');
 
     try {
+      const token = localStorage.getItem('servego_token');
       const res = await fetch(`${API_BASE_URL}/providers/${providerId}/services/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            serviceName: selectedName.trim(),
-            description: description.trim(),
-            popularIssues: [],
-            experienceYears: Number(experienceYears ?? 0)
-          })
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          serviceName: selectedName.trim(),
+          description: description.trim(),
+          popularIssues: [],
+          experienceYears: Number(experienceYears ?? 0)
+        })
       });
 
 
