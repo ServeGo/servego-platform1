@@ -38,13 +38,26 @@ async function bootstrap() {
 
   app.use('/api', apiRouter);
 
-  app.get('/api/health', (req, res) => {
-    res.json({
+  app.get('/api/health', async (req, res) => {
+    const health = {
       status: 'healthy',
       db: 'PostgreSQL',
       timestamp: new Date().toISOString()
-    });
+    };
+
+    try {
+      // Import lazily to avoid pulling Prisma during early boot if not needed.
+      const prisma = (await import('./prisma/client.js')).default;
+      await prisma.$queryRaw`SELECT 1 AS ok`;
+      health.dbStatus = 'reachable';
+    } catch (dbErr) {
+      health.dbStatus = 'unreachable';
+      health.dbError = dbErr?.message || String(dbErr);
+    }
+
+    res.json(health);
   });
+
 
   io.on('connection', (socket) => {
     console.log(`🔌 Live WebSocket Link Established: ${socket.id}`);
