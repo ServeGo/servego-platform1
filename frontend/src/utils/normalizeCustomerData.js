@@ -32,7 +32,12 @@ export function normalizeBooking(booking) {
     customerEmail: booking.customerEmail || booking.customer?.email || '',
     bookingDateLabel: formatDate(booking.bookingDate),
     messages: Array.isArray(booking.messages) ? booking.messages : [],
-    statusHistory: Array.isArray(booking.statusHistory) ? booking.statusHistory : [],
+    statusHistory: Array.isArray(booking.statusHistory)
+      ? booking.statusHistory.map((h) => ({
+          ...h,
+          status: lc(h.status),
+        }))
+      : [],
   };
 }
 

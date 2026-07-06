@@ -451,12 +451,11 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      body: JSON.stringify({
           ...bookingData,
+          // Prisma Booking does not store customerName/customerEmail/customerPhone.
+          // Keep request payload aligned with backend/DB contract.
           customerId: currentUser?.id,
-          customerName: currentUser?.name,
-          customerEmail: currentUser?.email,
-          customerPhone: currentUser?.phone
         })
       });
       const data = await res.json();
