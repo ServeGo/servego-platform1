@@ -7,13 +7,15 @@ import { useApp } from '../context/AppContext';
 import ProviderHeader from '../components/ProviderHeader';
 import LeadCard from '../components/LeadCard';
 import EarningsChart from '../components/EarningsChart';
+// (EarningsChart used in older UI flows)
+
 import ProviderServicesPanel from '../components/ProviderServicesPanel';
 import ProviderReviews from '../components/ProviderReviews';
 import ProviderSupport from '../components/ProviderSupport';
 import ProviderReferrals from '../components/ProviderReferrals';
 import ProviderProfileView from '../components/ProviderProfileView';
 import ProviderAvailability from '../components/ProviderAvailability';
-
+import ProviderAnalyticsDashboard from '../components/ProviderAnalyticsDashboard';
 
 
 export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setActiveTabExternal }) => {
@@ -76,9 +78,9 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   }, [activeProvider]);
 
   const allocatedBookings = useMemo(() => bookings.filter(b => b.providerId === activeProvider?.id), [bookings, activeProvider]);
-  const activeLeads = useMemo(() => allocatedBookings.filter(b => ['pending', 'confirmed', 'en_route', 'ongoing'].includes(b.status)), [allocatedBookings]);
-  const completedJobs = useMemo(() => allocatedBookings.filter(b => b.status === 'completed'), [allocatedBookings]);
-  const lifetimeEarnings = useMemo(() => completedJobs.reduce((sum, j) => sum + (j.totalAmount - j.serviceFee - j.tax), 0), [completedJobs]);
+  const activeLeads = useMemo(() => allocatedBookings.filter(b => ['pending', 'confirmed', 'in_progress', 'en_route', 'ongoing'].includes(b.status)), [allocatedBookings]);
+  const completedJobs = useMemo(() => allocatedBookings.filter(b => ['completed', 'reviewed'].includes(b.status)), [allocatedBookings]);
+  const completedCount = completedJobs.length;
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
@@ -123,7 +125,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         {isPending && <PendingBanner />}
 
         {!isPending && activeProvider && (
-          <ProviderHeader provider={activeProvider} earnings={lifetimeEarnings} />
+          <ProviderHeader provider={activeProvider} completedJobs={completedCount} />
         )}
 
         <TabList activeTab={activeTab} setActiveTab={setActiveTab} leadsCount={activeLeads.length} reviewsCount={activeProvider?.reviews?.length || 0} />
@@ -132,14 +134,13 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
           <LeadsPage
 
-            activeLeads={activeLeads}
+            activeLeads={allocatedBookings}
             openChatBookingId={openChatBookingId}
             onToggleChat={(id) => setOpenChatBookingId(openChatBookingId === id ? null : id)}
             chatInput={chatInput}
             setChatInput={setChatInput}
             onAccept={(id) => updateBookingStatus(id, 'confirmed', 'Accepted.')}
             onReject={(id) => updateBookingStatus(id, 'cancelled', 'Rejected.')}
-            onTravel={(id) => updateBookingStatus(id, 'en_route', 'En-route.')}
             onStartWork={(id) => updateBookingStatus(id, 'ongoing', 'Work started.')}
             onFinishWork={(id) => updateBookingStatus(id, 'completed', 'Completed.')}
             onSendMessage={sendChatMessage}
@@ -155,7 +156,15 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
           />
         )}
 
+        {activeTab === 'analytics' && activeProvider && (
+          <ProviderAnalyticsDashboard
+            providerId={activeProvider.id}
+          />
+        )}
+
+
         {activeTab === 'reviews' && <ProviderReviews rating={activeProvider?.rating} reviews={activeProvider?.reviews} />}
+
 
         {activeTab === 'support' && (
           <ProviderSupport 
@@ -215,6 +224,7 @@ function TabList({ activeTab, setActiveTab, leadsCount, reviewsCount }) {
   const tabs = [
     { id: 'leads', label: `Leads (${leadsCount})` },
     { id: 'services', label: 'My Services' },
+    { id: 'analytics', label: 'Analytics' },
     { id: 'reviews', label: `Reviews (${reviewsCount})` },
     { id: 'support', label: 'Support' },
     { id: 'referrals', label: '🤝 Ambassador' },
@@ -255,7 +265,6 @@ function LeadsPage({
   setChatInput,
   onAccept,
   onReject,
-  onTravel,
   onStartWork,
   onFinishWork,
   onSendMessage
@@ -272,8 +281,11 @@ function LeadsPage({
     if (statusFilter === 'pending') {
       arr = arr.filter(b => b.status === 'pending');
     } else if (statusFilter === 'active') {
-      arr = arr.filter(b => ['confirmed', 'en_route', 'ongoing'].includes(b.status));
+      arr = arr.filter(b => ['confirmed', 'in_progress', 'en_route', 'ongoing'].includes(b.status));
+    } else if (statusFilter === 'completed') {
+      arr = arr.filter(b => ['completed', 'reviewed', 'cancelled'].includes(b.status));
     }
+    // 'all' — no filter
 
     if (q) {
       arr = arr.filter(b => {
@@ -375,7 +387,6 @@ function LeadsPage({
               lead={bk}
               onAccept={onAccept}
               onReject={onReject}
-              onTravel={onTravel}
               onStartWork={onStartWork}
               onFinishWork={onFinishWork}
               chatOpen={openChatBookingId === bk.id}

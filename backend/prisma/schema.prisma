@@ -165,6 +165,9 @@ model ProviderServiceRequest {
   id                    String        @id @default(cuid())
   providerId            String
   requestedServiceName String
+  /// The Service that this request was created/approved against.
+  /// Backfilled from requestedServiceName.
+  requestedServiceId   String?
   description           String
   popularIssues        Json          @default("[]")
   experienceYears      Int?
@@ -176,6 +179,7 @@ model ProviderServiceRequest {
   provider              Provider @relation(fields: [providerId], references: [id])
   providerServices     ProviderService[]
 }
+
 
 model Booking {
   id              String        @id @default(cuid())
@@ -296,5 +300,18 @@ enum BadgeType {
   MULTI_SERVICE_EXPERT
   CUSTOMER_FAVORITE
   ELITE_PROVIDER
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String
+  action     String
+  targetType String
+  targetId   String
+  oldValue   Json?
+  newValue   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
 }
 

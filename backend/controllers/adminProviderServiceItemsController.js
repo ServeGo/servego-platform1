@@ -5,10 +5,6 @@ const normalize = (s) => (s || '').toString().trim().toLowerCase();
 export const AdminProviderServiceItemsController = {
   getAll: async (req, res) => {
     try {
-
-      const role = req.body?.role ?? req.query?.role;
-      if (role && role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-
       const [pendingRequests, approvedLinks] = await Promise.all([
         prisma.providerServiceRequest.findMany({
           where: { status: 'PENDING' },

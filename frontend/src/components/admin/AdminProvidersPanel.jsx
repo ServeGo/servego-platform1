@@ -21,7 +21,7 @@ export default function AdminProvidersPanel({ providersList, handlePartnerApprov
             <div className="space-y-3">
               <div className="flex justify-between items-start">
                 <div className="flex gap-3 items-center">
-                  <img className="w-10 h-10 rounded-xl object-cover border border-slate-200" src={p.avatar} referrerPolicy="no-referrer" />
+                  <img className="w-10 h-10 rounded-xl object-cover border border-slate-200" src={p.avatar} alt={p.name} referrerPolicy="no-referrer" />
                   <div>
                     <h4 className="font-extrabold text-slate-900 text-sm">{p.name}</h4>
                     <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-wide mt-1 inline-block">

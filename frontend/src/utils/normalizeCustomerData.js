@@ -26,11 +26,18 @@ export function normalizeBooking(booking) {
       booking.providerName || providerUser.name || booking.provider?.name || 'Assigned Specialist',
     providerAvatar:
       booking.providerAvatar || booking.provider?.photo || providerUser.avatar || null,
+    // serviceCategory must come from the booking record itself, never from provider.category
+    serviceCategory: booking.serviceCategory || '',
     customerName: booking.customerName || booking.customer?.name || '',
     customerEmail: booking.customerEmail || booking.customer?.email || '',
     bookingDateLabel: formatDate(booking.bookingDate),
     messages: Array.isArray(booking.messages) ? booking.messages : [],
-    statusHistory: Array.isArray(booking.statusHistory) ? booking.statusHistory : [],
+    statusHistory: Array.isArray(booking.statusHistory)
+      ? booking.statusHistory.map((h) => ({
+          ...h,
+          status: lc(h.status),
+        }))
+      : [],
   };
 }
 

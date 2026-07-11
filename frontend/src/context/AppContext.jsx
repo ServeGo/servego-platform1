@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { io } from 'socket.io-client';
 import {
   normalizeBooking,
   normalizeBookings,
@@ -12,13 +13,50 @@ import {
 const AppContext = createContext(undefined);
 
 const API_BASE_URL = 'http://localhost:4000/api';
+const SOCKET_URL = 'http://localhost:4000';
+const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
+  ? window.fetch.bind(window)
+  : fetch;
+
+const getStoredAuthToken = () => {
+  try {
+    return localStorage.getItem('servego_token');
+  } catch {
+    return null;
+  }
+};
+
+const apiFetch = async (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  const token = getStoredAuthToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData) && !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  return baseFetch(url, { ...options, headers });
+};
+
+const fetch = (url, options) => apiFetch(url, options);
 
 export const AppProvider = ({ children }) => {
+  const fetchProviderAvailability = async (providerId, dateYYYYMMDD) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/availability?date=${encodeURIComponent(dateYYYYMMDD)}`);
+      const data = await res.json();
+      if (!res.ok) return { error: data?.error || data?.message || 'Failed to fetch availability' };
+      return data;
+    } catch (err) {
+      return { error: 'Network error' };
+    }
+  };
+
   // Database of users - purely for local dev fallback or admin view if needed
   const [users, setUsers] = useState([]);
 
-  // Rehydrate login state on refresh so users don't get logged out.
-  // This matches the existing persistence logic below.
+  // Restore a previously authenticated session on refresh, but clear it on explicit logout.
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const raw = localStorage.getItem('servego_user');
@@ -27,6 +65,14 @@ export const AppProvider = ({ children }) => {
       return null;
     }
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('servego_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('servego_user');
+    }
+  }, [currentUser]);
 
 
   const [providers, setProviders] = useState([]);
@@ -47,6 +93,8 @@ export const AppProvider = ({ children }) => {
   const [selectedArea, setSelectedArea] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
+
+  const socketRef = useRef(null);
 
   const fetchProvidersByApprovedServiceName = useCallback(async (serviceName) => {
     if (!serviceName) return [];
@@ -74,31 +122,6 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('servego_favorites', JSON.stringify(favoriteProviders));
   }, [favoriteProviders]);
 
-  // Sync currentUser to local storage
-  // (Persistence is used for intra-session behavior only; we intentionally do NOT rehydrate on startup.)
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('servego_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('servego_user');
-    }
-  }, [currentUser]);
-
-  // Fetch initial data from backend
-  useEffect(() => {
-    fetchProviders();
-    fetchServices();
-    fetchNotifications();
-
-    if (currentUser) {
-      fetchBookings();
-      fetchTickets();
-    }
-    if (currentUser?.role === 'admin') {
-      fetchUsers();
-    }
-  }, [currentUser]);
-
   const fetchProviders = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/providers`);
@@ -120,33 +143,47 @@ export const AppProvider = ({ children }) => {
   };
 
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
+    if (!currentUser?.id) {
+      setBookings([]);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/bookings`);
       const data = await res.json();
       const bookingsArray = normalizeBookings(data);
-      // Filter for current user if not admin
+
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
-      } else if (currentUser?.role === 'provider') {
-        const providerId = currentUser.providerId || currentUser.id;
-        setBookings(bookingsArray.filter(b => b.providerId === providerId));
-      } else {
-        setBookings(bookingsArray.filter(b => b.customerId === currentUser.id));
+        return;
       }
+
+      if (currentUser?.role === 'provider') {
+        const providerIds = [currentUser?.providerId, currentUser?.id].filter(Boolean);
+        const providerMatch = providers.find((p) => providerIds.includes(p.id) || providerIds.includes(p.userId));
+        const providerId = providerMatch?.id || currentUser?.providerId || currentUser?.id;
+        const matchedIds = [providerId, currentUser?.providerId, currentUser?.id].filter(Boolean);
+
+        setBookings(
+          bookingsArray.filter((b) => {
+            const bookingProviderId = b.providerId || b.provider?.id || b.provider?.userId;
+            return matchedIds.includes(bookingProviderId);
+          })
+        );
+        return;
+      }
+
+      setBookings(bookingsArray.filter((b) => b.customerId === currentUser.id));
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
       setBookings([]);
     }
-  };
+  }, [currentUser?.id, currentUser?.providerId, currentUser?.role, providers]);
 
   const fetchNotifications = async () => {
     try {
-      // Scope to the signed-in user so customers never receive another inbox.
-      const url = currentUser?.id
-        ? `${API_BASE_URL}/notifications?userId=${encodeURIComponent(currentUser.id)}`
-        : `${API_BASE_URL}/notifications`;
-      const res = await fetch(url);
+      const res = await fetch(`${API_BASE_URL}/notifications`);
       const data = await res.json();
       setNotifications(normalizeNotifications(data));
     } catch (err) {
@@ -156,15 +193,10 @@ export const AppProvider = ({ children }) => {
 
   const fetchTickets = async () => {
     try {
-      // Admins read every ticket; customers/providers read only their own,
-      // scoped by email. A GET request must never carry a body.
       const url = currentUser?.role === 'admin'
-        ? `${API_BASE_URL}/admin/tickets?role=admin`
-        : `${API_BASE_URL}/tickets?requesterEmail=${encodeURIComponent(currentUser?.email || '')}`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+        ? `${API_BASE_URL}/admin/tickets`
+        : `${API_BASE_URL}/tickets`;
+      const res = await fetch(url);
       const data = await res.json();
       setTickets(normalizeTickets(data));
     } catch (err) {
@@ -222,12 +254,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const deleteService = async (id, payload = { role: 'admin' }) => {
+  const deleteService = async (id) => {
     try {
       const res = await fetch(`${API_BASE_URL}/services/${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
       if (res.ok) {
@@ -246,7 +277,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/services/${id}/hide`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin', isHidden })
+        body: JSON.stringify({ isHidden })
       });
       const data = await res.json();
       if (res.ok) {
@@ -267,6 +298,8 @@ export const AppProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      localStorage.removeItem('servego_user');
+      localStorage.removeItem('servego_token');
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -274,6 +307,9 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem('servego_token', data.token);
+        }
         setCurrentUser(data.user);
         return { success: true, role: data.user.role };
       } else {
@@ -292,6 +328,8 @@ export const AppProvider = ({ children }) => {
 
   const registerUser = async (payload) => {
     try {
+      localStorage.removeItem('servego_user');
+      localStorage.removeItem('servego_token');
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -307,6 +345,9 @@ export const AppProvider = ({ children }) => {
       }
 
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem('servego_token', data.token);
+        }
         setCurrentUser(data.user);
         return { success: true };
       }
@@ -319,6 +360,16 @@ export const AppProvider = ({ children }) => {
   };
 
   const logout = () => {
+    try {
+      localStorage.removeItem('servego_user');
+      localStorage.removeItem('servego_token');
+    } catch {
+      // Ignore storage errors.
+    }
+    // Fail-fast: clear protected state immediately.
+    setBookings([]);
+    setNotifications([]);
+    setTickets([]);
     setCurrentUser(null);
   };
 
@@ -336,26 +387,88 @@ export const AppProvider = ({ children }) => {
     setSelectedCategory(cat);
   };
 
+  useEffect(() => {
+    // Never expose provider/service catalog details unless authenticated.
+    if (currentUser?.id) {
+      fetchProviders();
+      fetchServices();
+
+      fetchNotifications();
+      fetchBookings();
+      fetchTickets();
+    } else {
+      setNotifications([]);
+      setBookings([]);
+      setTickets([]);
+
+      // Optional privacy: clear any previously loaded catalog data.
+      setProviders([]);
+      setServices([]);
+      setProvidersByApprovedService([]);
+    }
+
+    if (currentUser?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+
+    // Connect socket once per session
+    const socket = io(SOCKET_URL, { transports: ['websocket'] });
+    socketRef.current = socket;
+
+      // Real-time booking + notification updates
+      socket.on('newJobLead', () => fetchBookings());
+      socket.on('bookingUpdated', () => fetchBookings());
+      socket.on('bookingStatusChanged', () => fetchBookings());
+
+    socket.on('notification', (notif) => {
+      if (notif.userId === currentUser.id) {
+        setNotifications(prev => [normalizeNotification(notif), ...prev]);
+      }
+    });
+
+    // Poll bookings every 30s (reduced from 10s), no notification polling
+    fetchBookings();
+    const intervalId = window.setInterval(() => {
+      if (currentUser?.id) fetchBookings();
+    }, 30000);
+
+    if (currentUser?.role === 'admin') fetchUsers();
+
+    return () => {
+      window.clearInterval(intervalId);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentUser?.id, currentUser?.role, fetchBookings]);
+
   const createBooking = async (bookingData) => {
     try {
       const res = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      body: JSON.stringify({
           ...bookingData,
+          // Prisma Booking does not store customerName/customerEmail/customerPhone.
+          // Keep request payload aligned with backend/DB contract.
           customerId: currentUser?.id,
-          customerName: currentUser?.name,
-          customerEmail: currentUser?.email,
-          customerPhone: currentUser?.phone
         })
       });
       const data = await res.json();
+      if (!res.ok) {
+        return { error: data.message || data.error || 'Booking failed.' };
+      }
       if (data.id) {
         const normalized = normalizeBooking(data);
         setBookings(prev => [normalized, ...prev]);
+        fetchBookings();
         return normalized;
       }
-      return data;
+      return { error: 'Booking failed.' };
     } catch (err) {
       console.error('Failed to create booking:', err);
       return { error: 'Network error' };
@@ -367,18 +480,16 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status,
-          note,
-          role: currentUser?.role,
-          requesterId: currentUser?.id
-        })
+        body: JSON.stringify({ status, note })
       });
       const data = await res.json();
       if (data.id) {
         const normalized = normalizeBooking(data);
         setBookings(prev => prev.map(bk => bk.id === bookingId ? normalized : bk));
         return normalized;
+      }
+      if (data.error) {
+        return { error: data.error };
       }
       return data;
     } catch (err) {
@@ -513,8 +624,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin', response: responseText }),
-
+        body: JSON.stringify({ response: responseText })
       });
       const data = await res.json();
       if (data.id) {
@@ -635,13 +745,36 @@ export const AppProvider = ({ children }) => {
   const [providerServiceRequests, setProviderServiceRequests] = useState([]);
   const [providerServiceItems, setProviderServiceItems] = useState([]);
 
+  // Global async action spinner (for booking/admin/provider actions)
+  const [actionSpinner, setActionSpinner] = useState({ isOpen: false, message: '' });
+  const runWithActionSpinner = async (asyncFn, { message = 'Processing...' } = {}) => {
+    setActionSpinner({ isOpen: true, message });
+    try {
+      const result = await asyncFn();
+      return result;
+    } finally {
+      setActionSpinner({ isOpen: false, message: '' });
+    }
+  };
+
+
+  const fetchProviderAnalytics = async (providerId, range = '90d') => {
+    if (!providerId) return null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/analytics?range=${encodeURIComponent(range)}`);
+      const data = await res.json();
+      if (!res.ok) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  };
+
+
   const fetchProviderServiceRequests = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests?role=admin`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests`);
 
       const data = await res.json();
       if (res.ok) {
@@ -657,10 +790,7 @@ export const AppProvider = ({ children }) => {
   const fetchProviderServiceItems = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-items?role=admin`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await fetch(`${API_BASE_URL}/admin/provider-service-items`);
       const data = await res.json();
       if (res.ok) {
         setProviderServiceItems(Array.isArray(data) ? data : []);
@@ -691,9 +821,7 @@ export const AppProvider = ({ children }) => {
     if (currentUser?.role !== 'admin') return { error: 'Admin access required' };
     try {
       const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/approve`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin' })
+        method: 'PATCH'
       });
       const data = await res.json();
       if (res.ok) {
@@ -715,7 +843,7 @@ export const AppProvider = ({ children }) => {
       const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/deny`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'admin', reason })
+        body: JSON.stringify({ reason })
       });
       const data = await res.json();
       if (res.ok) {
@@ -775,6 +903,8 @@ export const AppProvider = ({ children }) => {
       updateService,
       deleteService,
       hideService,
+      fetchProviderAnalytics,
+
       // admin provider service request approvals
       providerServiceRequests,
       providerServiceItems,
@@ -782,11 +912,15 @@ export const AppProvider = ({ children }) => {
       fetchProviderServiceItems,
       approveProviderServiceRequest,
       denyProviderServiceRequest,
-      fetchProvidersByApprovedServiceName
+      fetchProvidersByApprovedServiceName,
+      fetchProviderAvailability,
 
-
-
+      // global async action spinner
+      actionSpinner,
+      runWithActionSpinner
     }}>
+
+
 
 
 

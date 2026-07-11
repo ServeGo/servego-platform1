@@ -54,7 +54,7 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
   // Loyalty progression based on completed bookings.
   const completedCount = useMemo(
-    () => userBookings.filter(b => b.status === 'completed').length,
+    () => userBookings.filter(b => ['completed', 'reviewed'].includes(b.status)).length,
     [userBookings]
   );
   const loyaltyProgress = useMemo(() => {
@@ -128,7 +128,7 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   };
 
   return (
-    <div id="customer-dashboard-page" className="bg-slate-50 min-h-screen py-10 px-4">
+    <div id="customer-dashboard-page" className="bg-slate-50 min-h-screen py-10 px-4 pb-24 md:pb-10">
       <div className="max-w-6xl mx-auto">
         
         {reviewBooking && (

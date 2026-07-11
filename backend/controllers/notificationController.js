@@ -1,18 +1,17 @@
 import prisma from '../prisma/client.js';
+import { sendApiError } from '../utils/response.js';
 
 export const NotificationController = {
   getAll: async (req, res) => {
     try {
-      // When a userId is provided, scope notifications to that user so a
-      // signed-in customer/provider never receives another user's inbox.
-      const userId = req.query?.userId;
+      const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
       const notifications = await prisma.notification.findMany({
-        where: userId ? { userId } : undefined,
+        where,
         orderBy: { createdAt: 'desc' }
       });
       res.json(notifications);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch user inbox feeds', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch notifications', err.message);
     }
   },
 
@@ -20,46 +19,36 @@ export const NotificationController = {
     try {
       const { userId, title, message, type } = req.body;
       if (!userId || !title || !message) {
-        return res.status(400).json({ error: 'Missing required notification fields.' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required fields: userId, title, message.');
       }
-
       const notif = await prisma.notification.create({
-        data: {
-          userId,
-          title,
-          message,
-          type: type || 'SYSTEM',
-          isRead: false
-        }
+        data: { userId, title, message, type: type || 'SYSTEM', isRead: false }
       });
       res.status(201).json(notif);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to post system alert', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create notification', err.message);
     }
   },
 
   read: async (req, res) => {
     try {
       const { id } = req.params;
-      const notif = await prisma.notification.update({
-        where: { id },
-        data: { isRead: true }
-      });
+      const notif = await prisma.notification.update({ where: { id }, data: { isRead: true } });
       res.json(notif);
     } catch (err) {
-      if (err.code === 'P2025') {
-        return res.status(404).json({ error: 'Notification reference missing' });
-      }
-      res.status(500).json({ error: 'Failed to update alert state', details: err.message });
+      if (err.code === 'P2025') return sendApiError(res, 404, 'NOT_FOUND', 'Notification not found.');
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to mark notification as read', err.message);
     }
   },
 
   clearAll: async (req, res) => {
     try {
-      await prisma.notification.deleteMany({});
-      res.json({ success: true, message: 'All notification history flushed.' });
+      // Admins can clear all; others only clear their own
+      const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
+      await prisma.notification.deleteMany({ where });
+      res.json({ success: true, message: 'Notifications cleared.' });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to erase notifications', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to clear notifications', err.message);
     }
   }
 };

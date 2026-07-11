@@ -1,220 +1,228 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
+import { notifyBookingCreated, notifyBookingStatusChanged } from '../services/notificationService.js';
+import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
+import { buildStatusHistory, isValidBookingTransition, normalizeBookingStatus, normalizePaymentStatus } from '../utils/workflow.js';
+import { canPerformAction } from '../utils/permissions.js';
+import { sendApiError } from '../utils/response.js';
+
+const BOOKING_INCLUDE = {
+  customer: { select: { id: true, name: true, email: true, phone: true } },
+  provider: {
+    include: {
+      user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
+    }
+  },
+  service: true,
+  payment: true
+};
 
 export const BookingController = {
   getAll: async (req, res) => {
     try {
-      const bookings = await prisma.booking.findMany({
-        include: {
-          customer: { select: { id: true, name: true, email: true, phone: true } },
-          provider: {
-            include: {
-              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
-            }
-          },
-          service: true,
-          payment: true
-        }
-      });
+      const bookings = await prisma.booking.findMany({ include: BOOKING_INCLUDE });
       res.json(bookings);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve active/historical bookings', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve bookings', err.message);
     }
   },
 
   getById: async (req, res) => {
     try {
-      const { id } = req.params;
-      const booking = await prisma.booking.findUnique({
-        where: { id },
-        include: {
-          customer: { select: { id: true, name: true, email: true, phone: true } },
-          provider: {
-            include: {
-              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
-            }
-          },
-          service: true,
-          payment: true
-        }
-      });
-      if (!booking) {
-        return res.status(404).json({ error: 'Booking not found' });
-      }
+      const booking = await prisma.booking.findUnique({ where: { id: req.params.id }, include: BOOKING_INCLUDE });
+      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
       res.json(booking);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch booking details', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch booking details', err.message);
     }
   },
 
   create: async (req, res) => {
     try {
       const bookingData = req.body;
-      if (!bookingData.customerId || !bookingData.providerId || !bookingData.serviceCategory) {
-        return res.status(400).json({ error: 'Missing critical booking components (customerId, providerId, serviceCategory)' });
+      const actorId = req.user.id;
+      const actorRole = req.user.role;
+
+      if (actorRole !== 'customer' && actorRole !== 'admin') {
+        return sendApiError(res, 403, 'FORBIDDEN', 'Only customers can create bookings.');
       }
+      if (actorRole === 'customer' && bookingData.customerId && bookingData.customerId !== actorId) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only create bookings for yourself.');
+      }
+      if (!bookingData.providerId || !bookingData.serviceCategory) {
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required fields: providerId, serviceCategory.');
+      }
+
+      const customerId = actorRole === 'customer' ? actorId : bookingData.customerId;
+      if (!customerId) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: customerId.');
 
       const parsedBookingDate = new Date(bookingData.bookingDate);
       if (!bookingData.bookingDate || Number.isNaN(parsedBookingDate.getTime())) {
-        return res.status(400).json({ error: 'A valid booking date is required.' });
+        return sendApiError(res, 400, 'INVALID_DATE', 'A valid booking date is required.');
       }
 
-      const timestamp = new Date();
-      const bookingId = `BK-${Math.floor(1000 + Math.random() * 9000)}`;
+      const [customer, provider] = await Promise.all([
+        prisma.user.findUnique({ where: { id: customerId }, select: { id: true, name: true } }),
+        prisma.provider.findUnique({ where: { id: bookingData.providerId }, include: { user: { select: { id: true, name: true } } } })
+      ]);
 
-      const result = await prisma.booking.create({
-        data: {
-          id: bookingId,
-          customerId: bookingData.customerId,
+      if (!customer || !provider) {
+        return sendApiError(res, 404, 'NOT_FOUND', 'Customer or provider not found.');
+      }
+
+      // Availability check — prevent double-booking the same slot
+      const slotTaken = await isProviderSlotTaken(
+        bookingData.providerId,
+        parsedBookingDate,
+        bookingData.bookingTimeSlot || 'Flexible'
+      );
+      if (slotTaken) {
+        return sendApiError(res, 409, 'SLOT_UNAVAILABLE', 'This provider is already booked for the selected date and time slot.');
+      }
+
+      // One-active-booking-per-provider rule: a customer cannot book the same
+      // provider again until their existing booking is completed/cancelled/denied.
+      // Only block re-booking the *same provider + same service* while the existing booking is pending.
+      const activePendingBookingForSameService = await prisma.booking.findFirst({
+        where: {
+          customerId,
           providerId: bookingData.providerId,
+          serviceId: bookingData.serviceId || undefined,
           serviceCategory: bookingData.serviceCategory,
-          bookingDate: parsedBookingDate,
-          bookingTimeSlot: bookingData.bookingTimeSlot || 'Flexible',
-          status: 'PENDING',
-          paymentStatus: bookingData.paymentStatus?.toUpperCase() || 'UNPAID',
-          paymentMethod: bookingData.paymentMethod || null,
-          locationAddress: bookingData.locationAddress,
-          city: bookingData.city || 'Hyderabad',
-          instructions: bookingData.instructions || '',
-          bookingTime: timestamp,
-
-          messages: [],
-
-          reviewed: false,
-          statusHistory: [
-            { status: 'PENDING', timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
-          ]
+          status: 'PENDING'
         },
-        include: {
-          customer: { select: { id: true, name: true, email: true, phone: true } },
-          provider: {
-            include: {
-              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
-            }
-          },
-          service: true,
-          payment: true
-        }
+        select: { id: true, serviceCategory: true, status: true }
       });
 
+      // If serviceId is not supplied (legacy flow), fall back to matching by serviceCategory.
+      const shouldFallbackToCategoryOnly = !bookingData.serviceId;
+      const blockingBooking = activePendingBookingForSameService || (shouldFallbackToCategoryOnly
+        ? await prisma.booking.findFirst({
+            where: {
+              customerId,
+              providerId: bookingData.providerId,
+              serviceCategory: bookingData.serviceCategory,
+              status: 'PENDING'
+            },
+            select: { id: true, serviceCategory: true, status: true }
+          })
+        : null);
 
-      // Notifications are keyed by User id; map the provider to its owning user.
-      // Never let a notification failure roll back a successful booking.
-      const providerUserId = result.provider?.userId || result.provider?.user?.id;
-      if (providerUserId) {
-        try {
-          await prisma.notification.create({
-            data: {
-              userId: providerUserId,
-              title: 'New Service Job Request',
-              message: `You have received a new ${bookingData.serviceCategory} request from ${bookingData.customerName || 'a customer'}.`,
-              type: 'BOOKING',
-              isRead: false
-            }
-          });
-        } catch (notifyErr) {
-          console.error('Failed to create provider notification for booking:', notifyErr.message);
-        }
+      if (blockingBooking) {
+        return sendApiError(
+          res,
+          409,
+          'SERVICE_ALREADY_PENDING',
+          `You already have a pending booking (${blockingBooking.id}) with this provider for "${blockingBooking.serviceCategory}". Please wait until it is confirmed/ongoing/completed or cancelled before booking again.`
+        );
       }
+
+
+      const timestamp = new Date();
+      const bookingCount = await prisma.booking.count();
+      const bookingId = `BID-${bookingCount + 1}`;
+      const initialStatus = 'PENDING';
+
+      // Transaction: create booking atomically
+      const result = await prisma.$transaction(async (tx) => {
+        return tx.booking.create({
+          data: {
+            id: bookingId,
+            customerId,
+            providerId: bookingData.providerId,
+            serviceCategory: bookingData.serviceCategory,
+            bookingDate: parsedBookingDate,
+            bookingTimeSlot: bookingData.bookingTimeSlot || 'Flexible',
+            status: initialStatus,
+            paymentStatus: normalizePaymentStatus(bookingData.paymentStatus),
+            paymentMethod: bookingData.paymentMethod || null,
+            locationAddress: bookingData.locationAddress || '',
+            city: bookingData.city || 'Hyderabad',
+            instructions: bookingData.instructions || '',
+            bookingTime: timestamp,
+            messages: [],
+            reviewed: false,
+            statusHistory: [
+              { status: initialStatus, timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
+            ]
+          },
+          include: BOOKING_INCLUDE
+        });
+      });
 
       const io = req.app.get('socketio');
-      if (io) {
-        io.emit('newJobLead', result);
-      }
+      await notifyBookingCreated(io, result, customer, provider?.user?.id);
 
       res.status(201).json(result);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to lock in service booking', details: err.message });
+      console.error('[BookingController.create] Error:', err.message, err.stack);
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create booking.', err.message);
     }
   },
 
   updateStatus: async (req, res) => {
     try {
-      const role = req.body?.role ?? req.query?.role;
+      const role = req.user.role;
+      const requesterId = req.user.id;
       const { id } = req.params;
       const { status, note } = req.body;
 
-      if (!status) {
-        return res.status(400).json({ error: 'A valid service status string is required.' });
-      }
+      if (!status) return sendApiError(res, 400, 'MISSING_FIELDS', 'A valid status string is required.');
 
-      const updatedStatus = String(status).toUpperCase();
-
+      const updatedStatus = normalizeBookingStatus(status);
       const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) {
-        return res.status(404).json({ error: 'Booking not found.' });
-      }
+      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
 
-      // Admins can set any status. A customer may only cancel their own booking
-      // while it is still pending/confirmed (before the job starts).
-      if (role !== 'admin') {
-        const requesterId = req.body?.requesterId ?? req.query?.requesterId;
-        const isOwner = requesterId && requesterId === booking.customerId;
-        const isCancellable = ['PENDING', 'CONFIRMED'].includes(booking.status);
-        if (!isOwner || updatedStatus !== 'CANCELLED' || !isCancellable) {
-          return res.status(403).json({ error: 'You are not allowed to update this booking.' });
+      const currentStatus = normalizeBookingStatus(booking.status);
+      const provider = await prisma.provider.findUnique({ where: { id: booking.providerId }, select: { userId: true } });
+
+      const canUpdate = canPerformAction({
+        role,
+        action: 'update_booking_status',
+        context: {
+          requesterId,
+          assignedProviderUserId: provider?.userId,
+          customerId: booking.customerId,
+          currentStatus,
+          nextStatus: updatedStatus
         }
-      }
-      const newHistory = [...(booking.statusHistory || []), {
-        status: updatedStatus,
-        timestamp: new Date().toISOString(),
-        note: note || `Status changed to ${updatedStatus}`
-      }];
+      }) && isValidBookingTransition(currentStatus, updatedStatus);
+
+      if (!canUpdate) return sendApiError(res, 403, 'FORBIDDEN', 'You are not allowed to perform this status transition.');
+
+      const newHistory = buildStatusHistory(booking.statusHistory, updatedStatus, note);
 
       const updated = await prisma.booking.update({
         where: { id },
         data: {
           status: updatedStatus,
-          statusHistory: newHistory
+          statusHistory: newHistory,
+          paymentStatus: updatedStatus === 'COMPLETED' ? 'PAID' : booking.paymentStatus
         },
-        include: {
-          customer: { select: { id: true, name: true, email: true, phone: true } },
-          provider: {
-            include: {
-              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
-            }
-          },
-          service: true,
-          payment: true
-        }
+        include: BOOKING_INCLUDE
       });
 
       await refreshProviderReputation(booking.providerId);
 
-      await prisma.notification.create({
-        data: {
-          userId: booking.customerId,
-          title: 'Booking Status Updated',
-          message: `Your booking for ${booking.serviceCategory} has been updated to "${updatedStatus}".`,
-          type: 'BOOKING',
-          isRead: false
-        }
-      });
-
       const io = req.app.get('socketio');
-      if (io) {
-        io.emit('bookingUpdated', updated);
-      }
+      await notifyBookingStatusChanged(io, booking, updatedStatus, provider?.userId);
 
       res.json(updated);
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      sendApiError(res, 400, 'BAD_REQUEST', err.message);
     }
   },
 
   addMessage: async (req, res) => {
     try {
       const { id } = req.params;
-      const { senderId, senderName, senderRole, text } = req.body;
+      const { senderName, senderRole, text } = req.body;
+      const senderId = req.user.id;
 
-      if (!senderId || !text) {
-        return res.status(400).json({ error: 'Sender details and message contents are required.' });
-      }
+      if (!text) return sendApiError(res, 400, 'MISSING_FIELDS', 'Message text is required.');
 
       const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) {
-        return res.status(404).json({ error: 'Booking not found.' });
-      }
+      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
 
       const messageObj = {
         id: `msg_${Math.random().toString(36).substring(2, 9)}`,
@@ -227,29 +235,16 @@ export const BookingController = {
 
       const updated = await prisma.booking.update({
         where: { id },
-        data: {
-          messages: [ ...(booking.messages || []), messageObj ]
-        },
-        include: {
-          customer: { select: { id: true, name: true, email: true, phone: true } },
-          provider: {
-            include: {
-              user: { select: { id: true, name: true, email: true, phone: true, avatar: true } }
-            }
-          },
-          service: true,
-          payment: true
-        }
+        data: { messages: [...(booking.messages || []), messageObj] },
+        include: BOOKING_INCLUDE
       });
 
       const io = req.app.get('socketio');
-      if (io) {
-        io.emit('chatMessageReceived', { bookingId: id, message: messageObj });
-      }
+      if (io) io.emit('chatMessageReceived', { bookingId: id, message: messageObj });
 
       res.status(201).json(updated);
     } catch (err) {
-      res.status(400).json({ error: err.message });
+      sendApiError(res, 400, 'BAD_REQUEST', err.message);
     }
   }
 };

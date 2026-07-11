@@ -63,24 +63,23 @@ export default function AdminServicesPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Service ID</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Service Name</label>
               <input
-                value={newServiceForm.id}
-                onChange={(e) => setNewServiceForm((prev) => ({ ...prev, id: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
-                placeholder="e.g. electrician, plumber, ac-repair"
+                value={newServiceForm.name}
+                onChange={(e) => setNewServiceForm((prev) => ({ ...prev, name: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
+                placeholder="e.g. Electrician"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Service Name</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Popular Issues</label>
               <input
-                value={newServiceForm.name}
-                onChange={(e) => setNewServiceForm((prev) => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
-                placeholder="e.g. Electrician"
-                required
+                value={newServiceForm.popularIssuesText}
+                onChange={(e) => setNewServiceForm((prev) => ({ ...prev, popularIssuesText: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
+                placeholder="Comma-separated, e.g. Short circuit fixing, Fan installation"
               />
             </div>
 
@@ -90,29 +89,8 @@ export default function AdminServicesPanel({
                 value={newServiceForm.description}
                 onChange={(e) => setNewServiceForm((prev) => ({ ...prev, description: e.target.value }))}
                 rows={3}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
                 placeholder="Short description for the service category"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Base Price (₹)</label>
-              <input
-                type="number"
-                value={newServiceForm.basePrice}
-                onChange={(e) => setNewServiceForm((prev) => ({ ...prev, basePrice: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
-                placeholder="249"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Popular Issues</label>
-              <input
-                value={newServiceForm.popularIssuesText}
-                onChange={(e) => setNewServiceForm((prev) => ({ ...prev, popularIssuesText: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
-                placeholder="Comma-separated, e.g. Short circuit fixing, Fan installation"
               />
             </div>
           </div>
@@ -134,17 +112,20 @@ export default function AdminServicesPanel({
 
       {canManage && isEditingService && (
         <form
-          onSubmit={(e) => {
-            // controller owns actual submitNewService/updateService; AdminPanel currently handled edit submit inline.
-            // Keep behavior by delegating to parent via updateService + state.
+          onSubmit={async (e) => {
             e.preventDefault();
+            const { name, description, popularIssuesText } = editServiceForm;
+            if (!name.trim()) return;
+            const popularIssues = popularIssuesText.split(',').map(x => x.trim()).filter(Boolean);
+            const resp = await updateService(editServiceId, { name: name.trim(), description: description.trim(), popularIssues });
+            if (resp?.error) { setEditServiceForm(prev => ({ ...prev, _error: resp.error })); return; }
+            closeEditService();
           }}
           className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-5"
         >
-          {/* NOTE: editing submit will be handled in AdminPanel to avoid changing behavior in this step. */}
           <div>
             <h3 className="text-base font-extrabold text-slate-900">Update service category</h3>
-            <p className="text-slate-500 text-xs mt-1">Make changes to the listing details. ID stays the same.</p>
+            <p className="text-slate-500 text-xs mt-1">Make changes to the listing details.</p>
           </div>
 
           {serviceEditError && (
@@ -156,22 +137,23 @@ export default function AdminServicesPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Service ID</label>
-              <input
-                value={editServiceForm.id}
-                readOnly
-                className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-600"
-              />
-            </div>
-
-            <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Service Name</label>
               <input
                 value={editServiceForm.name}
                 onChange={(e) => setEditServiceForm((prev) => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
                 placeholder="e.g. Electrician"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Popular Issues</label>
+              <input
+                value={editServiceForm.popularIssuesText}
+                onChange={(e) => setEditServiceForm((prev) => ({ ...prev, popularIssuesText: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
+                placeholder="Comma-separated, e.g. Short circuit fixing, Fan installation"
               />
             </div>
 
@@ -181,29 +163,8 @@ export default function AdminServicesPanel({
                 value={editServiceForm.description}
                 onChange={(e) => setEditServiceForm((prev) => ({ ...prev, description: e.target.value }))}
                 rows={3}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
                 placeholder="Short description for the service category"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Base Price (₹)</label>
-              <input
-                type="number"
-                value={editServiceForm.basePrice}
-                onChange={(e) => setEditServiceForm((prev) => ({ ...prev, basePrice: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
-                placeholder="249"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Popular Issues</label>
-              <input
-                value={editServiceForm.popularIssuesText}
-                onChange={(e) => setEditServiceForm((prev) => ({ ...prev, popularIssuesText: e.target.value }))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none border border-slate-300 focus:border-indigo-600 transition-all"
-                placeholder="Comma-separated, e.g. Short circuit fixing, Fan installation"
               />
             </div>
           </div>
@@ -218,7 +179,7 @@ export default function AdminServicesPanel({
             </button>
 
             {/* submit is intentionally handled by AdminPanel inline for now */}
-            <button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 text-xs font-bold rounded-lg transition-colors shadow-2xs opacity-70 cursor-not-allowed">
+            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 text-xs font-bold rounded-lg transition-colors shadow-2xs">
               Update Service
             </button>
           </div>

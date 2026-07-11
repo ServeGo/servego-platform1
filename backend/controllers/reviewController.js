@@ -1,7 +1,24 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
+import { notifyReviewPublished } from '../services/notificationService.js';
+import { sendApiError } from '../utils/response.js';
 
 export const ReviewController = {
+  getAll: async (req, res) => {
+    try {
+      const reviews = await prisma.review.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          provider: { select: { id: true, user: { select: { name: true } } } },
+          reviewer: { select: { name: true, email: true } }
+        }
+      });
+      res.json(reviews);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch reviews', details: err.message });
+    }
+  },
+
   create: async (req, res) => {
     try {
       const { reviewerId, reviewerName, rating, comment, serviceCategory, providerId, bookingId } = req.body;
@@ -29,12 +46,18 @@ export const ReviewController = {
       if (bookingId) {
         const booking = await prisma.booking.findUnique({
           where: { id: bookingId },
-          select: { id: true, providerId: true }
+          select: { id: true, providerId: true, customerId: true, status: true }
         });
 
         if (!booking) return res.status(400).json({ error: 'Invalid bookingId' });
         if (booking.providerId !== providerId) {
           return res.status(400).json({ error: 'bookingId does not belong to the given providerId' });
+        }
+        if (booking.customerId !== reviewerId) {
+          return res.status(403).json({ error: 'Only the customer who booked the service can leave a review.' });
+        }
+        if (!['COMPLETED', 'REVIEWED'].includes(booking.status)) {
+          return res.status(409).json({ error: 'Reviews can only be submitted after the booking is completed.' });
         }
       }
 
@@ -62,6 +85,8 @@ export const ReviewController = {
       }
 
       await refreshProviderReputation(providerId);
+
+      await notifyReviewPublished(reviewerId);
 
       res.status(201).json({ success: true, review });
     } catch (err) {

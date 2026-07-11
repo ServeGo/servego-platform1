@@ -3,9 +3,12 @@ import prisma from '../prisma/client.js';
 export const TicketController = {
   getAll: async (req, res) => {
     try {
-      const role = req.body?.role ?? req.query?.role;
-      const requesterEmail = req.body?.requesterEmail ?? req.query?.requesterEmail
-        ?? req.body?.email ?? req.query?.email;
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const role = req.user.role;
+      const requesterEmail = req.user.email;
 
       // Admins can read every ticket. Non-admin callers may only read their own
       // tickets, and must scope the request to their email address.
@@ -52,7 +55,11 @@ export const TicketController = {
 
   resolve: async (req, res) => {
     try {
-      const role = req.body?.role ?? req.query?.role;
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const role = req.user.role;
       if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
 
       const { id } = req.params;

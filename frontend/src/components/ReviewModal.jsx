@@ -59,12 +59,21 @@ export default function ReviewModal({
             />
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition-colors border border-indigo-500/10 shadow-sm"
-          >
-            Publish Verified Review
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-lg text-xs transition-colors border border-slate-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition-colors border border-indigo-500/10 shadow-sm"
+            >
+              Publish Verified Review
+            </button>
+          </div>
         </form>
       </div>
     </div>

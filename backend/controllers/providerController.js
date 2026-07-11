@@ -1,5 +1,8 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
+import { canPerformAction } from '../utils/permissions.js';
+import { writeAuditLog } from '../services/auditLogService.js';
+import { sendApiError } from '../utils/response.js';
 
 export const ProviderController = {
   getProviderServices: async (req, res) => {
@@ -73,6 +76,15 @@ export const ProviderController = {
     try {
       const { id } = req.params;
       const { serviceName, description, popularIssues, experienceYears } = req.body || {};
+      const role = req.user?.role || req.body?.role || 'provider';
+
+      if (!req.user?.id && role !== 'admin') {
+        return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Authentication required.' });
+      }
+
+      if (role !== 'provider' && role !== 'admin') {
+        return res.status(403).json({ error: 'You are not allowed to register a provider service.' });
+      }
 
       if (!serviceName) {
         return res.status(400).json({ error: 'Missing required field: serviceName' });
@@ -83,6 +95,9 @@ export const ProviderController = {
 
       const provider = await prisma.provider.findUnique({ where: { id } });
       if (!provider) return res.status(404).json({ error: 'Service provider not found' });
+      if (role !== 'admin' && provider.userId !== req.user?.id) {
+        return res.status(403).json({ error: 'You can only manage your own provider profile.' });
+      }
 
       const requestedService = String(serviceName).trim();
 
@@ -204,7 +219,7 @@ export const ProviderController = {
   updateProfile: async (req, res) => {
     try {
       const { id } = req.params;
-      const { bio, specialties, serviceAreas } = req.body;
+      const { bio, specialties, serviceAreas, experienceYears, phone, isVerified } = req.body;
 
       const existing = await prisma.provider.findUnique({ where: { id } });
       if (!existing) {
@@ -214,9 +229,11 @@ export const ProviderController = {
       const updated = await prisma.provider.update({
         where: { id },
         data: {
-          bio,
+          bio: bio ?? existing.bio,
           specialties: Array.isArray(specialties) ? specialties : existing.specialties,
-          serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas
+          serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas,
+          experienceYears: Number.isFinite(Number(experienceYears)) ? Number(experienceYears) : existing.experienceYears,
+          isVerified: typeof isVerified === 'boolean' ? isVerified : existing.isVerified
         },
         include: { reviews: true }
       });
@@ -251,16 +268,26 @@ export const ProviderController = {
       const { id } = req.params;
       const { isVerified } = req.body;
 
-      await prisma.provider.update({
-        where: { id },
-        data: {
-          isVerified: Boolean(isVerified)
-        }
-      });
+      const existing = await prisma.provider.findUnique({ where: { id }, select: { isVerified: true } });
+      if (!existing) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
+
+      await prisma.provider.update({ where: { id }, data: { isVerified: Boolean(isVerified) } });
       const updated = await refreshProviderReputation(id);
+
+      await writeAuditLog({
+        actorId: req.user.id,
+        actorRole: req.user.role,
+        action: isVerified ? 'VERIFY_PROVIDER' : 'UNVERIFY_PROVIDER',
+        targetType: 'Provider',
+        targetId: id,
+        oldValue: { isVerified: existing.isVerified },
+        newValue: { isVerified: Boolean(isVerified) },
+        ip: req.ip
+      });
+
       res.json(updated);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to verify provider credentials', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to verify provider credentials', err.message);
     }
   }
 };

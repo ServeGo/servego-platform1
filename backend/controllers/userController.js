@@ -1,9 +1,14 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma/client.js';
+import { generateAuthToken } from '../utils/auth.js';
 
 export const UserController = {
   getUsers: async (req, res) => {
     try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Admin access required.' });
+      }
+
       const users = await prisma.user.findMany({
         select: {
           id: true,
@@ -73,14 +78,13 @@ export const UserController = {
           return res.status(400).json({ error: 'Invalid pincode. Expected 5-6 digits.' });
         }
       } else if (role === 'provider') {
-        if (!serviceInterested) {
-          return res.status(400).json({ error: 'Service interested is required for provider signup.' });
-        }
+        // serviceInterested is no longer required at signup — provider registers services after login
       } else {
         return res.status(400).json({ error: 'Signup role must be either customer or provider.' });
       }
 
-      const existingUser = await prisma.user.findUnique({ where: { email } });
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
       if (existingUser) {
         return res.status(400).json({ error: 'An account with this email address already exists. Please choose another email.' });
       }
@@ -92,7 +96,7 @@ export const UserController = {
       const newUser = await prisma.user.create({
         data: {
           name,
-          email,
+          email: normalizedEmail,
           phone,
           role,
           password: hashedPassword,
@@ -124,12 +128,11 @@ export const UserController = {
         providerProfile = await prisma.provider.create({
           data: {
             userId: newUser.id,
-            category: serviceInterested,
-            bio: `Experienced specialist offering high-quality professional home servicing in ${serviceInterested}.`,
-            specialties: [`Emergency ${serviceInterested} Repair`, `Residential Installation`, `Routine Maintenance`],
+            category: 'General',
+            bio: 'Experienced specialist offering high-quality professional home servicing.',
+            specialties: ['Residential Services', 'Routine Maintenance'],
             serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills'],
             photo: photo || null,
-            serviceInterested,
             isVerified: true,
             isFeatured: false,
             availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -173,7 +176,7 @@ export const UserController = {
         updatedAt: newUser.updatedAt
       };
 
-      res.status(201).json({ success: true, user: safeUser });
+      res.status(201).json({ success: true, user: safeUser, token: generateAuthToken(newUser) });
     } catch (err) {
       console.error('Signup registration error:', err);
       res.status(500).json({ error: 'Server signup registration failed', details: err.message });
@@ -187,8 +190,9 @@ export const UserController = {
         return res.status(400).json({ error: 'Please enter both your email address and password.' });
       }
 
+      const normalizedEmail = String(email).trim().toLowerCase();
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
         include: {
           customerProfile: true,
           providerProfile: true
@@ -197,7 +201,7 @@ export const UserController = {
       if (!user || !(await bcrypt.compare(password, user.password))) {
         await prisma.authEvent.create({
           data: {
-            email,
+            email: normalizedEmail,
             eventType: 'LOGIN',
             success: false
           }
@@ -227,7 +231,7 @@ export const UserController = {
       });
 
       const { password: _, ...safeUser } = user;
-      res.json({ success: true, user: safeUser });
+      res.json({ success: true, user: safeUser, token: generateAuthToken(user) });
     } catch (err) {
       console.error('Login error:', err);
       res.status(500).json({ error: 'Server authentication login failed', details: err.message });
@@ -238,6 +242,10 @@ export const UserController = {
     try {
       const { id } = req.params;
       const { name, phone, address, pincode } = req.body;
+      if (req.user?.role !== 'admin' && req.user?.id !== id) {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You can only update your own profile.' });
+      }
+
       const user = await prisma.user.findUnique({ where: { id }, include: { customerProfile: true } });
       if (!user) {
         return res.status(404).json({ error: 'User not found' });

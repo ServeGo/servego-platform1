@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { User, Briefcase, Mail, Lock, Phone, ShieldAlert, Sparkles } from 'lucide-react';
+import { User, Briefcase, Mail, Lock, Phone, ShieldAlert, Sparkles, Eye, EyeOff } from 'lucide-react';
 
 export function Signup({ onNavigate }) {
   // Read partner application query params (set by BecomePartner page)
@@ -31,13 +31,14 @@ export function Signup({ onNavigate }) {
 
   // Provider fields
   const [photoDataUrl, setPhotoDataUrl] = useState(''); // base64 data URL
-  const [serviceInterested, setServiceInterested] = useState('');
 
   // Password fields
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -81,11 +82,7 @@ export function Signup({ onNavigate }) {
     return null;
   };
 
-  const validateProvider = () => {
-    if (signupType !== 'provider') return null;
-    if (!serviceInterested.trim()) return 'Please select what service you are interested in.';
-    return null;
-  };
+  const validateProvider = () => null;
 
 
 
@@ -109,17 +106,6 @@ export function Signup({ onNavigate }) {
         return;
       }
     }
-
-    if (signupType === 'provider') {
-      const providerError = validateProvider();
-      if (providerError) {
-        setErrorMsg(providerError);
-        return;
-      }
-    }
-
-    // normalize final serviceInterested in state is handled before payload creation
-    // setProviderServiceError removed (no longer used)
 
     setIsLoading(true);
 
@@ -145,7 +131,6 @@ export function Signup({ onNavigate }) {
             password,
             confirmPassword,
             photo: photoDataUrl || null,
-            serviceInterested: serviceInterested.trim(),
             acceptedTerms
           };
 
@@ -355,28 +340,7 @@ export function Signup({ onNavigate }) {
                 )}
               </div>
 
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1 font-sans">service interested *</label>
 
-                <select
-                  required
-                  value={serviceInterested}
-                  onChange={(e) => {
-                    setServiceInterested(e.target.value);
-                  }}
-                  className="w-full bg-white border border-slate-200 focus:border-teal-600 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
-                >
-                  <option value="">Select service</option>
-                  {Array.isArray(services) &&
-                    services.filter(s => !s.isHidden).map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                </select>
-
-
-              </div>
             </div>
           )}
 
@@ -388,13 +352,16 @@ export function Signup({ onNavigate }) {
                 <Lock className="w-4 h-4" />
               </div>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
-                placeholder="Choose a password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
               />
+              <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
 
 
             </div>
@@ -407,13 +374,16 @@ export function Signup({ onNavigate }) {
                 <Lock className="w-4 h-4" />
               </div>
               <input
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 required
                 placeholder="Re-enter your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
+                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
               />
+              <button type="button" onClick={() => setShowConfirmPassword((value) => !value)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 

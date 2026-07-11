@@ -7,8 +7,10 @@ export default function AdminOtherServicesRequestsPanel() {
     providerServiceItems,
     fetchProviderServiceItems,
     approveProviderServiceRequest,
-    denyProviderServiceRequest
+    denyProviderServiceRequest,
+    runWithActionSpinner
   } = useApp();
+
 
 
   const [loading, setLoading] = useState(false);
@@ -106,13 +108,17 @@ export default function AdminOtherServicesRequestsPanel() {
                           type="button"
                           onClick={async () => {
                             if (r.approvalStatus !== 'PENDING') return;
-                            await approveProviderServiceRequest(r.id);
+                            await runWithActionSpinner(
+                              () => approveProviderServiceRequest(r.id),
+                              { message: 'Approving service request...' }
+                            );
                           }}
                           disabled={r.approvalStatus !== 'PENDING'}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-[10px] shadow-2xs disabled:bg-emerald-300 disabled:cursor-not-allowed"
                         >
                           Approve
                         </button>
+
 
                         <button
                           type="button"
@@ -123,8 +129,13 @@ export default function AdminOtherServicesRequestsPanel() {
                               alert('Please enter a reason to deny the request.');
                               return;
                             }
-                            await denyProviderServiceRequest(r.id, reason.trim());
+
+                            await runWithActionSpinner(
+                              () => denyProviderServiceRequest(r.id, reason.trim()),
+                              { message: 'Denying service request...' }
+                            );
                           }}
+
                           disabled={r.approvalStatus !== 'PENDING'}
                           className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-2 rounded-lg text-[10px] disabled:bg-rose-100 disabled:text-rose-300 disabled:border-rose-200 disabled:cursor-not-allowed"
                         >
