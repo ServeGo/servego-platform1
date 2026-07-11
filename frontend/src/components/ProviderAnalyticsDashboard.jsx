@@ -64,8 +64,8 @@ export default function ProviderAnalyticsDashboard({ providerId }) {
 
   const totals = analytics?.totals || {};
 
-  const monthly = analytics?.monthlyEarnings || [];
-  const trends = analytics?.bookingTrendsByMonth || [];
+  const monthly = useMemo(() => (analytics?.monthlyEarnings || []), [analytics]);
+  const trends = useMemo(() => (analytics?.bookingTrendsByMonth || []), [analytics]);
 
   const revenueSeries = useMemo(() => {
     if (!Array.isArray(monthly)) return [];

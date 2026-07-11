@@ -12,8 +12,8 @@ import {
 
 const AppContext = createContext(undefined);
 
-const API_BASE_URL = 'http://localhost:4000/api';
-const SOCKET_URL = 'http://localhost:4000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || 'https://servego-backend.onrender.com/api';
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_SOCKET || 'https://servego-backend.onrender.com';
 const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
   ? window.fetch.bind(window)
   : fetch;
@@ -39,12 +39,13 @@ const apiFetch = async (url, options = {}) => {
   return baseFetch(url, { ...options, headers });
 };
 
-const fetch = (url, options) => apiFetch(url, options);
+// Use `api` as a small wrapper to avoid shadowing global `fetch`.
+const api = (url, options) => apiFetch(url, options);
 
 export const AppProvider = ({ children }) => {
   const fetchProviderAvailability = async (providerId, dateYYYYMMDD) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/availability?date=${encodeURIComponent(dateYYYYMMDD)}`);
+      const res = await api(`${API_BASE_URL}/providers/${providerId}/availability?date=${encodeURIComponent(dateYYYYMMDD)}`);
       const data = await res.json();
       if (!res.ok) return { error: data?.error || data?.message || 'Failed to fetch availability' };
       return data;
@@ -99,8 +100,7 @@ export const AppProvider = ({ children }) => {
   const fetchProvidersByApprovedServiceName = useCallback(async (serviceName) => {
     if (!serviceName) return [];
     try {
-      const API_BASE_URL = 'http://localhost:4000/api';
-      const res = await fetch(`${API_BASE_URL}/providers/by-approved-service?serviceName=${encodeURIComponent(serviceName)}`);
+      const res = await api(`${API_BASE_URL}/providers/by-approved-service?serviceName=${encodeURIComponent(serviceName)}`);
       const data = await res.json();
       if (!res.ok) {
         console.error('Failed to fetch providers by approved service:', data);
@@ -124,7 +124,7 @@ export const AppProvider = ({ children }) => {
 
   const fetchProviders = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/providers`);
+      const res = await api(`${API_BASE_URL}/providers`);
       const data = await res.json();
       setProviders(normalizeProviders(data));
     } catch (err) {
@@ -134,7 +134,7 @@ export const AppProvider = ({ children }) => {
 
   const fetchServices = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/services`);
+      const res = await api(`${API_BASE_URL}/services`);
       const data = await res.json();
       setServices(data);
     } catch (err) {
@@ -150,7 +150,7 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/bookings`);
+      const res = await api(`${API_BASE_URL}/bookings`);
       const data = await res.json();
       const bookingsArray = normalizeBookings(data);
 
@@ -183,7 +183,7 @@ export const AppProvider = ({ children }) => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/notifications`);
+      const res = await api(`${API_BASE_URL}/notifications`);
       const data = await res.json();
       setNotifications(normalizeNotifications(data));
     } catch (err) {
@@ -191,24 +191,24 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     try {
       const url = currentUser?.role === 'admin'
         ? `${API_BASE_URL}/admin/tickets`
         : `${API_BASE_URL}/tickets`;
-      const res = await fetch(url);
+      const res = await api(url);
       const data = await res.json();
       setTickets(normalizeTickets(data));
     } catch (err) {
       console.error('Failed to fetch tickets:', err);
       setTickets([]);
     }
-  };
+  }, [currentUser?.role]);
 
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/users`);
+      const res = await api(`${API_BASE_URL}/users`);
       const data = await res.json();
       setUsers(data);
     } catch (err) {
@@ -218,7 +218,7 @@ export const AppProvider = ({ children }) => {
 
   const createService = async (payload) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/services`, {
+      const res = await api(`${API_BASE_URL}/services`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -237,7 +237,7 @@ export const AppProvider = ({ children }) => {
 
   const updateService = async (id, payload) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/services/${id}`, {
+      const res = await api(`${API_BASE_URL}/services/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -256,7 +256,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteService = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/services/${id}`, {
+      const res = await api(`${API_BASE_URL}/services/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -274,7 +274,7 @@ export const AppProvider = ({ children }) => {
 
   const hideService = async (id, isHidden) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/services/${id}/hide`, {
+      const res = await api(`${API_BASE_URL}/services/${id}/hide`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isHidden })
@@ -300,7 +300,7 @@ export const AppProvider = ({ children }) => {
     try {
       localStorage.removeItem('servego_user');
       localStorage.removeItem('servego_token');
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await api(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -330,7 +330,7 @@ export const AppProvider = ({ children }) => {
     try {
       localStorage.removeItem('servego_user');
       localStorage.removeItem('servego_token');
-      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      const res = await api(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -410,14 +410,26 @@ export const AppProvider = ({ children }) => {
     if (currentUser?.role === 'admin') {
       fetchUsers();
     }
+    // Intentionally omit `fetchBookings`/`fetchTickets` from deps to avoid
+    // re-creating these effects when their identity changes due to provider/service
+    // updates (which caused reconnect loops). The functions themselves read
+    // latest state when invoked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, currentUser?.role]);
 
 
   useEffect(() => {
     if (!currentUser?.id) return undefined;
 
-    // Connect socket once per session
-    const socket = io(SOCKET_URL, { transports: ['websocket'] });
+    // Connect socket once per session. Provide auth token if available.
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      auth: { token: getStoredAuthToken() },
+      autoConnect: true,
+    });
     socketRef.current = socket;
 
       // Real-time booking + notification updates
@@ -429,6 +441,18 @@ export const AppProvider = ({ children }) => {
       if (notif.userId === currentUser.id) {
         setNotifications(prev => [normalizeNotification(notif), ...prev]);
       }
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('Socket connect error:', err?.message || err);
+    });
+
+    socket.on('reconnect_attempt', (attempt) => {
+      console.info('Socket reconnect attempt', attempt);
+    });
+
+    socket.on('reconnect_failed', () => {
+      console.warn('Socket failed to reconnect after attempts');
     });
 
     // Poll bookings every 30s (reduced from 10s), no notification polling
@@ -444,11 +468,13 @@ export const AppProvider = ({ children }) => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [currentUser?.id, currentUser?.role, fetchBookings]);
+    // Socket should only reconnect when user identity/role changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.role]);
 
   const createBooking = async (bookingData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/bookings`, {
+      const res = await api(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -477,7 +503,7 @@ export const AppProvider = ({ children }) => {
 
   const updateBookingStatus = async (bookingId, status, note) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
+      const res = await api(`${API_BASE_URL}/bookings/${bookingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, note })
@@ -500,7 +526,7 @@ export const AppProvider = ({ children }) => {
 
   const submitReview = async (bookingId, providerId, rating, comment) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/reviews`, {
+      const res = await api(`${API_BASE_URL}/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -525,7 +551,7 @@ export const AppProvider = ({ children }) => {
   const verifyProvider = async (providerId) => {
     try {
       const provider = providers.find(p => p.id === providerId);
-      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/verify`, {
+      const res = await api(`${API_BASE_URL}/providers/${providerId}/verify`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVerified: !provider.isVerified })
@@ -541,7 +567,7 @@ export const AppProvider = ({ children }) => {
 
   const updateProviderAvailability = async (providerId, availableDays, timeSlots) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/availability`, {
+      const res = await api(`${API_BASE_URL}/providers/${providerId}/availability`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ availableDays, timeSlots })
@@ -557,7 +583,7 @@ export const AppProvider = ({ children }) => {
 
   const updateProviderProfile = async (providerId, profileData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/profile`, {
+      const res = await api(`${API_BASE_URL}/providers/${providerId}/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileData)
@@ -575,7 +601,7 @@ export const AppProvider = ({ children }) => {
 
   const updateUserProfile = async (userId, profileData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/users/${userId}/profile`, {
+      const res = await api(`${API_BASE_URL}/users/${userId}/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profileData)
@@ -603,7 +629,7 @@ export const AppProvider = ({ children }) => {
 
   const submitSupportTicket = async (ticketData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/tickets`, {
+      const res = await api(`${API_BASE_URL}/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ticketData)
@@ -621,7 +647,7 @@ export const AppProvider = ({ children }) => {
 
   const respondToTicket = async (ticketId, responseText) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/resolve`, {
+      const res = await api(`${API_BASE_URL}/admin/tickets/${ticketId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: responseText })
@@ -638,7 +664,7 @@ export const AppProvider = ({ children }) => {
 
   const markNotificationAsRead = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+      const res = await api(`${API_BASE_URL}/notifications/${id}/read`, {
         method: 'PATCH'
       });
       const data = await res.json();
@@ -652,7 +678,7 @@ export const AppProvider = ({ children }) => {
 
   const clearNotifications = async () => {
     try {
-      await fetch(`${API_BASE_URL}/notifications`, { method: 'DELETE' });
+      await api(`${API_BASE_URL}/notifications`, { method: 'DELETE' });
       setNotifications([]);
     } catch (err) {
       console.error('Failed to clear notifications:', err);
@@ -661,7 +687,7 @@ export const AppProvider = ({ children }) => {
 
   const addSystemNotification = async (title, message, type, userId, role) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/notifications`, {
+      const res = await api(`${API_BASE_URL}/notifications`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, message, type, userId, role })
@@ -679,7 +705,7 @@ export const AppProvider = ({ children }) => {
     try {
       if (!currentUser?.id) return { success: false, message: 'Please login to apply a referral code.' };
 
-      const res = await fetch(`${API_BASE_URL}/referrals/apply`, {
+      const res = await api(`${API_BASE_URL}/referrals/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: currentUser.id, code })
@@ -720,7 +746,7 @@ export const AppProvider = ({ children }) => {
 
   const sendChatMessage = async (bookingId, text, senderRole) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/messages`, {
+      const res = await api(`${API_BASE_URL}/bookings/${bookingId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -761,7 +787,7 @@ export const AppProvider = ({ children }) => {
   const fetchProviderAnalytics = async (providerId, range = '90d') => {
     if (!providerId) return null;
     try {
-      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/analytics?range=${encodeURIComponent(range)}`);
+      const res = await api(`${API_BASE_URL}/providers/${providerId}/analytics?range=${encodeURIComponent(range)}`);
       const data = await res.json();
       if (!res.ok) return null;
       return data;
@@ -774,7 +800,7 @@ export const AppProvider = ({ children }) => {
   const fetchProviderServiceRequests = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests`);
+      const res = await api(`${API_BASE_URL}/admin/provider-service-requests`);
 
       const data = await res.json();
       if (res.ok) {
@@ -790,7 +816,7 @@ export const AppProvider = ({ children }) => {
   const fetchProviderServiceItems = async () => {
     if (currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-items`);
+      const res = await api(`${API_BASE_URL}/admin/provider-service-items`);
       const data = await res.json();
       if (res.ok) {
         setProviderServiceItems(Array.isArray(data) ? data : []);
@@ -820,7 +846,7 @@ export const AppProvider = ({ children }) => {
   const approveProviderServiceRequest = async (serviceRequestId) => {
     if (currentUser?.role !== 'admin') return { error: 'Admin access required' };
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/approve`, {
+      const res = await api(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/approve`, {
         method: 'PATCH'
       });
       const data = await res.json();
@@ -840,7 +866,7 @@ export const AppProvider = ({ children }) => {
   const denyProviderServiceRequest = async (serviceRequestId, reason) => {
     if (currentUser?.role !== 'admin') return { error: 'Admin access required' };
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/deny`, {
+      const res = await api(`${API_BASE_URL}/admin/provider-service-requests/${serviceRequestId}/deny`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason })

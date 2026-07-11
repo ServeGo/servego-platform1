@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
-import { MapPin, Navigation, Compass, RefreshCw, Landmark, Home, Truck, ShieldCheck, Activity } from 'lucide-react';
-
+import React, { useState, useEffect } from 'react';
+import { Compass, Truck, ShieldCheck, Activity } from 'lucide-react';
 
 
 export const LiveTrackingMap = ({ booking }) => {
@@ -10,7 +8,6 @@ export const LiveTrackingMap = ({ booking }) => {
   const [distance, setDistance] = useState(2.4); // kilometers
   const [currentLat, setCurrentLat] = useState(17.4445);
   const [currentLng, setCurrentLng] = useState(78.3782);
-  const [userLocation, setUserLocation] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
   const [gpsReady, setGpsReady] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(new Date().toLocaleTimeString());
@@ -63,10 +60,6 @@ export const LiveTrackingMap = ({ booking }) => {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
         setIsLocating(false);
         setGpsReady(true);
         // Add a slight variance to make it look matching Gachibowli coords
@@ -219,7 +212,7 @@ export const LiveTrackingMap = ({ booking }) => {
           style={{ left: `${Math.min(80, Math.max(10, (activeSpecialistPoint.x / 5.5)))}%`, top: `${activeSpecialistPoint.y - 45}px` }}
           className="absolute -translate-x-[50%] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-1 rounded-xl text-[9px] shadow-lg flex items-center gap-1.5 leading-none transition-all duration-300"
         >
-          <img src={booking.providerAvatar} className="w-4 h-4 rounded-full object-cover border border-slate-950" referrerPolicy="no-referrer" />
+          <img src={booking.providerAvatar} className="w-4 h-4 rounded-full object-cover border border-slate-950" alt={booking.providerName || 'Provider avatar'} referrerPolicy="no-referrer" />
           <Truck className="w-3.5 h-3.5 animate-bounce shrink-0" />
           <span>{booking.providerName.split(' ')[0]}</span>
           <span className="bg-slate-950/25 px-1 rounded text-[8px] font-bold">En Route</span>

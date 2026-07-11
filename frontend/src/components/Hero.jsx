@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { MapPin, Search, ArrowRight, ShieldCheck, Clock, Star, UserCheck } from 'lucide-react';
 import { HYDERABAD_NEIGHBORHOODS } from '../data';
 

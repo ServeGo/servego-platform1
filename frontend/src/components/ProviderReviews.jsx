@@ -45,7 +45,7 @@ export default function ProviderReviews({ rating, reviews }) {
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
 
-  const safeReviews = Array.isArray(reviews) ? reviews : [];
+  const safeReviews = useMemo(() => (Array.isArray(reviews) ? reviews : []), [reviews]);
 
   const computed = useMemo(() => {
     const list = safeReviews;

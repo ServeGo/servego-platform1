@@ -17,8 +17,8 @@
   },
   "scripts": {
     "start": "concurrently \"npm run tailwind:watch\" \"react-scripts start\"",
-    "tailwind:watch": "npx tailwindcss -i ./src/index.css -o ./src/tailwind-dist.css --watch",
-    "build": "npx tailwindcss -i ./src/index.css -o ./src/tailwind-dist.css && react-scripts build",
+    "tailwind:watch": "react-scripts start",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

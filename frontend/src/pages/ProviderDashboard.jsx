@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 
 import { ShieldAlert, ListOrdered } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -6,8 +6,7 @@ import { useApp } from '../context/AppContext';
 // Components
 import ProviderHeader from '../components/ProviderHeader';
 import LeadCard from '../components/LeadCard';
-import EarningsChart from '../components/EarningsChart';
-// (EarningsChart used in older UI flows)
+// EarningsChart intentionally removed; keep code minimal to avoid unused imports.
 
 import ProviderServicesPanel from '../components/ProviderServicesPanel';
 import ProviderReviews from '../components/ProviderReviews';
@@ -22,7 +21,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
   const { 
     currentUser, providers, bookings, 
-    updateBookingStatus, updateProviderAvailability, updateProviderProfile, submitSupportTicket, tickets,
+    updateBookingStatus, submitSupportTicket, tickets,
     applyReferralCode, sendChatMessage
   } = useApp();
 
@@ -43,13 +42,6 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
   const setActiveTab = setActiveTabExternal || setInternalActiveTab;
 
   // Local UI States
-  const [profileBio, setProfileBio] = useState(activeProvider?.bio || '');
-  const [workingDays, setWorkingDays] = useState(activeProvider?.availableDays || []);
-  const [workingHours, setWorkingHours] = useState(activeProvider?.timeSlots || []);
-  const [profileHourlyRate, setProfileHourlyRate] = useState(activeProvider?.hourlyRate || 350);
-  const [profileExperience, setProfileExperience] = useState(activeProvider?.experienceYears || 3);
-  const [profilePhone, setProfilePhone] = useState(activeProvider?.phone || '');
-  const [isSavedText, setIsSavedText] = useState(false);
   const [openChatBookingId, setOpenChatBookingId] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [supportSubject, setSupportSubject] = useState('');
@@ -65,30 +57,14 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
     bonusEarned: 0
   });
 
-  useEffect(() => {
-
-    if (activeProvider) {
-      setProfileBio(activeProvider.bio || '');
-      setWorkingDays(activeProvider.availableDays || []);
-      setWorkingHours(activeProvider.timeSlots || []);
-      setProfileHourlyRate(activeProvider.hourlyRate || 350);
-      setProfileExperience(activeProvider.experienceYears || 3);
-      setProfilePhone(activeProvider.phone || '');
-    }
-  }, [activeProvider]);
+  // (provider profile local editing removed; admin flows handle updates elsewhere)
 
   const allocatedBookings = useMemo(() => bookings.filter(b => b.providerId === activeProvider?.id), [bookings, activeProvider]);
   const activeLeads = useMemo(() => allocatedBookings.filter(b => ['pending', 'confirmed', 'in_progress', 'en_route', 'ongoing'].includes(b.status)), [allocatedBookings]);
   const completedJobs = useMemo(() => allocatedBookings.filter(b => ['completed', 'reviewed'].includes(b.status)), [allocatedBookings]);
   const completedCount = completedJobs.length;
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    updateProviderAvailability(activeProvider.id, workingDays, workingHours);
-    updateProviderProfile(activeProvider.id, { bio: profileBio, hourlyRate: Number(profileHourlyRate), experienceYears: Number(profileExperience), phone: profilePhone });
-    setIsSavedText(true);
-    setTimeout(() => setIsSavedText(false), 3000);
-  };
+  
 
   const handleSupportSubmit = (e) => {
     e.preventDefault();

@@ -12,7 +12,6 @@ import BookingSuccess from '../components/BookingSuccess';
 
 export const ServiceDetails = ({ catId, onNavigate }) => {
   const {
-    providers,
     providersByApprovedService,
     fetchProvidersByApprovedServiceName,
     currentUser,
@@ -63,19 +62,7 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
   const [errorText, setErrorText] = useState('');
   const [confirmedBookingDetails, setConfirmedBookingDetails] = useState(null);
 
-  const [autoBookingProviderId, setAutoBookingProviderId] = useState(null);
-
-  useEffect(() => {
-    const hash = window.location.hash || '';
-    // expected formats:
-    // 1) #service-details/<catOrProviderId>
-    // 2) if Favorites passes providerId, catId may become providerId; we treat it as providerId only when booking popup is desired.
-    const parts = hash.replace('#', '').split('/');
-    const last = parts[2] || parts[1];
-    if (last && last !== catId) {
-      setAutoBookingProviderId(last);
-    }
-  }, [catId]);
+  // (auto-booking via hash is currently unused; keeper removed to avoid unused state warning)
 
   useEffect(() => {
     if (categoryMeta?.name) {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 
 export default function ProviderSupport({
   tickets = [],
@@ -9,46 +9,6 @@ export default function ProviderSupport({
   setMessage,
   success
 }) {
-  const [statusFilter, setStatusFilter] = useState('open'); // open | resolved | all
-  const [query, setQuery] = useState('');
-  const [expandedId, setExpandedId] = useState(null);
-
-  const normalizedTickets = useMemo(() => {
-    return (tickets || []).map((t) => {
-      const rawStatus = t?.status;
-      const status = typeof rawStatus === 'string' ? rawStatus.toUpperCase() : '';
-      return {
-        ...t,
-        _statusNorm: status
-      };
-    });
-  }, [tickets]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let arr = [...normalizedTickets];
-
-    if (statusFilter === 'open') arr = arr.filter((t) => t._statusNorm === 'OPEN');
-    if (statusFilter === 'resolved') arr = arr.filter((t) => t._statusNorm === 'RESOLVED' || t._statusNorm === 'CLOSED');
-    if (statusFilter === 'all') {
-      // no-op
-    }
-
-    if (q) {
-      arr = arr.filter((t) => {
-        const hay = [t.id, t.subject, t.message].filter(Boolean).join(' ').toLowerCase();
-        return hay.includes(q);
-      });
-    }
-
-    arr.sort((a, b) => {
-      const da = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const db = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return db - da;
-    });
-
-    return arr;
-  }, [normalizedTickets, statusFilter, query]);
 
   // Keep for future expansion; currently UI uses raw ticket status.
   // const statusPill = (normStatus) => {
