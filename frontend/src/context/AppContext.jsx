@@ -26,6 +26,15 @@ const getStoredAuthToken = () => {
   }
 };
 
+const getStoredUser = () => {
+  try {
+    const raw = localStorage.getItem('servego_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 const apiFetch = async (url, options = {}) => {
   const headers = new Headers(options.headers || {});
   const token = getStoredAuthToken();
@@ -58,14 +67,7 @@ export const AppProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
 
   // Restore a previously authenticated session on refresh, but clear it on explicit logout.
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem('servego_user');
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState(getStoredUser);
 
   useEffect(() => {
     if (currentUser) {
@@ -419,9 +421,11 @@ export const AppProvider = ({ children }) => {
 
 
   useEffect(() => {
-    if (!currentUser?.id) return undefined;
+    if (!currentUser?.id) {
+      setConnectionStatus('offline');
+      return undefined;
+    }
 
-    // Connect socket once per session. Provide auth token if available.
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 20,
@@ -443,7 +447,12 @@ export const AppProvider = ({ children }) => {
       }
     });
 
+    socket.on('connect', () => {
+      setConnectionStatus('online');
+    });
+
     socket.on('connect_error', (err) => {
+      setConnectionStatus('reconnecting');
       console.warn('Socket connect error:', err?.message || err);
     });
 
@@ -452,6 +461,7 @@ export const AppProvider = ({ children }) => {
     });
 
     socket.on('reconnect_failed', () => {
+      setConnectionStatus('offline');
       console.warn('Socket failed to reconnect after attempts');
     });
 
@@ -773,6 +783,7 @@ export const AppProvider = ({ children }) => {
 
   // Global async action spinner (for booking/admin/provider actions)
   const [actionSpinner, setActionSpinner] = useState({ isOpen: false, message: '' });
+  const [connectionStatus, setConnectionStatus] = useState('online');
   const runWithActionSpinner = async (asyncFn, { message = 'Processing...' } = {}) => {
     setActionSpinner({ isOpen: true, message });
     try {
@@ -943,7 +954,8 @@ export const AppProvider = ({ children }) => {
 
       // global async action spinner
       actionSpinner,
-      runWithActionSpinner
+      runWithActionSpinner,
+      connectionStatus
     }}>
 
 
