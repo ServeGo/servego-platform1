@@ -17,7 +17,7 @@ export function Signup({ onNavigate }) {
 
   const partnerApplied = getQueryParam('partnerApplied');
   const partnerMessage = decodeURIComponent(getQueryParam('partnerMessage') || '');
-  const { registerUser, services } = useApp();
+  const { registerUser } = useApp();
 
 
   const [signupType, setSignupType] = useState('customer');
@@ -82,11 +82,7 @@ export function Signup({ onNavigate }) {
     return null;
   };
 
-  const validateProvider = () => null;
-
-
-
-
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();

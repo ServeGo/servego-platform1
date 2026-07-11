@@ -18,17 +18,6 @@ function Field({ label, children }) {
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text' }) {
-  return (
-    <input
-      value={value}
-      type={type}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl px-4 py-3 text-xs font-bold outline-none text-slate-800"
-    />
-  );
-}
 
 export default function ProviderAvailability() {
   const { currentUser, providers, updateProviderAvailability } = useApp();
@@ -49,9 +38,6 @@ export default function ProviderAvailability() {
 
 
   // Time slots removed from UI as requested.
-  const [newSlotText, setNewSlotText] = useState('');
-
-
 
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');

@@ -38,9 +38,10 @@ import {
 } from 'lucide-react';
 
 
+const RESTRICTED_ROUTES = ['dashboard-customer', 'dashboard-provider', 'admin'];
+
 export function MainLayout() {
   const { currentUser, logout, notifications, actionSpinner } = useApp();
-
 
   const unreadNotifications = (notifications || []).filter(
     (n) => n.userId === currentUser?.id && !n.read
@@ -53,17 +54,14 @@ export function MainLayout() {
   const [providerActiveTabExternal, setProviderActiveTabExternal] = useState('leads');
   const [adminActiveTabExternal, setAdminActiveTabExternal] = useState('dashboard');
 
-  const restrictedRoutes = ['dashboard-customer', 'dashboard-provider', 'admin'];
-
   const getDefaultDashboardForRole = (user) => {
     if (!user) return 'login';
     if (user.role === 'admin') return 'admin';
     if (user.role === 'provider') return 'dashboard-provider';
     return 'dashboard-customer';
   };
-
   const isAllowedForCurrentUser = (page, user) => {
-    if (!restrictedRoutes.includes(page)) return true;
+    if (!RESTRICTED_ROUTES.includes(page)) return true;
     if (!user) return false;
     if (page === 'dashboard-customer') return user.role === 'customer';
     if (page === 'dashboard-provider') return user.role === 'provider';
@@ -134,7 +132,7 @@ export function MainLayout() {
     window.addEventListener('hashchange', handleHash);
     handleHash();
     return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
+  }, [currentUser]);
 
 
   // Ensure we don't render anything based on a previous restricted hash.
@@ -142,7 +140,7 @@ export function MainLayout() {
 
 
   useEffect(() => {
-    if (!currentUser && restrictedRoutes.includes(currentPage)) {
+    if (!currentUser && RESTRICTED_ROUTES.includes(currentPage)) {
       setCurrentPage('login');
       window.location.hash = 'login';
       return;
@@ -163,14 +161,14 @@ export function MainLayout() {
   }, [currentUser, currentPage]);
 
   const handlePageTransition = (page, categoryId) => {
-    if (restrictedRoutes.includes(page) && !currentUser) {
+    if (RESTRICTED_ROUTES.includes(page) && !currentUser) {
       setCurrentPage('login');
       window.location.hash = 'login';
       window.scrollTo(0, 0);
       return;
     }
 
-    if (restrictedRoutes.includes(page) && currentUser && !isAllowedForCurrentUser(page, currentUser)) {
+    if (RESTRICTED_ROUTES.includes(page) && currentUser && !isAllowedForCurrentUser(page, currentUser)) {
       const redirectPage = getDefaultDashboardForRole(currentUser);
       setCurrentPage(redirectPage);
       window.location.hash = redirectPage;

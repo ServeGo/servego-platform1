@@ -13,8 +13,6 @@ export const Services = ({ onNavigate }) => {
     setSearchQuery,
     setCategory,
     providers,
-    providersByApprovedService,
-    fetchProvidersByApprovedServiceName,
     selectedArea,
     services
   } = useApp();

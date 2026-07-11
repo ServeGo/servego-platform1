@@ -1,11 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { ShieldAlert, Sparkles, Send } from 'lucide-react';
-import { useApp } from '../context/AppContext';
 import { SERVICE_CATEGORIES, HYDERABAD_NEIGHBORHOODS } from '../data';
 
 export const BecomePartner = () => {
-  const { currentUser } = useApp();
-  
   
   // Intake form fields
   const [name, setName] = useState('');
@@ -29,11 +26,8 @@ export const BecomePartner = () => {
     );
   };
 
-  const specialtiesList = useMemo(() => {
-    return specialtiesText
-      ? specialtiesText.split(',').map(s => s.trim()).filter(Boolean)
-      : [`General ${category} Services`];
-  }, [specialtiesText, category]);
+  // NOTE: `currentUser` and a dedicated `specialtiesList` preview are intentionally omitted
+  // to keep this registration form focused and avoid unused variable warnings.
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -53,7 +47,6 @@ export const BecomePartner = () => {
     setIsSubmitting(true);
 
     const msg = encodeURIComponent('successfully submitted. Please register your account to continue.');
-    const next = `/signup?partnerApplied=1&partnerMessage=${msg}`;
 
     // Use hash-based navigation so SPA route stays consistent.
     window.location.hash = `signup?partnerApplied=1&partnerMessage=${msg}`;

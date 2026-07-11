@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
-const getToken = () => { try { return localStorage.getItem('authToken'); } catch { return null; } };
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || 'https://servego-backend.onrender.com/api';
+const getToken = () => { try { return localStorage.getItem('servego_token'); } catch { return null; } };
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 

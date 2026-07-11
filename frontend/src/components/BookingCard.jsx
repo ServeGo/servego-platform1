@@ -30,7 +30,7 @@ export default function BookingCard({
       {/* Meta and description column */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-6 mb-5 border-b border-slate-100/60">
         <div className="md:col-span-4 flex items-start gap-3">
-          <img className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200" src={booking.providerAvatar} />
+          <img className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200" src={booking.providerAvatar} alt={booking.providerName || 'Provider avatar'} />
           <div>
             <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">Assigned Expert</span>
             <h4 className="font-bold text-slate-800 text-sm">{booking.providerName}</h4>
