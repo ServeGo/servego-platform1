@@ -1,2 +1,0 @@
-- [Neon DB wiring](neon-db.md) — real DB connected via NEON_DATABASE_URL secret; Prisma client prefers it over DATABASE_URL
-- [Production improvements](prod-improvements.md) — all security/race-condition fixes applied July 2026; key decisions here
