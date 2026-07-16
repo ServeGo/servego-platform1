@@ -12,13 +12,17 @@ import {
 
 const AppContext = createContext(undefined);
 
-const API_BASE_URL = (import.meta && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
-  ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL)
-  : 'https://servego-backend.onrender.com/api';
+// REST calls go through the Vite proxy (/api → localhost:4000/api) in dev,
+// and to the same-origin server in production. Never hardcode a remote URL.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || import.meta.env.VITE_API_URL
+  || '/api';
 
-const SOCKET_URL = (import.meta && import.meta.env && (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET))
-  ? (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET)
-  : 'https://servego-backend.onrender.com';
+// Socket.io connects to the Vite proxy (same origin) in dev,
+// and to an explicit URL in production if needed.
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
+  || import.meta.env.VITE_SOCKET
+  || '';
 const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
   ? window.fetch.bind(window)
   : fetch;
@@ -91,6 +95,14 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [tickets, setTickets] = useState([]);
 
+  // Loading flags — components use these to show skeleton loaders
+  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+
+  // User-facing fetch errors — cleared on successful fetch
+  const [fetchError, setFetchError] = useState(null);
+
   const [favoriteProviders, setFavoriteProviders] = useState(() => {
     const saved = localStorage.getItem('servego_favorites');
     return saved ? JSON.parse(saved) : [];
@@ -130,22 +142,34 @@ export const AppProvider = ({ children }) => {
   }, [favoriteProviders]);
 
   const fetchProviders = async () => {
+    setIsLoadingProviders(true);
     try {
       const res = await api(`${API_BASE_URL}/providers`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to load providers');
       setProviders(normalizeProviders(data));
+      setFetchError(null);
     } catch (err) {
       console.error('Failed to fetch providers:', err);
+      setFetchError('Could not load service providers. Please refresh.');
+    } finally {
+      setIsLoadingProviders(false);
     }
   };
 
   const fetchServices = async () => {
+    setIsLoadingServices(true);
     try {
       const res = await api(`${API_BASE_URL}/services`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to load services');
       setServices(data);
+      setFetchError(null);
     } catch (err) {
       console.error('Failed to fetch services:', err);
+      setFetchError('Could not load service categories. Please refresh.');
+    } finally {
+      setIsLoadingServices(false);
     }
   };
 
@@ -156,6 +180,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
 
+    setIsLoadingBookings(true);
     try {
       const res = await api(`${API_BASE_URL}/bookings`);
       const data = await res.json();
@@ -185,6 +210,8 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch bookings:', err);
       setBookings([]);
+    } finally {
+      setIsLoadingBookings(false);
     }
   }, [currentUser?.id, currentUser?.providerId, currentUser?.role, providers]);
 
@@ -470,16 +497,13 @@ export const AppProvider = ({ children }) => {
       console.warn('Socket failed to reconnect after attempts');
     });
 
-    // Poll bookings every 30s (reduced from 10s), no notification polling
+    // Initial fetch on connect; further updates come from socket events.
+    // Polling removed — socket handles real-time sync.
     fetchBookings();
-    const intervalId = window.setInterval(() => {
-      if (currentUser?.id) fetchBookings();
-    }, 30000);
 
     if (currentUser?.role === 'admin') fetchUsers();
 
     return () => {
-      window.clearInterval(intervalId);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -930,6 +954,12 @@ export const AppProvider = ({ children }) => {
       updateUserProfile,
       toggleFavoriteProvider,
       favoriteProviders,
+      // Loading states for skeleton loaders
+      isLoadingProviders,
+      isLoadingServices,
+      isLoadingBookings,
+      fetchError,
+
       // fetchProviderServices: not implemented yet in this context
       // registerProviderService: not implemented yet in this context
       submitSupportTicket,

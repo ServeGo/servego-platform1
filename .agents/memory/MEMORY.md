@@ -1,0 +1,3 @@
+- [Mock DB layer](mock-db-layer.md) — auto-activates when DB schema absent; mock client + store in backend/prisma/ and backend/data/
+- [Mock client where-matching](mock-client-where.md) — supports nested relation where, compound unique keys, OR/AND/NOT, mode:insensitive
+- [Seeder independence](seeder-note.md) — servicesSeed.js must NOT import from frontend; data defined inline in the seeder
