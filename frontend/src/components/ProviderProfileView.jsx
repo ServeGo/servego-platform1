@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AchievementList, VerificationLevelPill } from './ProviderReputation';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || 'https://servego-backend.onrender.com/api';
+const API_BASE_URL = import.meta?.env?.VITE_API_BASE_URL || import.meta?.env?.VITE_API_URL || 'https://servego-backend.onrender.com/api';
 
 export default function ProviderProfileView() {
   const { currentUser, providers, logout, updateProviderAvailability, updateProviderProfile } = useApp();
