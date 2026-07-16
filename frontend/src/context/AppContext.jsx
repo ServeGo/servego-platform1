@@ -12,8 +12,13 @@ import {
 
 const AppContext = createContext(undefined);
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_API_URL || 'https://servego-backend.onrender.com/api';
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_SOCKET || 'https://servego-backend.onrender.com';
+const API_BASE_URL = (import.meta && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
+  ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL)
+  : 'https://servego-backend.onrender.com/api';
+
+const SOCKET_URL = (import.meta && import.meta.env && (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET))
+  ? (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET)
+  : 'https://servego-backend.onrender.com';
 const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
   ? window.fetch.bind(window)
   : fetch;
