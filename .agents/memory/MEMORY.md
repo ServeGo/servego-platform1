@@ -1,3 +1,2 @@
-- [Mock DB layer](mock-db-layer.md) — auto-activates when DB schema absent; mock client + store in backend/prisma/ and backend/data/
-- [Mock client where-matching](mock-client-where.md) — supports nested relation where, compound unique keys, OR/AND/NOT, mode:insensitive
-- [Seeder independence](seeder-note.md) — servicesSeed.js must NOT import from frontend; data defined inline in the seeder
+- [Neon DB wiring](neon-db.md) — real DB connected via NEON_DATABASE_URL secret; Prisma client prefers it over DATABASE_URL
+- [Production improvements](prod-improvements.md) — all security/race-condition fixes applied July 2026; key decisions here
