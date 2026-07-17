@@ -5,6 +5,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import jwt from 'jsonwebtoken';
+
 
 import apiRouter from './routes/api.js';
 import { seedServicesIfEmpty } from './seeders/servicesSeed.js';
@@ -118,8 +120,10 @@ async function bootstrap() {
     // Handle explicit authentication
     socket.on('authenticate', (token) => {
       try {
-        // server.js is ESM (package.json has "type":"module"), so avoid require()
-        const decoded = (await import('jsonwebtoken')).default.verify(token, process.env.JWT_SECRET || 'servego-dev-secret');
+        const decoded = jwt.verify(
+          token,
+          process.env.JWT_SECRET || 'servego-dev-secret'
+        );
         socket.userId = decoded.id;
         socket.userRole = decoded.role;
         socket.join(`user:${decoded.id}`);
@@ -128,6 +132,7 @@ async function bootstrap() {
         socket.emit('authenticated', { success: false, error: 'Invalid token' });
       }
     });
+
 
 
 
