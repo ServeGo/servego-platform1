@@ -27,6 +27,14 @@ model User {
 
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
+
+  // Indexes for common queries
+  @@index([role])
+  @@index([status])
+  @@index([email])
+  @@index([providerId])
+  @@index([createdAt])
+
   authEvents              AuthEvent[]
   bookingsAsCustomer      Booking[]      @relation("CustomerBookings")
   notifications           Notification[]
@@ -57,6 +65,13 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Indexes for common queries
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([type])
+
   user      User     @relation(fields: [userId], references: [id])
 }
 
@@ -71,6 +86,11 @@ model Ticket {
   resolvedAt     DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  // Indexes for common queries
+  @@index([status])
+  @@index([requesterEmail])
+  @@index([createdAt])
 }
 
 model AuthEvent {
@@ -106,6 +126,15 @@ model Provider {
   timeSlots         Json      @default("[]")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  // Indexes for common queries
+  @@index([userId])
+  @@index([category])
+  @@index([rating])
+  @@index([isVerified])
+  @@index([isFeatured])
+  @@index([createdAt])
+
   bookings          Booking[]
   user              User      @relation(fields: [userId], references: [id])
   reviews           Review[]  @relation("ProviderReviews")
@@ -202,6 +231,17 @@ model Booking {
   statusHistory   Json          @default("[]")
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  // Indexes for common queries
+  @@index([customerId])
+  @@index([providerId])
+  @@index([status])
+  @@index([bookingDate])
+  @@index([paymentStatus])
+  @@index([serviceCategory])
+  @@index([createdAt])
+  @@index([customerId, status])
+  @@index([providerId, status])
 
   customer        User          @relation("CustomerBookings", fields: [customerId], references: [id])
   provider        Provider      @relation(fields: [providerId], references: [id])

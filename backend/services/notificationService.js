@@ -1,92 +1,181 @@
 import prisma from '../prisma/client.js';
 
+/**
+ * Create a notification for a user
+ */
 async function createNotification(userId, title, message, type = 'SYSTEM') {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: { userId, title, message, type, isRead: false }
     });
+    return notification;
   } catch (err) {
     console.error(`[NotificationService] Failed to create notification for user ${userId}:`, err.message);
     return null;
   }
 }
 
-export async function notifyBookingCreated(io, booking, customer, providerUserId) {
-  const [providerNotif, customerNotif] = await Promise.all([
-    providerUserId && createNotification(
-      providerUserId,
-      'New Service Request',
-      `You have a new ${booking.serviceCategory} request from ${customer.name}.`,
-      'BOOKING'
-    ),
-    createNotification(
-      customer.id,
-      'Booking Received',
-      `Your ${booking.serviceCategory} booking is pending confirmation.`,
-      'BOOKING'
-    )
-  ]);
+/**
+ * Emit notification to user's room
+ */
+function emitToUserRoom(io, userId, event, data) {
   if (io) {
-    io.emit('newJobLead', booking);
-    if (providerNotif) io.emit('notification', providerNotif);
-    if (customerNotif) io.emit('notification', customerNotif);
+    io.to(`user:${userId}`).emit(event, data);
   }
 }
 
-export async function notifyBookingStatusChanged(io, booking, updatedStatus, providerUserId) {
-  const [customerNotif, providerNotif] = await Promise.all([
-    createNotification(
-      booking.customerId,
-      'Booking Status Updated',
-      `Your booking for ${booking.serviceCategory} has been updated to "${updatedStatus}".`,
+/**
+ * Notify about a new booking creation
+ */
+export async function notifyBookingCreated(io, booking, customer, providerUserId) {
+  const notifications = [];
+
+  if (providerUserId) {
+    const providerNotif = await createNotification(
+      providerUserId,
+      'New Service Request',
+      `You have a new ${booking.serviceCategory} request from ${customer?.name || 'a customer'}.`,
       'BOOKING'
-    ),
-    providerUserId && createNotification(
+    );
+    notifications.push(providerNotif);
+  }
+
+  const customerNotif = await createNotification(
+    customer?.id,
+    'Booking Received',
+    `Your ${booking.serviceCategory} booking is pending confirmation.`,
+    'BOOKING'
+  );
+  notifications.push(customerNotif);
+
+  // Emit real-time events
+  if (io) {
+    // Emit to provider's room if they have one
+    if (providerUserId) {
+      emitToUserRoom(io, providerUserId, 'newJobLead', booking);
+      if (notifications[0]) {
+        emitToUserRoom(io, providerUserId, 'notification', notifications[0]);
+      }
+    }
+    // Emit to customer's room
+    if (notifications[1]) {
+      emitToUserRoom(io, customer?.id, 'notification', notifications[1]);
+    }
+  }
+}
+
+/**
+ * Notify about booking status change
+ */
+export async function notifyBookingStatusChanged(io, booking, updatedStatus, providerUserId) {
+  const notifications = [];
+
+  const customerNotif = await createNotification(
+    booking.customerId,
+    'Booking Status Updated',
+    `Your booking for ${booking.serviceCategory} has been updated to "${updatedStatus}".`,
+    'BOOKING'
+  );
+  notifications.push(customerNotif);
+
+  if (providerUserId) {
+    const providerNotif = await createNotification(
       providerUserId,
       'Booking Update',
       `Booking ${booking.id} changed to ${updatedStatus}.`,
       'BOOKING'
-    )
-  ]);
+    );
+    notifications.push(providerNotif);
+  }
+
   if (io) {
-    io.emit('bookingUpdated', { bookingId: booking.id, status: updatedStatus });
-    if (customerNotif) io.emit('notification', customerNotif);
-    if (providerNotif) io.emit('notification', providerNotif);
+    // Emit to customer's room
+    emitToUserRoom(io, booking.customerId, 'bookingUpdated', { 
+      bookingId: booking.id, 
+      status: updatedStatus,
+      serviceCategory: booking.serviceCategory 
+    });
+    if (notifications[0]) {
+      emitToUserRoom(io, booking.customerId, 'notification', notifications[0]);
+    }
+
+    // Emit to provider's room if applicable
+    if (providerUserId && notifications[1]) {
+      emitToUserRoom(io, providerUserId, 'notification', notifications[1]);
+    }
   }
 }
 
+/**
+ * Notify provider about service approval
+ */
 export async function notifyServiceApproved(providerUserId, serviceName) {
-  return createNotification(
+  const notification = await createNotification(
     providerUserId,
     'Service Approved',
     `Your service request "${serviceName}" has been approved.`,
     'SERVICE_APPROVAL'
   );
+  return notification;
 }
 
+/**
+ * Notify provider about service denial
+ */
 export async function notifyServiceDenied(providerUserId, serviceName, reason) {
-  return createNotification(
+  const notification = await createNotification(
     providerUserId,
     'Service Denied',
-    `Your service request "${serviceName}" has been denied.\nReason: ${reason}`,
+    `Your service request "${serviceName}" has been denied.\nReason: ${reason || 'No reason provided'}`,
     'SERVICE_DENIAL'
   );
+  return notification;
 }
 
+/**
+ * Notify about payment received
+ */
 export async function notifyPaymentReceived(userId, bookingId) {
-  return createNotification(
+  const notification = await createNotification(
     userId,
     'Payment Received',
     `Payment for booking ${bookingId} was received successfully.`,
     'PAYMENT'
   );
+  return notification;
 }
 
+/**
+ * Notify about review publication
+ */
 export async function notifyReviewPublished(userId) {
-  return createNotification(
+  const notification = await createNotification(
     userId,
     'Review Published',
     'Thank you for sharing your feedback. It helps other customers choose trusted providers.',
     'REVIEW'
   );
+  return notification;
+}
+
+/**
+ * Bulk create notifications for multiple users
+ */
+export async function createBulkNotifications(userIds, title, message, type = 'SYSTEM') {
+  try {
+    const notifications = await prisma.notification.createMany({
+      data: userIds.map(userId => ({
+        userId,
+        title,
+        message,
+        type,
+        isRead: false
+      })),
+      skipDuplicates: true
+    });
+    return notifications;
+  } catch (err) {
+    console.error('[NotificationService] Bulk notification creation failed:', err.message);
+    return null;
+  }
 }
