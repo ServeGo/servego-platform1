@@ -1,6 +1,7 @@
 import React from 'react';
 
 export default function AdminCustomersPanel({ customersList }) {
+  const safeCustomers = Array.isArray(customersList) ? customersList : [];
   return (
     <div className="space-y-6">
       <div>

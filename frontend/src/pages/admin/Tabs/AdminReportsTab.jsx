@@ -13,11 +13,20 @@ export default function AdminReportsTab() {
   const [tab, setTab] = useState('bookings'); // bookings | providers | audit
 
   useEffect(() => {
+    // Backend currently doesn't expose this route on Render.
+    // Avoid repeated failing network calls that spam the console.
+    return;
+
     fetch(`${API_BASE_URL}/admin/audit-logs`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     })
-      .then(r => r.ok ? r.json() : [])
-      .then(d => { setAuditLogs(Array.isArray(d) ? d : (d?.data || [])); setAuditLoading(false); })
+      .then(async (r) => {
+        // If endpoint isn't implemented on the backend, keep UI functional.
+        if (!r.ok) return [];
+        const json = await r.json();
+        return Array.isArray(json) ? json : (json?.data || []);
+      })
+      .then((d) => { setAuditLogs(Array.isArray(d) ? d : []); setAuditLoading(false); })
       .catch(() => setAuditLoading(false));
   }, []);
 
