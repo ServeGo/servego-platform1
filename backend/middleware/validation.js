@@ -1,0 +1,339 @@
+import { body, param, query, validationResult } from 'express-validator';
+import { sendApiError } from '../utils/response.js';
+
+/**
+ * Validation middleware that processes express-validator results
+ */
+export const validate = (validations) => {
+  return async (req, res, next) => {
+    // Run all validations
+    await Promise.all(validations.map(validation => validation.run(req)));
+
+    const errors = validationResult(req);
+    if (errors.isEmpty()) {
+      return next();
+    }
+
+    const extractedErrors = errors.array().map(err => ({
+      field: err.path,
+      message: err.msg
+    }));
+
+    return sendApiError(res, 400, 'VALIDATION_ERROR', 'Request validation failed', extractedErrors);
+  };
+};
+
+// ==================== Authentication Validations ====================
+
+export const registerValidation = [
+  body('name')
+    .trim()
+    .notEmpty().withMessage('Name is required')
+    .isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters')
+    .escape(),
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail()
+    .isLength({ max: 255 }).withMessage('Email too long'),
+  body('phone')
+    .trim()
+    .notEmpty().withMessage('Phone number is required')
+    .matches(/^[+]?[\d\s-]{10,15}$/).withMessage('Invalid phone number format'),
+  body('password')
+    .notEmpty().withMessage('Password is required')
+    .isLength({ min: 8, max: 128 }).withMessage('Password must be between 8 and 128 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  body('confirmPassword')
+    .notEmpty().withMessage('Confirm password is required'),
+  body('role')
+    .notEmpty().withMessage('Role is required')
+    .isIn(['customer', 'provider']).withMessage('Role must be either customer or provider'),
+  body('address')
+    .optional()
+    .trim()
+    .isLength({ max: 500 }).withMessage('Address too long')
+    .escape(),
+  body('pincode')
+    .optional()
+    .trim()
+    .matches(/^[0-9]{5,6}$/).withMessage('Invalid pincode format'),
+  body('acceptedTerms')
+    .isBoolean().withMessage('Terms acceptance must be a boolean')
+    .equals('true').withMessage('You must accept the terms and conditions')
+];
+
+export const loginValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail(),
+  body('password')
+    .notEmpty().withMessage('Password is required')
+];
+
+// ==================== Booking Validations ====================
+
+export const createBookingValidation = [
+  body('providerId')
+    .trim()
+    .notEmpty().withMessage('Provider ID is required'),
+  body('serviceCategory')
+    .trim()
+    .notEmpty().withMessage('Service category is required')
+    .isLength({ max: 200 }).withMessage('Service category too long')
+    .escape(),
+  body('bookingDate')
+    .notEmpty().withMessage('Booking date is required')
+    .isISO8601().withMessage('Invalid date format')
+    .custom((value) => {
+      const bookingDate = new Date(value);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      if (bookingDate < now) {
+        throw new Error('Booking date cannot be in the past');
+      }
+      return true;
+    }),
+  body('bookingTimeSlot')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('Time slot too long')
+    .escape(),
+  body('locationAddress')
+    .optional()
+    .trim()
+    .isLength({ max: 500 }).withMessage('Address too long')
+    .escape(),
+  body('city')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('City name too long')
+    .escape(),
+  body('instructions')
+    .optional()
+    .trim()
+    .isLength({ max: 1000 }).withMessage('Instructions too long')
+    .escape(),
+  body('paymentMethod')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('Payment method too long')
+];
+
+export const updateBookingStatusValidation = [
+  body('status')
+    .notEmpty().withMessage('Status is required')
+    .isIn(['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED']).withMessage('Invalid booking status'),
+  body('note')
+    .optional()
+    .trim()
+    .isLength({ max: 500 }).withMessage('Note too long')
+    .escape()
+];
+
+// ==================== Review Validations ====================
+
+export const createReviewValidation = [
+  body('reviewerId')
+    .trim()
+    .notEmpty().withMessage('Reviewer ID is required'),
+  body('reviewerName')
+    .trim()
+    .notEmpty().withMessage('Reviewer name is required')
+    .isLength({ max: 100 }).withMessage('Name too long')
+    .escape(),
+  body('rating')
+    .notEmpty().withMessage('Rating is required')
+    .isFloat({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+  body('providerId')
+    .trim()
+    .notEmpty().withMessage('Provider ID is required'),
+  body('bookingId')
+    .optional()
+    .trim(),
+  body('comment')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage('Comment too long')
+    .escape(),
+  body('serviceCategory')
+    .optional()
+    .trim()
+    .isLength({ max: 200 }).withMessage('Service category too long')
+    .escape()
+];
+
+// ==================== Ticket Validations ====================
+
+export const createTicketValidation = [
+  body('name')
+    .trim()
+    .notEmpty().withMessage('Name is required')
+    .isLength({ max: 100 }).withMessage('Name too long')
+    .escape(),
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail(),
+  body('subject')
+    .trim()
+    .notEmpty().withMessage('Subject is required')
+    .isLength({ min: 5, max: 200 }).withMessage('Subject must be between 5 and 200 characters')
+    .escape(),
+  body('message')
+    .trim()
+    .notEmpty().withMessage('Message is required')
+    .isLength({ min: 10, max: 5000 }).withMessage('Message must be between 10 and 5000 characters')
+    .escape()
+];
+
+export const resolveTicketValidation = [
+  body('response')
+    .trim()
+    .notEmpty().withMessage('Response is required')
+    .isLength({ min: 10, max: 2000 }).withMessage('Response must be between 10 and 2000 characters')
+    .escape()
+];
+
+// ==================== Payment Validations ====================
+
+export const createPaymentValidation = [
+  body('bookingId')
+    .trim()
+    .notEmpty().withMessage('Booking ID is required'),
+  body('paymentMethod')
+    .trim()
+    .notEmpty().withMessage('Payment method is required')
+    .isLength({ max: 50 }).withMessage('Payment method too long')
+    .escape(),
+  body('status')
+    .optional()
+    .isIn(['PENDING', 'UNPAID', 'PAID', 'FAILED']).withMessage('Invalid payment status'),
+  body('transactionId')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('Transaction ID too long')
+    .escape()
+];
+
+// ==================== Provider Validations ====================
+
+export const registerProviderServiceValidation = [
+  body('serviceName')
+    .trim()
+    .notEmpty().withMessage('Service name is required')
+    .isLength({ max: 200 }).withMessage('Service name too long')
+    .escape(),
+  body('description')
+    .trim()
+    .notEmpty().withMessage('Description is required')
+    .isLength({ min: 10, max: 2000 }).withMessage('Description must be between 10 and 2000 characters')
+    .escape(),
+  body('popularIssues')
+    .optional()
+    .isArray().withMessage('Popular issues must be an array'),
+  body('experienceYears')
+    .optional()
+    .isInt({ min: 0, max: 50 }).withMessage('Experience years must be between 0 and 50')
+];
+
+export const updateProviderProfileValidation = [
+  body('bio')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage('Bio too long')
+    .escape(),
+  body('specialties')
+    .optional()
+    .isArray().withMessage('Specialties must be an array'),
+  body('serviceAreas')
+    .optional()
+    .isArray().withMessage('Service areas must be an array'),
+  body('experienceYears')
+    .optional()
+    .isInt({ min: 0, max: 50 }).withMessage('Experience years must be between 0 and 50'),
+  body('phone')
+    .optional()
+    .trim()
+    .matches(/^[+]?[\d\s-]{10,15}$/).withMessage('Invalid phone number format')
+];
+
+export const updateAvailabilityValidation = [
+  body('availableDays')
+    .optional()
+    .isArray().withMessage('Available days must be an array'),
+  body('timeSlots')
+    .optional()
+    .isArray().withMessage('Time slots must be an array')
+];
+
+// ==================== Service Validations ====================
+
+export const createServiceValidation = [
+  body('name')
+    .trim()
+    .notEmpty().withMessage('Service name is required')
+    .isLength({ min: 2, max: 200 }).withMessage('Service name must be between 2 and 200 characters')
+    .escape(),
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage('Description too long')
+    .escape(),
+  body('popularIssues')
+    .optional()
+    .isArray().withMessage('Popular issues must be an array')
+];
+
+export const updateServiceValidation = [
+  body('name')
+    .trim()
+    .notEmpty().withMessage('Service name is required')
+    .isLength({ min: 2, max: 200 }).withMessage('Service name must be between 2 and 200 characters')
+    .escape(),
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage('Description too long')
+    .escape(),
+  body('popularIssues')
+    .optional()
+    .isArray().withMessage('Popular issues must be an array')
+];
+
+// ==================== Chat Message Validation ====================
+
+export const sendMessageValidation = [
+  body('text')
+    .trim()
+    .notEmpty().withMessage('Message text is required')
+    .isLength({ max: 2000 }).withMessage('Message too long')
+    .escape()
+];
+
+// ==================== Parameter Validations ====================
+
+export const mongoIdParam = [
+  param('id')
+    .trim()
+    .notEmpty().withMessage('ID is required')
+    .isLength({ max: 100 }).withMessage('Invalid ID format')
+];
+
+export const serviceNameQuery = [
+  query('serviceName')
+    .optional()
+    .trim()
+    .isLength({ max: 200 }).withMessage('Service name too long')
+    .escape()
+];
+
+export const dateQuery = [
+  query('date')
+    .optional()
+    .isISO8601().withMessage('Invalid date format')
+];

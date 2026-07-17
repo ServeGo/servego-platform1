@@ -20,19 +20,86 @@ const BOOKING_INCLUDE = {
 export const BookingController = {
   getAll: async (req, res) => {
     try {
-      const bookings = await prisma.booking.findMany({ include: BOOKING_INCLUDE });
-      res.json(bookings);
+      const { page = 1, limit = 50, status, providerId, customerId } = req.query;
+      const skip = (Math.max(1, parseInt(page)) - 1) * Math.min(100, Math.max(1, parseInt(limit)));
+
+      const where = {};
+      if (status) where.status = status;
+      if (providerId) where.providerId = providerId;
+      if (customerId) where.customerId = customerId;
+
+      // Filter based on user role
+      if (req.user.role === 'provider') {
+        // Provider should only see their bookings
+        const provider = await prisma.provider.findFirst({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+        if (provider) {
+          where.providerId = provider.id;
+        }
+      } else if (req.user.role === 'customer') {
+        // Customer should only see their bookings
+        where.customerId = req.user.id;
+      }
+
+      const [bookings, total] = await Promise.all([
+        prisma.booking.findMany({
+          where,
+          include: BOOKING_INCLUDE,
+          skip,
+          take: Math.min(100, Math.max(1, parseInt(limit))),
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.booking.count({ where })
+      ]);
+
+      res.json({
+        bookings,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / Math.min(100, Math.max(1, parseInt(limit))))
+        }
+      });
     } catch (err) {
+      console.error('[BookingController.getAll] Error:', err);
       sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve bookings', err.message);
     }
   },
 
   getById: async (req, res) => {
     try {
-      const booking = await prisma.booking.findUnique({ where: { id: req.params.id }, include: BOOKING_INCLUDE });
-      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+      const { id } = req.params;
+      
+      const booking = await prisma.booking.findUnique({ 
+        where: { id }, 
+        include: BOOKING_INCLUDE 
+      });
+      
+      if (!booking) {
+        return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+      }
+
+      // Authorization check - ensure user can only view their own bookings or providers can view assigned bookings
+      if (req.user.role === 'customer' && booking.customerId !== req.user.id) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only view your own bookings.');
+      }
+      
+      if (req.user.role === 'provider') {
+        const provider = await prisma.provider.findFirst({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+        if (provider && booking.providerId !== provider.id) {
+          return sendApiError(res, 403, 'FORBIDDEN', 'You can only view your assigned bookings.');
+        }
+      }
+
       res.json(booking);
     } catch (err) {
+      console.error('[BookingController.getById] Error:', err);
       sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch booking details', err.message);
     }
   },
@@ -61,16 +128,26 @@ export const BookingController = {
         return sendApiError(res, 400, 'INVALID_DATE', 'A valid booking date is required.');
       }
 
+      // Validate booking date is not in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (parsedBookingDate < today) {
+        return sendApiError(res, 400, 'INVALID_DATE', 'Booking date cannot be in the past.');
+      }
+
       const [customer, provider] = await Promise.all([
         prisma.user.findUnique({ where: { id: customerId }, select: { id: true, name: true } }),
-        prisma.provider.findUnique({ where: { id: bookingData.providerId }, include: { user: { select: { id: true, name: true } } } })
+        prisma.provider.findUnique({ 
+          where: { id: bookingData.providerId }, 
+          include: { user: { select: { id: true, name: true } } } 
+        })
       ]);
 
       if (!customer || !provider) {
         return sendApiError(res, 404, 'NOT_FOUND', 'Customer or provider not found.');
       }
 
-      // Availability check — prevent double-booking the same slot
+      // Check provider availability
       const slotTaken = await isProviderSlotTaken(
         bookingData.providerId,
         parsedBookingDate,
@@ -80,9 +157,7 @@ export const BookingController = {
         return sendApiError(res, 409, 'SLOT_UNAVAILABLE', 'This provider is already booked for the selected date and time slot.');
       }
 
-      // One-active-booking-per-provider rule: a customer cannot book the same
-      // provider again until their existing booking is completed/cancelled/denied.
-      // Only block re-booking the *same provider + same service* while the existing booking is pending.
+      // One-active-booking-per-provider rule
       const activePendingBookingForSameService = await prisma.booking.findFirst({
         where: {
           customerId,
@@ -94,7 +169,6 @@ export const BookingController = {
         select: { id: true, serviceCategory: true, status: true }
       });
 
-      // If serviceId is not supplied (legacy flow), fall back to matching by serviceCategory.
       const shouldFallbackToCategoryOnly = !bookingData.serviceId;
       const blockingBooking = activePendingBookingForSameService || (shouldFallbackToCategoryOnly
         ? await prisma.booking.findFirst({
@@ -117,23 +191,18 @@ export const BookingController = {
         );
       }
 
-
       const timestamp = new Date();
-      const bookingCount = await prisma.booking.count();
-      const bookingId = `BID-${bookingCount + 1}`;
-      const initialStatus = 'PENDING';
-
-      // Transaction: create booking atomically
+      
+      // Use Prisma's create with auto-generated ID instead of manual counting
       const result = await prisma.$transaction(async (tx) => {
-        return tx.booking.create({
+        const booking = await tx.booking.create({
           data: {
-            id: bookingId,
             customerId,
             providerId: bookingData.providerId,
             serviceCategory: bookingData.serviceCategory,
             bookingDate: parsedBookingDate,
             bookingTimeSlot: bookingData.bookingTimeSlot || 'Flexible',
-            status: initialStatus,
+            status: 'PENDING',
             paymentStatus: normalizePaymentStatus(bookingData.paymentStatus),
             paymentMethod: bookingData.paymentMethod || null,
             locationAddress: bookingData.locationAddress || '',
@@ -143,11 +212,12 @@ export const BookingController = {
             messages: [],
             reviewed: false,
             statusHistory: [
-              { status: initialStatus, timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
+              { status: 'PENDING', timestamp: timestamp.toISOString(), note: 'Booking created by customer' }
             ]
           },
           include: BOOKING_INCLUDE
         });
+        return booking;
       });
 
       const io = req.app.get('socketio');
@@ -170,11 +240,26 @@ export const BookingController = {
       if (!status) return sendApiError(res, 400, 'MISSING_FIELDS', 'A valid status string is required.');
 
       const updatedStatus = normalizeBookingStatus(status);
+      
+      // Validate status transition
+      if (!['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(updatedStatus)) {
+        return sendApiError(res, 400, 'INVALID_STATUS', 'Invalid booking status provided.');
+      }
+
       const booking = await prisma.booking.findUnique({ where: { id } });
       if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
 
       const currentStatus = normalizeBookingStatus(booking.status);
-      const provider = await prisma.provider.findUnique({ where: { id: booking.providerId }, select: { userId: true } });
+      
+      // Prevent redundant status update
+      if (currentStatus === updatedStatus) {
+        return sendApiError(res, 400, 'NO_CHANGE', 'Booking is already in this status.');
+      }
+
+      const provider = await prisma.provider.findUnique({ 
+        where: { id: booking.providerId }, 
+        select: { userId: true } 
+      });
 
       const canUpdate = canPerformAction({
         role,
@@ -202,34 +287,60 @@ export const BookingController = {
         include: BOOKING_INCLUDE
       });
 
-      await refreshProviderReputation(booking.providerId);
+      // Refresh provider reputation after completion
+      if (updatedStatus === 'COMPLETED') {
+        await refreshProviderReputation(booking.providerId);
+      }
 
       const io = req.app.get('socketio');
       await notifyBookingStatusChanged(io, booking, updatedStatus, provider?.userId);
 
       res.json(updated);
     } catch (err) {
-      sendApiError(res, 400, 'BAD_REQUEST', err.message);
+      console.error('[BookingController.updateStatus] Error:', err);
+      sendApiError(res, 500, 'INTERNAL_ERROR', err.message);
     }
   },
 
   addMessage: async (req, res) => {
     try {
       const { id } = req.params;
-      const { senderName, senderRole, text } = req.body;
+      const { text } = req.body;
       const senderId = req.user.id;
+      const senderName = req.user.email?.split('@')[0] || 'User';
+      const senderRole = req.user.role;
 
-      if (!text) return sendApiError(res, 400, 'MISSING_FIELDS', 'Message text is required.');
+      if (!text || !text.trim()) {
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Message text is required.');
+      }
+
+      if (text.length > 2000) {
+        return sendApiError(res, 400, 'MESSAGE_TOO_LONG', 'Message text cannot exceed 2000 characters.');
+      }
 
       const booking = await prisma.booking.findUnique({ where: { id } });
       if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
 
+      // Authorization check
+      if (req.user.role === 'customer' && booking.customerId !== req.user.id) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only send messages on your own bookings.');
+      }
+      if (req.user.role === 'provider') {
+        const provider = await prisma.provider.findFirst({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+        if (provider && booking.providerId !== provider.id) {
+          return sendApiError(res, 403, 'FORBIDDEN', 'You can only send messages on your assigned bookings.');
+        }
+      }
+
       const messageObj = {
-        id: `msg_${Math.random().toString(36).substring(2, 9)}`,
+        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         senderId,
         senderName,
         senderRole,
-        text,
+        text: text.trim(),
         timestamp: new Date().toISOString()
       };
 
@@ -240,11 +351,19 @@ export const BookingController = {
       });
 
       const io = req.app.get('socketio');
-      if (io) io.emit('chatMessageReceived', { bookingId: id, message: messageObj });
+      if (io) {
+        io.to(`booking:${id}`).emit('chatMessageReceived', { bookingId: id, message: messageObj });
+        // Also emit to the other party's room
+        const otherPartyId = req.user.role === 'customer' ? booking.provider?.user?.id : booking.customerId;
+        if (otherPartyId) {
+          io.to(`user:${otherPartyId}`).emit('bookingMessage', { bookingId: id, message: messageObj });
+        }
+      }
 
       res.status(201).json(updated);
     } catch (err) {
-      sendApiError(res, 400, 'BAD_REQUEST', err.message);
+      console.error('[BookingController.addMessage] Error:', err);
+      sendApiError(res, 500, 'INTERNAL_ERROR', err.message);
     }
   }
 };

@@ -1,40 +1,71 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma/client.js';
-import { generateAuthToken } from '../utils/auth.js';
+import { generateTokenPair, verifyRefreshToken, isAuthBlocked, recordFailedAuthAttempt } from '../utils/auth.js';
+import { sendApiError } from '../utils/response.js';
+import { validatePasswordStrength } from '../utils/validation.js';
 
 export const UserController = {
   getUsers: async (req, res) => {
     try {
       if (req.user?.role !== 'admin') {
-        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Admin access required.' });
+        return sendApiError(res, 403, 'FORBIDDEN', 'Admin access required.');
       }
 
-      const users = await prisma.user.findMany({
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          role: true,
-          avatar: true,
-          status: true,
-          address: true,
-          pincode: true,
-          referralCode: true,
-          referredBy: true,
-          referralsCount: true,
-          referralDiscountBalance: true,
-          referralBonusEarned: true,
-          providerId: true,
-          createdAt: true,
-          updatedAt: true,
-          customerProfile: true,
-          providerProfile: true
+      const { page = 1, limit = 50, role, status, search } = req.query;
+      const skip = (Math.max(1, parseInt(page)) - 1) * Math.min(100, Math.max(1, parseInt(limit)));
+
+      const where = {};
+      if (role) where.role = role;
+      if (status) where.status = status;
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const [users, total] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            avatar: true,
+            status: true,
+            address: true,
+            pincode: true,
+            referralCode: true,
+            referredBy: true,
+            referralsCount: true,
+            referralDiscountBalance: true,
+            referralBonusEarned: true,
+            providerId: true,
+            createdAt: true,
+            updatedAt: true,
+            customerProfile: true,
+            providerProfile: true
+          },
+          skip,
+          take: Math.min(100, Math.max(1, parseInt(limit))),
+          orderBy: { createdAt: 'desc' }
+        }),
+        prisma.user.count({ where })
+      ]);
+
+      res.json({
+        users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / Math.min(100, Math.max(1, parseInt(limit))))
         }
       });
-      res.json(users);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve users', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve users', err.message);
     }
   },
 
@@ -54,56 +85,61 @@ export const UserController = {
         acceptedTerms
       } = req.body;
 
+      // Validation
       if (!name || !email || !phone || !role || !password) {
-        return res.status(400).json({ error: 'Missing required signup parameters (name, email, phone, role, password)' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required signup parameters (name, email, phone, role, password)');
       }
 
       if (!acceptedTerms) {
-        return res.status(400).json({ error: 'You must agree to the Terms & Conditions to continue.' });
+        return sendApiError(res, 400, 'TERMS_NOT_ACCEPTED', 'You must agree to the Terms & Conditions to continue.');
       }
 
       if (!confirmPassword) {
-        return res.status(400).json({ error: 'Confirm Password is required.' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Confirm Password is required.');
       }
 
       if (password !== confirmPassword) {
-        return res.status(400).json({ error: 'Password and Confirm Password must match.' });
+        return sendApiError(res, 400, 'PASSWORD_MISMATCH', 'Password and Confirm Password must match.');
+      }
+
+      // Password strength validation
+      const passwordErrors = validatePasswordStrength(password);
+      if (passwordErrors.length > 0) {
+        return sendApiError(res, 400, 'WEAK_PASSWORD', 'Password does not meet security requirements', passwordErrors);
       }
 
       if (role === 'customer') {
         if (!address || !pincode) {
-          return res.status(400).json({ error: 'Address and pincode are required for customer signup.' });
+          return sendApiError(res, 400, 'MISSING_FIELDS', 'Address and pincode are required for customer signup.');
         }
         if (!/^[0-9]{5,6}$/.test(String(pincode))) {
-          return res.status(400).json({ error: 'Invalid pincode. Expected 5-6 digits.' });
+          return sendApiError(res, 400, 'INVALID_PINCDE', 'Invalid pincode. Expected 5-6 digits.');
         }
-      } else if (role === 'provider') {
-        // serviceInterested is no longer required at signup — provider registers services after login
-      } else {
-        return res.status(400).json({ error: 'Signup role must be either customer or provider.' });
+      } else if (role !== 'provider') {
+        return sendApiError(res, 400, 'INVALID_ROLE', 'Signup role must be either customer or provider.');
       }
 
       const normalizedEmail = String(email).trim().toLowerCase();
       const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
       if (existingUser) {
-        return res.status(400).json({ error: 'An account with this email address already exists. Please choose another email.' });
+        return sendApiError(res, 400, 'EMAIL_EXISTS', 'An account with this email address already exists. Please choose another email.');
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 12);
       const referralCode = `SERVEGO-${role === 'provider' ? 'PRO' : 'CUST'}-${name.substring(0, 3).toUpperCase().replace(/\s/g, 'X')}${Math.floor(10 + Math.random() * 90)}`;
       const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F172A&color=fff&size=150`;
 
       const newUser = await prisma.user.create({
         data: {
-          name,
+          name: name.trim(),
           email: normalizedEmail,
-          phone,
+          phone: String(phone).trim(),
           role,
           password: hashedPassword,
           avatar,
           status: 'ACTIVE',
-          address: role === 'customer' ? address : null,
-          pincode: role === 'customer' ? pincode : null,
+          address: role === 'customer' ? (address?.trim() || null) : null,
+          pincode: role === 'customer' ? String(pincode).trim() : null,
           referralCode,
           referralsCount: 0,
           referralDiscountBalance: 0
@@ -117,8 +153,8 @@ export const UserController = {
         customerProfile = await prisma.customer.create({
           data: {
             userId: newUser.id,
-            address,
-            pincode,
+            address: address?.trim(),
+            pincode: String(pincode).trim(),
             preferences: []
           }
         });
@@ -151,7 +187,9 @@ export const UserController = {
           userId: newUser.id,
           email: newUser.email,
           eventType: 'SIGNUP',
-          success: true
+          success: true,
+          ip: req.ip,
+          userAgent: req.get('user-agent')
         }
       });
 
@@ -176,18 +214,30 @@ export const UserController = {
         updatedAt: newUser.updatedAt
       };
 
-      res.status(201).json({ success: true, user: safeUser, token: generateAuthToken(newUser) });
+      const tokens = generateTokenPair(newUser);
+
+      res.status(201).json({ 
+        success: true, 
+        user: safeUser, 
+        ...tokens 
+      });
     } catch (err) {
       console.error('Signup registration error:', err);
-      res.status(500).json({ error: 'Server signup registration failed', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed', err.message);
     }
   },
 
   login: async (req, res) => {
     try {
       const { email, password } = req.body;
+      
       if (!email || !password) {
-        return res.status(400).json({ error: 'Please enter both your email address and password.' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please enter both your email address and password.');
+      }
+
+      const clientIp = req.ip || req.connection?.remoteAddress;
+      if (isAuthBlocked(clientIp)) {
+        return sendApiError(res, 429, 'AUTH_BLOCKED', 'Too many failed attempts. Please try again in 15 minutes.');
       }
 
       const normalizedEmail = String(email).trim().toLowerCase();
@@ -198,19 +248,26 @@ export const UserController = {
           providerProfile: true
         }
       });
-      if (!user || !(await bcrypt.compare(password, user.password))) {
+
+      const isValidCredentials = user && await bcrypt.compare(password, user.password);
+      
+      if (!isValidCredentials) {
         await prisma.authEvent.create({
           data: {
             email: normalizedEmail,
             eventType: 'LOGIN',
-            success: false
+            success: false,
+            ip: clientIp,
+            userAgent: req.get('user-agent')
           }
         });
-        return res.status(401).json({ error: 'Incorrect email address or password. Please verify and try again.' });
+        
+        recordFailedAuthAttempt(clientIp);
+        
+        return sendApiError(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email address or password. Please verify and try again.');
       }
 
       if (user.status !== 'ACTIVE') {
-        // Structured response so frontend can show a clean “under review” state for providers/customers.
         const blockedReason = user.status === 'INACTIVE' || user.status === 'SUSPENDED' ? 'inactive_or_suspended' : 'under_review';
         return res.status(403).json({
           success: false,
@@ -220,21 +277,63 @@ export const UserController = {
         });
       }
 
-
       await prisma.authEvent.create({
         data: {
           userId: user.id,
           email: user.email,
           eventType: 'LOGIN',
-          success: true
+          success: true,
+          ip: clientIp,
+          userAgent: req.get('user-agent')
         }
       });
 
       const { password: _, ...safeUser } = user;
-      res.json({ success: true, user: safeUser, token: generateAuthToken(user) });
+      const tokens = generateTokenPair(user);
+      
+      res.json({ success: true, user: safeUser, ...tokens });
     } catch (err) {
       console.error('Login error:', err);
-      res.status(500).json({ error: 'Server authentication login failed', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Server authentication login failed', err.message);
+    }
+  },
+
+  refreshToken: async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      
+      if (!refreshToken) {
+        return sendApiError(res, 400, 'MISSING_TOKEN', 'Refresh token is required.');
+      }
+
+      const decoded = verifyRefreshToken(refreshToken);
+      if (!decoded) {
+        return sendApiError(res, 401, 'INVALID_REFRESH_TOKEN', 'Invalid or expired refresh token.');
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true
+        }
+      });
+
+      if (!user || user.status !== 'ACTIVE') {
+        return sendApiError(res, 401, 'ACCOUNT_INACTIVE', 'User account is not active.');
+      }
+
+      const tokens = generateTokenPair(user);
+
+      res.json({ 
+        success: true, 
+        ...tokens 
+      });
+    } catch (err) {
+      console.error('Token refresh error:', err);
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token', err.message);
     }
   },
 
@@ -242,22 +341,23 @@ export const UserController = {
     try {
       const { id } = req.params;
       const { name, phone, address, pincode } = req.body;
+
       if (req.user?.role !== 'admin' && req.user?.id !== id) {
-        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You can only update your own profile.' });
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own profile.');
       }
 
       const user = await prisma.user.findUnique({ where: { id }, include: { customerProfile: true } });
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return sendApiError(res, 404, 'USER_NOT_FOUND', 'User not found');
       }
 
       const updatedUser = await prisma.user.update({
         where: { id },
         data: {
-          name: name ?? user.name,
-          phone: phone ?? user.phone,
-          address: address ?? user.address,
-          pincode: pincode ?? user.pincode
+          name: name?.trim() ?? user.name,
+          phone: phone?.trim() ?? user.phone,
+          address: address?.trim() ?? user.address,
+          pincode: pincode?.trim() ?? user.pincode
         },
         include: {
           customerProfile: true,
@@ -270,16 +370,16 @@ export const UserController = {
           await prisma.customer.update({
             where: { id: user.customerProfile.id },
             data: {
-              address: address ?? user.customerProfile.address,
-              pincode: pincode ?? user.customerProfile.pincode
+              address: address?.trim() ?? user.customerProfile.address,
+              pincode: pincode?.trim() ?? user.customerProfile.pincode
             }
           });
         } else if (address && pincode) {
           await prisma.customer.create({
             data: {
               userId: user.id,
-              address,
-              pincode,
+              address: address.trim(),
+              pincode: pincode.trim(),
               preferences: []
             }
           });
@@ -294,7 +394,7 @@ export const UserController = {
       res.json({ success: true, user: safeUser });
     } catch (err) {
       console.error('Failed to update user profile:', err);
-      res.status(500).json({ error: 'Failed to update user profile', details: err.message });
+      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile', err.message);
     }
   }
 };

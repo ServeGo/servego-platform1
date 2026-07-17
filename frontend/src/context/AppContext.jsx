@@ -9,19 +9,12 @@ import {
   normalizeNotification,
   normalizeNotifications,
 } from '../utils/normalizeCustomerData';
+import { api as apiClient, API_BASE_URL, SOCKET_URL, setTokens, clearTokens, initializeTokens } from '../utils/apiClient';
 
 const AppContext = createContext(undefined);
 
-const API_BASE_URL = (import.meta && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
-  ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL)
-  : 'https://servego-backend.onrender.com/api';
-
-const SOCKET_URL = (import.meta && import.meta.env && (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET))
-  ? (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET)
-  : 'https://servego-backend.onrender.com';
-const baseFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
-  ? window.fetch.bind(window)
-  : fetch;
+// Initialize tokens on load
+initializeTokens();
 
 const getStoredAuthToken = () => {
   try {
@@ -40,21 +33,15 @@ const getStoredUser = () => {
   }
 };
 
-const apiFetch = async (url, options = {}) => {
-  const headers = new Headers(options.headers || {});
-  const token = getStoredAuthToken();
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData) && !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  return baseFetch(url, { ...options, headers });
+// Wrapper for backward compatibility
+const api = async (url, options = {}) => {
+  const response = await apiClient.get(url.replace(API_BASE_URL, ''), options);
+  return {
+    ok: response.ok,
+    status: response.status,
+    json: () => Promise.resolve(response.data)
+  };
 };
-
-// Use `api` as a small wrapper to avoid shadowing global `fetch`.
-const api = (url, options) => apiFetch(url, options);
 
 export const AppProvider = ({ children }) => {
   const fetchProviderAvailability = async (providerId, dateYYYYMMDD) => {
@@ -306,29 +293,28 @@ export const AppProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       localStorage.removeItem('servego_user');
-      localStorage.removeItem('servego_token');
-      const res = await api(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (data.token) {
-          localStorage.setItem('servego_token', data.token);
+      clearTokens();
+      
+      // Use the new API client for better error handling and retry
+      const response = await apiClient.post('/auth/login', { email, password }, { retryConfig: { maxRetries: 2 } });
+      
+      if (response.ok && response.data.success) {
+        // Store tokens using the new token management system
+        if (response.data.accessToken) {
+          setTokens(response.data.accessToken, response.data.refreshToken);
         }
-        setCurrentUser(data.user);
-        return { success: true, role: data.user.role };
+        setCurrentUser(response.data.user);
+        return { success: true, role: response.data.user.role };
       } else {
         return {
           success: false,
-          error: data.error || 'Login failed',
-          blockedReason: data.blockedReason,
-          needsReview: data.needsReview
+          error: response.data?.error || 'Login failed',
+          blockedReason: response.data?.blockedReason,
+          needsReview: response.data?.needsReview
         };
       }
-
     } catch (err) {
+      console.error('Login error:', err);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };
@@ -336,32 +322,27 @@ export const AppProvider = ({ children }) => {
   const registerUser = async (payload) => {
     try {
       localStorage.removeItem('servego_user');
-      localStorage.removeItem('servego_token');
-      const res = await api(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      let data;
-      try {
-        data = await res.json();
-      } catch (jsonErr) {
-        const text = await res.text();
-        console.error('Signup response not JSON:', text);
-        return { success: false, error: `Unexpected server response: ${text}` };
-      }
-
-      if (data.success) {
-        if (data.token) {
-          localStorage.setItem('servego_token', data.token);
+      clearTokens();
+      
+      const response = await apiClient.post('/auth/register', payload, { retryConfig: { maxRetries: 2 } });
+      const data = response.data;
+      
+      if (response.ok && data.success) {
+        // Store tokens using the new token management system
+        if (data.accessToken) {
+          setTokens(data.accessToken, data.refreshToken);
         }
         setCurrentUser(data.user);
-        return { success: true };
+        return { success: true, role: data.user.role };
+      } else {
+        return {
+          success: false,
+          error: data?.error || 'Registration failed',
+          details: data?.details
+        };
       }
-
-      return { success: false, error: data.error || 'Registration failed' };
     } catch (err) {
-      console.error('Signup network error:', err);
+      console.error('Registration error:', err);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };
@@ -370,6 +351,7 @@ export const AppProvider = ({ children }) => {
     try {
       localStorage.removeItem('servego_user');
       localStorage.removeItem('servego_token');
+      clearTokens();
     } catch {
       // Ignore storage errors.
     }

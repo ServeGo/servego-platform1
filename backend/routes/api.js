@@ -16,6 +16,8 @@ import { ReferralsController } from '../controllers/referralsController.js';
 import { ProviderServiceDiscoveryController } from '../controllers/providerServiceDiscoveryController.js';
 import { ProviderAnalyticsController } from '../controllers/providerAnalyticsController.js';
 import { requireAuth, requireRole } from '../utils/auth.js';
+import { authRateLimiter, bookingRateLimiter, reviewRateLimiter } from '../middleware/security.js';
+import { validate, registerValidation, loginValidation, createBookingValidation, createReviewValidation, createTicketValidation } from '../middleware/validation.js';
 
 
 
@@ -40,8 +42,9 @@ const apiRouter = Router();
 // --- Authentication & Users ---
 
 
-apiRouter.post('/auth/register', UserController.register);
-apiRouter.post('/auth/login', UserController.login);
+apiRouter.post('/auth/register', validate(registerValidation), UserController.register);
+apiRouter.post('/auth/login', authRateLimiter, validate(loginValidation), UserController.login);
+apiRouter.post('/auth/refresh', UserController.refreshToken);
 apiRouter.get('/users', requireAuth, requireRole('admin'), UserController.getUsers);
 apiRouter.patch('/users/:id/profile', requireAuth, UserController.updateProfile);
 
@@ -60,7 +63,7 @@ apiRouter.patch('/providers/:id/verify', requireAuth, requireRole('admin'), Prov
 // --- Bookings ---
 apiRouter.get('/bookings', requireAuth, BookingController.getAll);
 apiRouter.get('/bookings/:id', requireAuth, BookingController.getById);
-apiRouter.post('/bookings', requireAuth, BookingController.create);
+apiRouter.post('/bookings', bookingRateLimiter, validate(createBookingValidation), BookingController.create);
 apiRouter.patch('/bookings/:id/status', requireAuth, BookingController.updateStatus);
 apiRouter.patch('/admin/bookings/:id/status', requireAuth, requireRole('admin'), BookingController.updateStatus);
 
@@ -74,7 +77,7 @@ apiRouter.delete('/notifications', requireAuth, NotificationController.clearAll)
 
 // --- Support Tickets ---
 apiRouter.get('/tickets', requireAuth, TicketController.getAll);
-apiRouter.post('/tickets', TicketController.create);
+apiRouter.post('/tickets', validate(createTicketValidation), TicketController.create);
 apiRouter.patch('/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
 apiRouter.get('/admin/tickets', requireAuth, requireRole('admin'), TicketController.getAll);
 apiRouter.patch('/admin/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
@@ -82,7 +85,7 @@ apiRouter.patch('/admin/tickets/:id/resolve', requireAuth, requireRole('admin'),
 
 // --- Reviews ---
 apiRouter.get('/reviews', requireAuth, requireRole('admin'), ReviewController.getAll);
-apiRouter.post('/reviews', requireAuth, ReviewController.create);
+apiRouter.post('/reviews', reviewRateLimiter, validate(createReviewValidation), ReviewController.create);
 
 // --- Payments ---
 apiRouter.get('/payments', requireAuth, PaymentController.getAll);
@@ -105,6 +108,7 @@ apiRouter.get('/providers/:id/analytics', requireAuth, requireRole('provider'), 
 
 // --- Admin: Dashboard ---
 apiRouter.get('/admin/dashboard', requireAuth, requireRole('admin'), AdminDashboardController.getSummary);
+apiRouter.get('/admin/analytics', requireAuth, requireRole('admin'), AdminDashboardController.getAnalytics);
 
 
 // --- Admin: provider service items (pending requests + approved registrations) ---
