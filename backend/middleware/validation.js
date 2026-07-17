@@ -60,8 +60,14 @@ export const registerValidation = [
     .trim()
     .matches(/^[0-9]{5,6}$/).withMessage('Invalid pincode format'),
   body('acceptedTerms')
-    .isBoolean().withMessage('Terms acceptance must be a boolean')
-    .equals('true').withMessage('You must accept the terms and conditions')
+    .optional()
+    .custom((value) => {
+      // Accept boolean true, string 'true', or number 1
+      if (value === true || value === 'true' || value === 1 || value === '1') {
+        return true;
+      }
+      throw new Error('You must accept the terms and conditions');
+    })
 ];
 
 export const loginValidation = [

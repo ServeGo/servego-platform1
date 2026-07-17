@@ -90,7 +90,8 @@ export const UserController = {
         return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required signup parameters (name, email, phone, role, password)');
       }
 
-      if (!acceptedTerms) {
+      // Accept boolean true, string 'true', or number 1
+      if (acceptedTerms !== true && acceptedTerms !== 'true' && acceptedTerms !== 1 && acceptedTerms !== '1') {
         return sendApiError(res, 400, 'TERMS_NOT_ACCEPTED', 'You must agree to the Terms & Conditions to continue.');
       }
 
