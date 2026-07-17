@@ -60,7 +60,8 @@ export function useAdminPanelController() {
   const [serviceEditSuccess, setServiceEditSuccess] = useState('');
 
   const customersList = useMemo(() => {
-    return (users || []).filter((u) => u.role === 'customer');
+    const list = Array.isArray(users) ? users : [];
+    return list.filter((u) => u?.role === 'customer');
   }, [users]);
 
   const providersList = useMemo(() => {

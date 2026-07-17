@@ -4,11 +4,11 @@
 
 const API_BASE_URL = (import.meta && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
   ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL)
-  : 'http://localhost:4000/api';
+  : 'https://servego-backend.onrender.com/api';
 
 const SOCKET_URL = (import.meta && import.meta.env && (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET))
   ? (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET)
-  : 'http://localhost:4000';
+  : 'https://servego-backend.onrender.com';
 
 // Retry configuration
 const DEFAULT_RETRY_CONFIG = {
