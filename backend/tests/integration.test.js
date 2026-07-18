@@ -43,11 +43,6 @@ test('rejects short passwords', () => {
   assert.ok(errors.some(e => e.includes('8 characters')), 'Should reject short passwords');
 });
 
-test('rejects passwords without uppercase', () => {
-  const errors = validatePasswordStrength('test@1234');
-  assert.ok(errors.some(e => e.includes('uppercase')), 'Should reject without uppercase');
-});
-
 test('rejects passwords without lowercase', () => {
   const errors = validatePasswordStrength('TEST@1234');
   assert.ok(errors.some(e => e.includes('lowercase')), 'Should reject without lowercase');
@@ -58,9 +53,9 @@ test('rejects passwords without numbers', () => {
   assert.ok(errors.some(e => e.includes('number')), 'Should reject without numbers');
 });
 
-test('rejects passwords without special characters', () => {
-  const errors = validatePasswordStrength('TestPass123');
-  assert.ok(errors.some(e => e.includes('special')), 'Should reject without special characters');
+test('accepts passwords without uppercase or special characters', () => {
+  const errors = validatePasswordStrength('password123');
+  assert.equal(errors.length, 0, 'Password with lowercase letters and a number should be accepted');
 });
 
 // ==================== Booking Workflow Tests ====================

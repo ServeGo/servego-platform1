@@ -1,6 +1,5 @@
 import React from 'react';
 import { Activity, Landmark, Users, MessageSquare, DollarSign, UserCheck } from 'lucide-react';
-import { normalizeProviderIsVerified } from '../../utils/normalizeAdminData';
 
 
 export default function AdminDashboardPanel({
@@ -140,38 +139,23 @@ export default function AdminDashboardPanel({
               <UserCheck className="w-4 h-4 text-amber-600" />
               <span>Awaiting Vetting Audit</span>
             </h3>
-            <button onClick={() => setActiveTab('providers')} className="text-teal-700 font-extrabold text-xs hover:underline uppercase tracking-wide">
+            <button onClick={() => setActiveTab('providerServiceRequests')} className="text-teal-700 font-extrabold text-xs hover:underline uppercase tracking-wide">
               Queue
             </button>
           </div>
 
-          {providers.filter((p) => !normalizeProviderIsVerified(p)).length === 0 ? (
-
-            <p className="text-slate-400 italic text-center py-10 text-xs font-semibold">All specialists are vetted & verified successfully.</p>
+          {pendingPartnersCount === 0 ? (
+            <p className="text-slate-400 italic text-center py-10 text-xs font-semibold">No pending service requests.</p>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {providers
-                .filter((p) => !p.isVerified)
-                .slice(0, 3)
-                .map((p) => (
-                  <div key={p.id} className="py-3 first:pt-0 last:pb-0 font-semibold text-xs">
-                    <div className="flex justify-between items-start gap-4">
-                      <div>
-                        <span className="font-bold text-slate-900 block">{p.name}</span>
-                        <span className="text-[10px] text-indigo-600 font-bold block uppercase mt-0.5">{p.category} Specialist</span>
-                        <span className="text-[9px] text-slate-400 block mt-1 font-mono">
-                          Exp{p.experienceYears} Years • Payout/hr{p.hourlyRate}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handlePartnerApproval(p.id)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-2.5 py-1 text-[10px] font-extrabold font-sans transition-colors shrink-0"
-                      >
-                        Approve Now
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            <div className="flex flex-col items-center justify-center py-6 gap-3">
+              <span className="text-3xl font-black text-amber-600">{pendingPartnersCount}</span>
+              <span className="text-xs text-slate-500 font-semibold">pending service approval{pendingPartnersCount !== 1 ? 's' : ''}</span>
+              <button
+                onClick={() => setActiveTab('providerServiceRequests')}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition-colors"
+              >
+                Review Requests
+              </button>
             </div>
           )}
         </div>

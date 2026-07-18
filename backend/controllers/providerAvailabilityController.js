@@ -33,6 +33,27 @@ function dayOfWeekShort(date) {
 }
 
 export const ProviderAvailabilityController = {
+  getAvailability: async (req, res) => {
+    try {
+      const providerId = req.params.id;
+      // Schedules are public booking-flow data; mutations remain provider/admin-only.
+      if (req.query.date) return ProviderAvailabilityController.getAvailabilityForDate(req, res);
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+        select: { userId: true, availableDays: true, timeSlots: true, availabilitySlots: true }
+      });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
+      return sendApiSuccess(res, 200, {
+        providerId,
+        availableDays: provider.availableDays,
+        timeSlots: provider.timeSlots,
+        availabilitySlots: provider.availabilitySlots
+      });
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve availability schedule', err.message);
+    }
+  },
+
   getAvailabilityForDate: async (req, res) => {
     try {
       const providerId = req.params.id;
@@ -50,7 +71,7 @@ export const ProviderAvailabilityController = {
 
       const provider = await prisma.provider.findUnique({
         where: { id: providerId },
-        select: { availableDays: true, timeSlots: true },
+        select: { availableDays: true, timeSlots: true, availabilitySlots: true },
       });
 
       if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
@@ -73,7 +94,10 @@ export const ProviderAvailabilityController = {
         });
       }
 
-      const rawSlots = Array.isArray(provider.timeSlots) ? provider.timeSlots : [];
+      const configuredSlots = Array.isArray(provider.availabilitySlots) ? provider.availabilitySlots : [];
+      const rawSlots = configuredSlots.length
+        ? configuredSlots.filter((slot) => normalizeDowInput(slot.dayOfWeek) === dow).map((slot) => `${slot.startTime}-${slot.endTime}`)
+        : (Array.isArray(provider.timeSlots) ? provider.timeSlots : []);
       const slots = rawSlots.length ? rawSlots : ['Flexible'];
 
       const slotResults = await Promise.all(

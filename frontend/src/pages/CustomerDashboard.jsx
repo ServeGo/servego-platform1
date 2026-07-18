@@ -18,7 +18,7 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
     currentUser, bookings, updateBookingStatus, submitReview, 
     providers, favoriteProviders, toggleFavoriteProvider, tickets, submitSupportTicket, 
     notifications, markNotificationAsRead, applyReferralCode, getCustomerLoyaltyTier, sendChatMessage,
-    updateUserProfile
+    updateUserProfile, savedProsData
   } = useApp();
 
   const [internalActiveTab, setInternalActiveTab] = useState('bookings');
@@ -48,7 +48,13 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
   // Memoized data
   const userBookings = useMemo(() => bookings.filter(b => b.customerId === currentUser?.id), [bookings, currentUser]);
-  const userFavorites = useMemo(() => providers.filter(p => favoriteProviders.includes(p.id)), [providers, favoriteProviders]);
+  const userFavorites = useMemo(() => {
+    // Use real SavedPro API data when available; fall back to provider list filtered by IDs
+    if (Array.isArray(savedProsData) && savedProsData.length > 0) {
+      return savedProsData.map(sp => sp.provider || providers.find(p => p.id === (sp.providerId || sp.provider?.id))).filter(Boolean);
+    }
+    return providers.filter(p => favoriteProviders.includes(p.id));
+  }, [savedProsData, providers, favoriteProviders]);
   const userTickets = useMemo(() => tickets.filter(t => t.email === currentUser?.email), [tickets, currentUser]);
   const userNotifications = useMemo(() => notifications.filter(n => n.userId === currentUser?.id), [notifications, currentUser]);
 
@@ -163,22 +169,7 @@ export const CustomerDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
             {userBookings.length === 0 ? (
               <EmptyBookings onNavigate={onNavigate} />
             ) : (
-              <div className="space-y-6">
-                {userBookings.map(bk => (
-                  <BookingCard 
-                    key={bk.id}
-                    booking={bk}
-                    onDownloadReceipt={setInvoiceBooking}
-                    onCancel={updateBookingStatus}
-                    onReview={setReviewBooking}
-                    chatOpen={openChatBookingId === bk.id}
-                    onToggleChat={() => setOpenChatBookingId(openChatBookingId === bk.id ? null : bk.id)}
-                    chatInput={chatInput}
-                    setChatInput={setChatInput}
-                    onSendMessage={sendChatMessage}
-                  />
-                ))}
-              </div>
+              <BookingSubTabs bookings={userBookings} onDownloadReceipt={setInvoiceBooking} onCancel={updateBookingStatus} onReview={setReviewBooking} openChatBookingId={openChatBookingId} setOpenChatBookingId={setOpenChatBookingId} chatInput={chatInput} setChatInput={setChatInput} onSendMessage={sendChatMessage} onNavigate={onNavigate} />
             )}
           </div>
         )}
@@ -248,6 +239,76 @@ function EmptyBookings({ onNavigate }) {
       >
         Browse Services
       </button>
+    </div>
+  );
+}
+
+const BOOKING_SUB_TABS = [
+  // Accept both backend canonical enums (PENDING/CONFIRMED/...) and UI lowercase variants.
+  { id: 'active', label: 'Active', statuses: ['confirmed', 'ongoing', 'CONFIRMED', 'ONGOING'] },
+  { id: 'pending', label: 'Pending', statuses: ['pending', 'PENDING'] },
+  { id: 'cancelled', label: 'Cancelled', statuses: ['cancelled', 'CANCELLED', 'rejected', 'REJECTED'] },
+  { id: 'past', label: 'Past', statuses: ['completed', 'reviewed', 'COMPLETED', 'REVIEWED'] },
+];
+
+function BookingSubTabs({ bookings, onDownloadReceipt, onCancel, onReview, openChatBookingId, setOpenChatBookingId, chatInput, setChatInput, onSendMessage, onNavigate }) {
+  const [subTab, setSubTab] = useState('pending');
+
+  const filtered = useMemo(() => {
+    const tab = BOOKING_SUB_TABS.find(t => t.id === subTab);
+    if (!tab) return bookings;
+    return bookings.filter(b => tab.statuses.includes((b.status || '').toLowerCase()));
+  }, [bookings, subTab]);
+
+  const counts = useMemo(() => {
+    const result = {};
+    BOOKING_SUB_TABS.forEach(t => {
+      result[t.id] = bookings.filter(b => t.statuses.includes((b.status || '').toLowerCase())).length;
+    });
+    return result;
+  }, [bookings]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-1 bg-white border border-slate-200 p-1.5 rounded-2xl w-full sm:w-fit">
+        {BOOKING_SUB_TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black transition-all ${subTab === t.id ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            {t.label} {counts[t.id] > 0 && <span className="ml-1 opacity-70">({counts[t.id]})</span>}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-2xs max-w-sm mx-auto">
+          <p className="text-slate-500 text-xs font-medium">No {subTab} bookings.</p>
+          {subTab === 'pending' && (
+            <button onClick={() => onNavigate('services')} className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors">
+              Browse Services
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filtered.map(bk => (
+            <BookingCard
+              key={bk.id}
+              booking={bk}
+              onDownloadReceipt={onDownloadReceipt}
+              onCancel={onCancel}
+              onReview={onReview}
+              chatOpen={openChatBookingId === bk.id}
+              onToggleChat={() => setOpenChatBookingId(openChatBookingId === bk.id ? null : bk.id)}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              onSendMessage={onSendMessage}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

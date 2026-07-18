@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../../context/AppContext';
-
-const API_BASE_URL = import.meta?.env?.VITE_API_BASE_URL || import.meta?.env?.VITE_API_URL || 'https://servego-backend.onrender.com/api';
-const getToken = () => { try { return localStorage.getItem('servego_token'); } catch { return null; } };
+import { api } from '../../../utils/apiClient';
 
 export default function AdminAnalyticsTab() {
   const { bookings, providers, services } = useApp();
@@ -10,11 +8,8 @@ export default function AdminAnalyticsTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/admin/dashboard`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-      .then(r => r.json())
-      .then(d => { setMetrics(d.data || d); setLoading(false); })
+    api.get('/admin/dashboard')
+      .then(response => { setMetrics(response.ok ? response.data : null); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 

@@ -7,6 +7,11 @@ import { Mail, Lock, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from '
 export function Login({ onNavigate }) {
   const { login } = useApp();
 
+  // Read redirect intent from URL query param (set by booking flow when unauthenticated)
+  const redirectParam = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('redirect')
+    : null;
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -46,6 +51,29 @@ export function Login({ onNavigate }) {
       }. Opening your dashboard...`);
       
       setTimeout(() => {
+        // Check for a stored booking intent (set when unauthenticated user clicked Book)
+        const bookingIntentRaw = sessionStorage.getItem('servego_booking_intent');
+        if (bookingIntentRaw && destRole === 'customer') {
+          try {
+            const intent = JSON.parse(bookingIntentRaw);
+            if (intent.catId) {
+              // Navigate back to service-details; the page will resume the modal
+              onNavigate('service-details', intent.catId);
+              return;
+            }
+          } catch {
+            sessionStorage.removeItem('servego_booking_intent');
+          }
+        }
+        // If there's a redirect intent (e.g. from booking flow), honor it
+        if (redirectParam && destRole === 'customer') {
+          // redirectParam is like "service-details/Electrician" — parse and navigate
+          const parts = redirectParam.replace(/^\//, '').split('/');
+          if (parts[0] === 'service-details' && parts[1]) {
+            onNavigate('service-details', decodeURIComponent(parts[1]));
+            return;
+          }
+        }
         if (destRole === 'customer') {
           onNavigate('dashboard-customer');
         } else if (destRole === 'provider') {

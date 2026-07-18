@@ -69,7 +69,9 @@ export function Signup({ onNavigate }) {
     if (!email.trim() || !email.includes('@')) return 'Please enter a valid email address.';
     if (!mobileNumber.trim() || mobileNumber.trim().length < 10)
       return 'Please enter a valid mobile number (at least 10 digits).';
-    if (!password || password.length < 4) return 'Password should be at least 4 characters long.';
+    if (!password || password.length < 8 || !/[a-z]/.test(password) || !/\d/.test(password)) {
+      return 'Password must be at least 8 characters and include a lowercase letter and a number.';
+    }
     if (password !== confirmPassword) return 'Password and Confirm Password must match.';
     if (!acceptedTerms) return 'You must agree to the Terms & Conditions to continue.';
     return null;

@@ -121,7 +121,7 @@ export function requireAuth(req, res, next) {
   const token = extractToken(header);
   const decoded = verifyAuthToken(token);
 
-  if (!decoded) {
+  if (!decoded || decoded.expired) {
     return res.status(401).json({ 
       success: false, 
       code: 'UNAUTHORIZED', 
@@ -136,20 +136,12 @@ export function requireAuth(req, res, next) {
 
 /**
  * Role-based access control middleware
+ * Must be used after requireAuth — relies on req.user already being set.
  */
 export function requireRole(roleOrRoles) {
   const allowedRoles = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];
 
   return (req, res, next) => {
-    const header = req.headers?.authorization || '';
-    const token = extractToken(header);
-    const decoded = verifyAuthToken(token);
-
-    // Reuse existing user from previous middleware if available
-    if (!req.user && decoded) {
-      req.user = decoded;
-    }
-
     if (!req.user) {
       return res.status(401).json({ 
         success: false, 
@@ -199,12 +191,14 @@ export function recordFailedAuthAttempt(ip) {
   failedAttempts.set(key, current + 1);
   
   // Clear after 15 minutes
-  setTimeout(() => {
+  const decayTimer = setTimeout(() => {
     const val = failedAttempts.get(key);
     if (val) {
       failedAttempts.set(key, Math.max(0, val - 1));
     }
   }, 15 * 60 * 1000);
+  // These housekeeping timers must not keep the server or test process alive.
+  decayTimer.unref?.();
 }
 
 export function getFailedAuthAttempts(ip) {

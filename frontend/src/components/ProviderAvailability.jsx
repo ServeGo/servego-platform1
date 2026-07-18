@@ -35,9 +35,7 @@ export default function ProviderAvailability() {
   const [loading, setLoading] = useState(!activeProvider);
 
   const [availableDays, setAvailableDays] = useState([]);
-
-
-  // Time slots removed from UI as requested.
+  const [availabilitySlots, setAvailabilitySlots] = useState([]);
 
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
@@ -51,8 +49,7 @@ export default function ProviderAvailability() {
     if (!activeProvider) return;
 
     setAvailableDays(Array.isArray(activeProvider.availableDays) ? activeProvider.availableDays : (activeProvider.availableDays ? parseCommaList(activeProvider.availableDays) : []));
-
-
+    setAvailabilitySlots(Array.isArray(activeProvider.availabilitySlots) ? activeProvider.availabilitySlots : []);
 
     setLoading(false);
   }, [activeProvider]);
@@ -63,6 +60,7 @@ export default function ProviderAvailability() {
     if (!availableDays.length) errors.push('Available days is required');
 
     if (availableDays.some(d => d.length > 20)) errors.push('Day names look too long');
+    if (availabilitySlots.some((slot) => !slot.startTime || !slot.endTime || slot.startTime >= slot.endTime)) errors.push('Every time slot needs a valid start and end time');
 
     return errors;
   };
@@ -87,9 +85,7 @@ export default function ProviderAvailability() {
 
     setSaving(true);
     try {
-      // backend currently expects (providerId, availableDays, timeSlots)
-      // but UI no longer collects timeSlots. Pass empty list.
-      await updateProviderAvailability(activeProvider.id, availableDays, []);
+      await updateProviderAvailability(activeProvider.id, availableDays, [], availabilitySlots);
       setSaveMsg('Availability saved successfully');
     } catch (err) {
       setSaveErr(err?.message || 'Failed to save availability');
@@ -120,7 +116,11 @@ export default function ProviderAvailability() {
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const toggleDay = (d) => {
     setAvailableDays(prev => (prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]));
+    setAvailabilitySlots(prev => prev.filter((slot) => slot.dayOfWeek !== d || !availableDays.includes(d)));
   };
+
+  const addSlot = (dayOfWeek) => setAvailabilitySlots((prev) => [...prev, { dayOfWeek, startTime: '09:00', endTime: '17:00' }]);
+  const updateSlot = (index, key, value) => setAvailabilitySlots((prev) => prev.map((slot, i) => i === index ? { ...slot, [key]: value } : slot));
 
 
 
@@ -129,7 +129,7 @@ export default function ProviderAvailability() {
       <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs max-w-3xl mx-auto">
         <h2 className="text-xl font-black text-slate-900">Availability</h2>
         <p className="text-xs text-slate-500 font-semibold mt-1">
-          Click to add/remove days and time slots. Save updates backend for provider.
+          Choose working days and one or more appointment windows for each day.
         </p>
       </div>
 
@@ -158,12 +158,29 @@ export default function ProviderAvailability() {
                 })}
               </div>
             </Field>
+          </div>
 
-
+          <div className="space-y-3">
+            <Field label="Appointment windows">
+              {availableDays.length === 0 ? (
+                <p className="text-xs text-slate-500">Select at least one day to add time slots.</p>
+              ) : availableDays.map((day) => {
+                const daySlots = availabilitySlots.map((slot, index) => ({ slot, index })).filter(({ slot }) => slot.dayOfWeek === day);
+                return <div key={day} className="rounded-2xl border border-slate-200 p-3 space-y-2">
+                  <div className="flex items-center justify-between"><span className="text-xs font-black text-slate-700">{day}</span><button type="button" onClick={() => addSlot(day)} className="text-xs font-bold text-indigo-700">Add slot</button></div>
+                  {daySlots.map(({ slot, index }) => <div key={`${day}-${index}`} className="flex items-center gap-2">
+                    <input type="time" value={slot.startTime} onChange={(e) => updateSlot(index, 'startTime', e.target.value)} className="border border-slate-200 rounded-lg px-2 py-1 text-xs" />
+                    <span className="text-xs text-slate-400">to</span>
+                    <input type="time" value={slot.endTime} onChange={(e) => updateSlot(index, 'endTime', e.target.value)} className="border border-slate-200 rounded-lg px-2 py-1 text-xs" />
+                    <button type="button" onClick={() => setAvailabilitySlots((prev) => prev.filter((_, i) => i !== index))} className="text-xs font-bold text-rose-600">Remove</button>
+                  </div>)}
+                </div>;
+              })}
+            </Field>
           </div>
 
           <div className="text-xs text-slate-500 font-semibold bg-slate-50 border border-slate-200 rounded-2xl p-4">
-            Tip: Select the available days for your appointments.
+            Tip: Add multiple windows when you work morning and evening shifts.
           </div>
 
 

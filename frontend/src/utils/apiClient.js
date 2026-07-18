@@ -2,19 +2,14 @@
  * Production-grade API client with retry logic, error handling, and token refresh
  */
 
-const API_BASE_URL = (import.meta && import.meta.env && (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL))
-  ? (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL)
-  : 'https://servego-backend.onrender.com/api';
-
-const SOCKET_URL = (import.meta && import.meta.env && (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET))
-  ? (import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET)
-  : 'https://servego-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_SOCKET || window.location.origin;
 
 // Retry configuration
 const DEFAULT_RETRY_CONFIG = {
   maxRetries: 3,
   retryDelay: 1000,
-  retryableStatuses: [408, 429, 500, 502, 503, 504]
+  retryableStatuses: [408, 500, 502, 503, 504]
 };
 
 // Token storage
@@ -92,8 +87,9 @@ async function refreshAccessToken() {
       return null;
     }
 
-    const data = await response.json();
-    if (data.success && data.accessToken) {
+    const payload = await response.json();
+    const data = payload?.success === true ? payload.data : payload;
+    if (data?.accessToken) {
       setTokens(data.accessToken, data.refreshToken);
       return data.accessToken;
     }
@@ -156,14 +152,10 @@ async function apiRequest(endpoint, options = {}) {
         }
       }
       
-      // Handle rate limiting
+      // A retry here would multiply traffic while the limiter window is still
+      // active. Return the structured response so the caller can surface it.
       if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After');
-        const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : config.retryDelay * 2;
-        if (attempt < config.maxRetries) {
-          await sleep(delay);
-          continue;
-        }
+        lastError = new Error('Request rate limited');
       }
       
       // Retry on server errors if attempts remaining
@@ -179,6 +171,13 @@ async function apiRequest(endpoint, options = {}) {
         data = await response.json();
       } else {
         data = await response.text();
+      }
+
+      // Successful backend responses use { success: true, data }. Consumers
+      // receive the resource itself; failed responses remain intact so their
+      // error code and message can be displayed.
+      if (response.ok && data?.success === true && Object.hasOwn(data, 'data')) {
+        data = data.data;
       }
       
       // Return structured response

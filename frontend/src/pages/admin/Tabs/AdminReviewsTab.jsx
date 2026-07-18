@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
-
-const API_BASE_URL = import.meta?.env?.VITE_API_BASE_URL || import.meta?.env?.VITE_API_URL || 'https://servego-backend.onrender.com/api';
-
-const getToken = () => {
-  try { return localStorage.getItem('servego_token'); } catch { return null; }
-};
+import { api } from '../../../utils/apiClient';
 
 const stars = (n) => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
 
@@ -15,13 +10,10 @@ export default function AdminReviewsTab() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    const token = getToken();
-    fetch(`${API_BASE_URL}/reviews`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(data => {
-        setReviews(Array.isArray(data) ? data : []);
+    api.get('/reviews')
+      .then(response => {
+        if (!response.ok) throw new Error(response.status);
+        setReviews(Array.isArray(response.data) ? response.data : []);
         setLoading(false);
       })
       .catch(() => { setError('Failed to load reviews.'); setLoading(false); });

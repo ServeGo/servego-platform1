@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { UserController } from '../controllers/userController.js';
 import { ProviderController } from '../controllers/providerController.js';
 import { ProviderAvailabilityController } from '../controllers/providerAvailabilityController.js';
-
 import { BookingController } from '../controllers/bookingController.js';
 import { TicketController } from '../controllers/ticketController.js';
 import { NotificationController } from '../controllers/notificationController.js';
@@ -12,90 +11,148 @@ import { PaymentController } from '../controllers/paymentController.js';
 import { AdminProviderServiceController } from '../controllers/adminProviderServiceController.js';
 import { AdminProviderServiceItemsController } from '../controllers/adminProviderServiceItemsController.js';
 import { AdminDashboardController } from '../controllers/adminDashboardController.js';
+import { AdminProviderStatusController } from '../controllers/adminProviderStatusController.js';
 import { ReferralsController } from '../controllers/referralsController.js';
 import { ProviderServiceDiscoveryController } from '../controllers/providerServiceDiscoveryController.js';
 import { ProviderAnalyticsController } from '../controllers/providerAnalyticsController.js';
-import { requireAuth, requireRole } from '../utils/auth.js';
-import { authRateLimiter, bookingRateLimiter, reviewRateLimiter } from '../middleware/security.js';
+import { SavedProController } from '../controllers/savedProController.js';
+import prisma from '../prisma/client.js';
+import { requireAuth, requireRole, optionalAuth } from '../utils/auth.js';
+import { authRateLimiter, bookingRateLimiter, reviewRateLimiter, supportTicketRateLimiter } from '../middleware/security.js';
 import { validate, registerValidation, loginValidation, createBookingValidation, createReviewValidation, createTicketValidation } from '../middleware/validation.js';
 
 const apiRouter = Router();
 
 // --- Authentication & Users ---
 apiRouter.post('/auth/register', validate(registerValidation), UserController.register);
+apiRouter.post('/auth/signup', validate(registerValidation), UserController.register);
 apiRouter.post('/auth/login', authRateLimiter, validate(loginValidation), UserController.login);
+apiRouter.post('/auth/forgot-password', authRateLimiter, UserController.forgotPassword);
+apiRouter.post('/auth/reset-password', authRateLimiter, UserController.resetPassword);
 apiRouter.post('/auth/refresh', UserController.refreshToken);
+apiRouter.get('/auth/me', requireAuth, UserController.getMe);
 apiRouter.get('/users', requireAuth, requireRole('admin'), UserController.getUsers);
 apiRouter.patch('/users/:id/profile', requireAuth, UserController.updateProfile);
 
 // --- Service Providers (Partners) ---
 apiRouter.get('/providers', ProviderController.getAll);
-apiRouter.get('/providers/by-approved-service', (req, res) => ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res));
+apiRouter.get('/providers/by-approved-service', ProviderServiceDiscoveryController.getApprovedProvidersByServiceName);
 apiRouter.get('/providers/:id', ProviderController.getById);
 apiRouter.get('/providers/:id/services', ProviderController.getProviderServices);
-apiRouter.get('/providers/:id/availability', ProviderAvailabilityController.getAvailabilityForDate);
+apiRouter.get('/providers/:id/availability', ProviderAvailabilityController.getAvailability);
+
+apiRouter.put('/providers/me/availability', requireAuth, requireRole('provider'), (req, res, next) => {
+  prisma.provider.findUnique({ where: { userId: req.user.id }, select: { id: true } }).then((provider) => {
+    if (!provider) return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Provider profile not found.' });
+    req.params.id = provider.id;
+    return ProviderController.updateAvailability(req, res, next);
+  }).catch(next);
+});
 
 apiRouter.post('/providers/:id/services/register', requireAuth, ProviderController.registerProviderService);
 apiRouter.patch('/providers/:id/profile', requireAuth, ProviderController.updateProfile);
 apiRouter.patch('/providers/:id/availability', requireAuth, ProviderController.updateAvailability);
+apiRouter.put('/providers/:id/availability', requireAuth, ProviderController.updateAvailability);
 apiRouter.patch('/providers/:id/verify', requireAuth, requireRole('admin'), ProviderController.verify);
+apiRouter.post('/provider-services', requireAuth, requireRole('provider'), ProviderController.registerOwnProviderService);
+apiRouter.get('/provider-services/mine', requireAuth, requireRole('provider'), ProviderController.getMyProviderServices);
+apiRouter.get('/provider-services', requireAuth, requireRole('admin'), AdminProviderServiceController.getPendingRequests);
 
 // --- Bookings ---
 apiRouter.get('/bookings', requireAuth, BookingController.getAll);
+apiRouter.get('/bookings/mine', requireAuth, BookingController.getAll);
+apiRouter.get('/bookings/:id/timeline', requireAuth, requireRole('admin'), BookingController.getTimeline);
 apiRouter.get('/bookings/:id', requireAuth, BookingController.getById);
-apiRouter.post('/bookings', bookingRateLimiter, validate(createBookingValidation), BookingController.create);
+apiRouter.post('/bookings', requireAuth, bookingRateLimiter, validate(createBookingValidation), BookingController.create);
 apiRouter.patch('/bookings/:id/status', requireAuth, BookingController.updateStatus);
+apiRouter.patch('/bookings/:id/accept', requireAuth, requireRole('provider'), BookingController.transition('CONFIRMED'));
+apiRouter.patch('/bookings/:id/decline', requireAuth, requireRole('provider'), BookingController.transition('CANCELLED'));
+apiRouter.patch('/bookings/:id/cancel', requireAuth, BookingController.transition('CANCELLED'));
+apiRouter.patch('/bookings/:id/complete', requireAuth, requireRole('provider'), BookingController.transition('COMPLETED'));
 apiRouter.patch('/admin/bookings/:id/status', requireAuth, requireRole('admin'), BookingController.updateStatus);
-
 apiRouter.post('/bookings/:id/messages', requireAuth, BookingController.addMessage);
+apiRouter.get('/bookings/:id/messages', requireAuth, BookingController.getMessages);
 
 // --- Notifications ---
 apiRouter.get('/notifications', requireAuth, NotificationController.getAll);
+apiRouter.get('/notifications/mine', requireAuth, NotificationController.getAll);
 apiRouter.post('/notifications', requireAuth, NotificationController.create);
+apiRouter.patch('/notifications/read-all', requireAuth, NotificationController.readAll);
 apiRouter.patch('/notifications/:id/read', requireAuth, NotificationController.read);
 apiRouter.delete('/notifications', requireAuth, NotificationController.clearAll);
 
 // --- Support Tickets ---
 apiRouter.get('/tickets', requireAuth, TicketController.getAll);
-apiRouter.post('/tickets', validate(createTicketValidation), TicketController.create);
+apiRouter.post('/tickets', requireAuth, validate(createTicketValidation), TicketController.create);
 apiRouter.patch('/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
 apiRouter.get('/admin/tickets', requireAuth, requireRole('admin'), TicketController.getAll);
 apiRouter.patch('/admin/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
+apiRouter.get('/support-tickets/mine', requireAuth, TicketController.getAll);
+apiRouter.get('/support-tickets', requireAuth, requireRole('admin'), TicketController.getAll);
+apiRouter.post('/support-tickets', supportTicketRateLimiter, optionalAuth, TicketController.create);
+apiRouter.patch('/support-tickets/:id/status', requireAuth, requireRole('admin'), TicketController.setStatus);
 
 // --- Reviews ---
 apiRouter.get('/reviews', requireAuth, requireRole('admin'), ReviewController.getAll);
-apiRouter.post('/reviews', reviewRateLimiter, validate(createReviewValidation), ReviewController.create);
+apiRouter.post('/reviews', requireAuth, reviewRateLimiter, validate(createReviewValidation), ReviewController.create);
+apiRouter.get('/providers/:id/reviews', ReviewController.getByProvider);
+apiRouter.delete('/reviews/:id', requireAuth, requireRole('admin'), ReviewController.deleteOne);
 
 // --- Payments ---
 apiRouter.get('/payments', requireAuth, PaymentController.getAll);
 apiRouter.post('/payments', requireAuth, PaymentController.create);
+apiRouter.post('/payments/initiate', requireAuth, PaymentController.create);
+apiRouter.post('/payments/webhook', PaymentController.webhook);
 
 // --- Referrals / Ambassador ---
-apiRouter.post('/referrals/apply', requireAuth, (req, res) => ReferralsController.applyReferral(req, res));
-apiRouter.get('/referrals/me', requireAuth, (req, res) => ReferralsController.getMeReferral(req, res));
+apiRouter.post('/referrals/apply', requireAuth, ReferralsController.applyReferral);
+apiRouter.get('/referrals/me', requireAuth, ReferralsController.getMeReferral);
+apiRouter.post('/referrals/generate', requireAuth, ReferralsController.generate);
+apiRouter.post('/referrals/claim', requireAuth, ReferralsController.applyReferral);
 
 // --- Services (Service Categories) ---
+apiRouter.get('/services/search', ServiceController.search);
 apiRouter.get('/services', ServiceController.getAll);
+apiRouter.get('/categories', ServiceController.getAll);
+apiRouter.get('/categories/:slug', ServiceController.getCategoryBySlug);
+apiRouter.get('/categories/:slug/providers', ProviderServiceDiscoveryController.getApprovedProvidersByCategory);
 apiRouter.post('/services', requireAuth, requireRole('admin'), ServiceController.create);
+apiRouter.post('/categories', requireAuth, requireRole('admin'), ServiceController.create);
 apiRouter.delete('/services/:id', requireAuth, requireRole('admin'), ServiceController.deleteOne);
+apiRouter.delete('/categories/:id', requireAuth, requireRole('admin'), ServiceController.deleteOne);
 apiRouter.patch('/services/:id', requireAuth, requireRole('admin'), ServiceController.updateOne);
+apiRouter.patch('/categories/:id', requireAuth, requireRole('admin'), ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', requireAuth, requireRole('admin'), ServiceController.hideOne);
+apiRouter.get('/categories/:id/active-count', ServiceController.getActiveCount);
 
 // --- Provider Analytics ---
-apiRouter.get('/providers/:id/analytics', requireAuth, requireRole('provider'), ProviderAnalyticsController.getProviderAnalytics);
+// Admin can also view any provider's analytics
+apiRouter.get('/providers/:id/analytics', requireAuth, requireRole(['provider', 'admin']), ProviderAnalyticsController.getProviderAnalytics);
 
 // --- Admin: Dashboard ---
 apiRouter.get('/admin/dashboard', requireAuth, requireRole('admin'), AdminDashboardController.getSummary);
+apiRouter.get('/admin/dashboard-summary', requireAuth, requireRole('admin'), AdminDashboardController.getSummary);
 apiRouter.get('/admin/analytics', requireAuth, requireRole('admin'), AdminDashboardController.getAnalytics);
 
-// --- Admin: provider service items (pending requests + approved registrations) ---
-apiRouter.get('/admin/provider-service-items', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceItemsController.getAll(req, res));
+// --- Admin: provider service items ---
+apiRouter.get('/admin/provider-service-items', requireAuth, requireRole('admin'), AdminProviderServiceItemsController.getAll);
 
 // Backward compatible: pending requests only
-apiRouter.get('/admin/provider-service-requests', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.getPendingRequests(req, res));
+apiRouter.get('/admin/provider-service-requests', requireAuth, requireRole('admin'), AdminProviderServiceController.getPendingRequests);
 
-apiRouter.patch('/admin/provider-service-requests/:id/approve', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.approveService(req, res));
-apiRouter.patch('/admin/provider-service-requests/:id/deny', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.denyService(req, res));
-apiRouter.post('/admin/providers/reputation/refresh', requireAuth, requireRole('admin'), (req, res) => AdminProviderServiceController.refreshReputation(req, res));
+apiRouter.patch('/admin/provider-service-requests/:id/approve', requireAuth, requireRole('admin'), AdminProviderServiceController.approveService);
+apiRouter.patch('/admin/provider-service-requests/:id/deny', requireAuth, requireRole('admin'), AdminProviderServiceController.denyService);
+apiRouter.patch('/provider-services/:id/approve', requireAuth, requireRole('admin'), AdminProviderServiceController.approveService);
+apiRouter.patch('/provider-services/:id/reject', requireAuth, requireRole('admin'), AdminProviderServiceController.denyService);
+apiRouter.post('/admin/providers/reputation/refresh', requireAuth, requireRole('admin'), AdminProviderServiceController.refreshReputation);
+
+// --- Admin: Provider Account Status ---
+apiRouter.patch('/admin/providers/:id/status', requireAuth, requireRole('admin'), AdminProviderStatusController.setStatus);
+apiRouter.patch('/providers/:id/status', requireAuth, requireRole('admin'), AdminProviderStatusController.setStatus);
+
+// --- Saved Pros ---
+apiRouter.get('/saved-pros', requireAuth, requireRole('customer'), SavedProController.getMine);
+apiRouter.post('/saved-pros', requireAuth, requireRole('customer'), SavedProController.save);
+apiRouter.delete('/saved-pros/:providerId', requireAuth, requireRole('customer'), SavedProController.unsave);
 
 export default apiRouter;

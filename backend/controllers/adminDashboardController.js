@@ -150,6 +150,24 @@ export const AdminDashboardController = {
         }
       };
 
+      const [escrow, disputedTickets] = await Promise.all([
+        prisma.booking.aggregate({
+          _sum: { amount: true },
+          where: { paymentStatus: { in: ['PENDING', 'PAID'] } }
+        }),
+        prisma.ticket.count({
+          where: { status: 'OPEN', subject: { contains: 'dispute', mode: 'insensitive' } }
+        })
+      ]);
+      // No payout/commission model exists yet, so net payout is deliberately
+      // reported as the gateway-settled gross amount rather than invented.
+      summary.aggregates = {
+        grossEscrowVolume: Number(escrow._sum.amount || 0),
+        adminNetPayout: Number(escrow._sum.amount || 0),
+        vettingBacklogCount: pendingApprovals,
+        disputeTicketsCount: disputedTickets
+      };
+
       sendApiSuccess(res, 200, summary);
     } catch (err) {
       console.error('[AdminDashboardController] Error:', err);

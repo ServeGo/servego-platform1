@@ -6,8 +6,8 @@ const normalizeCode = (code) => (code || '').toString().trim();
 export const ReferralsController = {
   applyReferral: async (req, res) => {
     try {
-      const { userId, code } = req.body || {};
-      if (!userId) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: userId');
+      const { code } = req.body || {};
+      const userId = req.user.id;
       if (!code) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: code');
 
       const normalized = normalizeCode(code);
@@ -61,8 +61,7 @@ export const ReferralsController = {
 
   getMeReferral: async (req, res) => {
     try {
-      const userId = req.query?.userId;
-      if (!userId) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required query param: userId');
+      const userId = req.user.id;
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -80,6 +79,20 @@ export const ReferralsController = {
       });
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch referral info', err.message);
+    }
+  },
+
+  generate: async (req, res) => {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { referralCode: true, role: true, name: true } });
+      if (!user) return sendApiError(res, 404, 'NOT_FOUND', 'User not found');
+      if (user.referralCode) return sendApiSuccess(res, 200, { referralCode: user.referralCode });
+      const prefix = user.role === 'provider' ? 'PRO' : 'CUST';
+      const code = `SERVEGO-${prefix}-${user.name.slice(0, 3).toUpperCase().replace(/\\s/g, 'X')}${Math.floor(100 + Math.random() * 900)}`;
+      const updated = await prisma.user.update({ where: { id: req.user.id }, data: { referralCode: code }, select: { referralCode: true } });
+      return sendApiSuccess(res, 201, updated);
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to generate referral code', err.message);
     }
   }
 };

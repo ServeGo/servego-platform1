@@ -19,14 +19,47 @@ export const ReviewController = {
     }
   },
 
+  getByProvider: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const reviews = await prisma.review.findMany({
+        where: { providerId: id },
+        orderBy: { createdAt: 'desc' },
+        include: { reviewer: { select: { name: true, avatar: true } } }
+      });
+      return sendApiSuccess(res, 200, reviews);
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider reviews', err.message);
+    }
+  },
+
+  deleteOne: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+      if (!reason || !String(reason).trim()) {
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'A moderation reason is required.');
+      }
+      const review = await prisma.review.findUnique({ where: { id }, select: { id: true } });
+      if (!review) return sendApiError(res, 404, 'NOT_FOUND', 'Review not found.');
+      await prisma.review.delete({ where: { id } });
+      return sendApiSuccess(res, 200, { message: 'Review removed.' });
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to delete review', err.message);
+    }
+  },
+
   create: async (req, res) => {
     try {
-      const { reviewerId, reviewerName, rating, comment, serviceCategory, providerId, bookingId } = req.body;
+      const { reviewerName, rating, comment, serviceCategory, providerId, bookingId } = req.body;
+      const reviewerId = req.user.id;
 
-      if (!reviewerId || !reviewerName || rating === undefined || !providerId) {
+      if (req.user.role !== 'customer') {
+        return sendApiError(res, 403, 'FORBIDDEN', 'Only customers can leave provider reviews.');
+      }
+      if (!reviewerName || rating === undefined || !providerId) {
         return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing core review parameters (reviewerId, reviewerName, rating, providerId)', {
           missing: {
-            reviewerId: !reviewerId,
             reviewerName: !reviewerName,
             rating: rating === undefined,
             providerId: !providerId
@@ -58,6 +91,8 @@ export const ReviewController = {
         if (!['COMPLETED', 'REVIEWED'].includes(booking.status)) {
           return sendApiError(res, 409, 'BOOKING_NOT_COMPLETED', 'Reviews can only be submitted after the booking is completed.');
         }
+        const existingReview = await prisma.review.findFirst({ where: { bookingId }, select: { id: true } });
+        if (existingReview) return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Only one review may be submitted per booking.');
       }
 
       const safeComment = comment === undefined ? null : String(comment);
@@ -88,7 +123,8 @@ export const ReviewController = {
 
       return sendApiSuccess(res, 201, { review });
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to record customer review log', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to record customer review log',
+        process.env.NODE_ENV !== 'production' ? err.message : undefined);
     }
   }
 };

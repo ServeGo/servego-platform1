@@ -8,11 +8,17 @@ export default function ServiceCard({
   onSelect, 
   onIssueClick 
 }) {
-  const categoryProviders = Array.isArray(providers) ? providers.filter(
-    (p) => (p.category || '').toLowerCase() === category.name.toLowerCase()
-  ) : [];
-  
-  const verifiedProviders = categoryProviders.filter(p => p.isVerified);
+  const safeProviders = Array.isArray(providers) ? providers : [];
+  // Prefer server-derived count; fall back to client-side count
+  const activeCount = typeof category.activeSpecialistCount === 'number'
+    ? category.activeSpecialistCount
+    : safeProviders.filter(
+        (p) => (p.category || '').toLowerCase() === (category.name || '').toLowerCase() && p.isVerified
+      ).length;
+
+  const verifiedProviders = safeProviders.filter(
+    (p) => (p.category || '').toLowerCase() === (category.name || '').toLowerCase() && p.isVerified
+  );
   const bestRating = verifiedProviders.length > 0
     ? Math.max(...verifiedProviders.map(p => p.rating))
     : 5.0;
@@ -53,7 +59,7 @@ export default function ServiceCard({
       <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-bold text-slate-650">
         <div>
           <span className="font-bold text-slate-700 block text-[11px]">
-            {verifiedProviders.length} Verified Pros
+            {activeCount} Active Specialists
           </span>
           <span className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-400">
             ⭐ {bestRating} Highest

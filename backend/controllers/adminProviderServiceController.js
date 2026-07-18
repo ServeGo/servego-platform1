@@ -9,8 +9,9 @@ const normalize = (s) => (s || '').toString().trim().toLowerCase();
 export const AdminProviderServiceController = {
   getPendingRequests: async (req, res) => {
     try {
+      const requestedStatus = String(req.query.status || 'PENDING').toUpperCase();
       const requests = await prisma.providerServiceRequest.findMany({
-        where: { status: 'PENDING' },
+        where: { status: ['PENDING', 'APPROVED', 'DENIED', 'REJECTED'].includes(requestedStatus) ? requestedStatus : 'PENDING' },
         orderBy: { createdAt: 'desc' },
         include: {
           provider: {
@@ -88,11 +89,25 @@ export const AdminProviderServiceController = {
         }
       });
 
-      await prisma.providerServiceRequest.update({ where: { id }, data: { status: 'APPROVED' } });
+      await prisma.providerServiceRequest.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          reviewedBy: req.user.id,
+          reviewedAt: new Date()
+        }
+      });
       await refreshProviderReputation(request.providerId);
 
       if (!wasAlreadyApproved && request?.provider?.user?.id) {
         await notifyServiceApproved(request.provider.user.id, requestedName);
+        // Emit socket event so all open dashboards refresh the active-specialist count
+        const io = req.app?.get('socketio');
+        if (io) {
+          io.emit('serviceApproved', { serviceId: service.id, serviceName: requestedName });
+          io.to(`user:${request.provider.user.id}`).emit('providerService:approved', { providerServiceRequestId: request.id, serviceId: service.id });
+          io.emit('category:activeCountChanged', { serviceId: service.id });
+        }
       }
 
       await writeAuditLog({
@@ -129,11 +144,18 @@ export const AdminProviderServiceController = {
 
       await prisma.providerServiceRequest.update({
         where: { id },
-        data: { status: 'DENIED', denialReason: String(reason).trim() }
+        data: {
+          status: 'DENIED',
+          denialReason: String(reason).trim(),
+          reviewedBy: req.user.id,
+          reviewedAt: new Date()
+        }
       });
 
       if (request?.provider?.user?.id) {
         await notifyServiceDenied(request.provider.user.id, request.requestedServiceName, String(reason).trim());
+        const io = req.app?.get('socketio');
+        if (io) io.to(`user:${request.provider.user.id}`).emit('providerService:rejected', { providerServiceRequestId: request.id });
       }
 
       await writeAuditLog({

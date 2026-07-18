@@ -5,6 +5,16 @@ import { sendApiError, sendApiSuccess } from '../utils/response.js';
 import { validatePasswordStrength } from '../utils/validation.js';
 
 export const UserController = {
+  forgotPassword: async (_req, res) => {
+    // A reset flow must send a one-time token through a configured mailer;
+    // this repository has no mail transport or token store to do that safely.
+    return sendApiError(res, 501, 'PASSWORD_RESET_NOT_CONFIGURED', 'Password reset email delivery is not configured.');
+  },
+
+  resetPassword: async (_req, res) => {
+    return sendApiError(res, 501, 'PASSWORD_RESET_NOT_CONFIGURED', 'Password reset email delivery is not configured.');
+  },
+
   getUsers: async (req, res) => {
     try {
       if (req.user?.role !== 'admin') {
@@ -41,7 +51,7 @@ export const UserController = {
             referredBy: true,
             referralsCount: true,
             referralDiscountBalance: true,
-            referralBonusEarned: true,
+            referralBonusEarned: true, profileComplete: true,
             providerId: true,
             createdAt: true,
             updatedAt: true,
@@ -106,7 +116,7 @@ export const UserController = {
       // Password strength validation
       const passwordErrors = validatePasswordStrength(password);
       if (passwordErrors.length > 0) {
-        return sendApiError(res, 400, 'WEAK_PASSWORD', 'Password must be at least 8 characters with uppercase, lowercase, and a number', passwordErrors);
+        return sendApiError(res, 400, 'WEAK_PASSWORD', 'Password must be at least 8 characters and include a lowercase letter and a number', passwordErrors);
       }
 
       if (role === 'customer') {
@@ -202,6 +212,7 @@ export const UserController = {
         role: newUser.role,
         avatar: newUser.avatar,
         status: newUser.status,
+        profileComplete: newUser.profileComplete,
         address: newUser.address,
         pincode: newUser.pincode,
         providerId: role === 'provider' ? providerProfile?.id || null : null,
@@ -220,7 +231,8 @@ export const UserController = {
       return sendApiSuccess(res, 201, { user: safeUser, ...tokens });
     } catch (err) {
       console.error('Signup registration error:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed',
+        process.env.NODE_ENV !== 'production' ? err.message : undefined);
     }
   },
 
@@ -268,6 +280,9 @@ export const UserController = {
         const blockedReason = user.status === 'INACTIVE' || user.status === 'SUSPENDED' ? 'inactive_or_suspended' : 'under_review';
         return sendApiError(res, 403, 'ACCOUNT_NOT_ACTIVE', 'Your account is not active. Please contact support for assistance', { blockedReason });
       }
+      if (user.role === 'provider' && user.providerProfile?.accountStatus === 'BLOCKED') {
+        return sendApiError(res, 403, 'PROVIDER_BLOCKED', 'This provider account has been blocked. Please contact support.');
+      }
 
       await prisma.authEvent.create({
         data: {
@@ -286,7 +301,8 @@ export const UserController = {
       return sendApiSuccess(res, 200, { user: safeUser, ...tokens });
     } catch (err) {
       console.error('Login error:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again later', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again later',
+        process.env.NODE_ENV !== 'production' ? err.message : undefined);
     }
   },
 
@@ -322,7 +338,37 @@ export const UserController = {
       return sendApiSuccess(res, 200, tokens);
     } catch (err) {
       console.error('Token refresh error:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token',
+        process.env.NODE_ENV !== 'production' ? err.message : undefined);
+    }
+  },
+
+  getMe: async (req, res) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: {
+          id: true, name: true, email: true, phone: true, role: true,
+          avatar: true, status: true, profileComplete: true, address: true, pincode: true,
+          referralCode: true, referredBy: true, referralsCount: true,
+          referralDiscountBalance: true, referralBonusEarned: true,
+          providerId: true, createdAt: true, updatedAt: true,
+          customerProfile: true,
+          providerProfile: {
+            select: {
+              id: true, category: true, rating: true, reviewCount: true,
+              verificationLevel: true, accountStatus: true, experienceYears: true,
+              jobsCompleted: true, bio: true, specialties: true, serviceAreas: true,
+              photo: true, isVerified: true, isFeatured: true,
+              availableDays: true, timeSlots: true
+            }
+          }
+        }
+      });
+      if (!user) return sendApiError(res, 404, 'NOT_FOUND', 'User not found.');
+      return sendApiSuccess(res, 200, { user });
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch user profile', err.message);
     }
   },
 
@@ -383,7 +429,8 @@ export const UserController = {
       return sendApiSuccess(res, 200, { user: safeUser });
     } catch (err) {
       console.error('Failed to update user profile:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile',
+        process.env.NODE_ENV !== 'production' ? err.message : undefined);
     }
   }
 };

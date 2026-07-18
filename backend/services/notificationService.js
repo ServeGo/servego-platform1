@@ -21,6 +21,7 @@ async function createNotification(userId, title, message, type = 'SYSTEM') {
 function emitToUserRoom(io, userId, event, data) {
   if (io) {
     io.to(`user:${userId}`).emit(event, data);
+    if (event === 'notification') io.to(`user:${userId}`).emit('notification:new', { notificationId: data?.id, type: data?.type });
   }
 }
 
@@ -99,9 +100,16 @@ export async function notifyBookingStatusChanged(io, booking, updatedStatus, pro
       emitToUserRoom(io, booking.customerId, 'notification', notifications[0]);
     }
 
-    // Emit to provider's room if applicable
-    if (providerUserId && notifications[1]) {
-      emitToUserRoom(io, providerUserId, 'notification', notifications[1]);
+    // Emit to provider's room
+    if (providerUserId) {
+      emitToUserRoom(io, providerUserId, 'bookingStatusChanged', {
+        bookingId: booking.id,
+        status: updatedStatus,
+        serviceCategory: booking.serviceCategory
+      });
+      if (notifications[1]) {
+        emitToUserRoom(io, providerUserId, 'notification', notifications[1]);
+      }
     }
   }
 }

@@ -20,8 +20,12 @@ export function normalizeBooking(booking) {
 
   return {
     ...booking,
+    // Ensure customer-facing filters work reliably
+    customerId: booking.customerId,
+    providerId: booking.providerId,
     status: lc(booking.status),
     paymentStatus: lc(booking.paymentStatus),
+
     providerName:
       booking.providerName || providerUser.name || booking.provider?.name || 'Assigned Specialist',
     providerAvatar:
@@ -41,8 +45,12 @@ export function normalizeBooking(booking) {
   };
 }
 
-export const normalizeBookings = (list) =>
-  Array.isArray(list) ? list.map(normalizeBooking) : [];
+export const normalizeBookings = (payload) => {
+  // Booking collection endpoints include pagination, while older callers may
+  // still provide a raw array. Support both without dropping valid results.
+  const list = Array.isArray(payload) ? payload : payload?.bookings;
+  return Array.isArray(list) ? list.map(normalizeBooking) : [];
+};
 
 /**
  * Canonical provider shape (from `GET /providers`, where name/avatar are nested
