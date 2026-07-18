@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 const normalize = (s) => (s || '').toString().trim().toLowerCase();
 
@@ -6,9 +7,9 @@ export const ServiceController = {
   getAll: async (req, res) => {
     try {
       const services = await prisma.service.findMany();
-      res.json(services);
+      return sendApiSuccess(res, 200, services);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch services', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch services', err.message);
     }
   },
 
@@ -16,10 +17,9 @@ export const ServiceController = {
     try {
       const { name, description, popularIssues } = req.body;
       if (!name) {
-        return res.status(400).json({ error: 'Missing required field: name' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: name');
       }
 
-      // Generate SID-101, SID-102, ... by finding the highest existing SID-xxx id
       const existing = await prisma.service.findMany({ select: { id: true } });
       const maxNum = existing.reduce((max, s) => {
         const m = s.id.match(/^SID-(\d+)$/);
@@ -37,34 +37,34 @@ export const ServiceController = {
         }
       });
 
-      res.status(201).json(created);
+      return sendApiSuccess(res, 201, created);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to create service', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create service', err.message);
     }
   },
 
   deleteOne: async (req, res) => {
     try {
       const { id } = req.params;
-      if (!id) return res.status(400).json({ error: 'Missing service id' });
+      if (!id) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing service id');
 
       await prisma.service.delete({ where: { id } });
-      res.json({ success: true });
+      return sendApiSuccess(res, 200, { message: 'Service deleted successfully' });
     } catch (err) {
       if (err.code === 'P2025') {
-        return res.status(404).json({ error: 'Service not found' });
+        return sendApiError(res, 404, 'NOT_FOUND', 'Service not found');
       }
-      res.status(500).json({ error: 'Failed to delete service', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to delete service', err.message);
     }
   },
 
   updateOne: async (req, res) => {
     try {
       const { id } = req.params;
-      if (!id) return res.status(400).json({ error: 'Missing service id' });
+      if (!id) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing service id');
 
       const { name, description, popularIssues } = req.body || {};
-      if (!name) return res.status(400).json({ error: 'Missing required field: name' });
+      if (!name) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: name');
 
       const updated = await prisma.service.update({
         where: { id },
@@ -77,19 +77,19 @@ export const ServiceController = {
       });
 
 
-      res.json({ success: true, service: updated });
+      return sendApiSuccess(res, 200, { service: updated });
     } catch (err) {
       if (err.code === 'P2025') {
-        return res.status(404).json({ error: 'Service not found' });
+        return sendApiError(res, 404, 'NOT_FOUND', 'Service not found');
       }
-      res.status(500).json({ error: 'Failed to update service', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update service', err.message);
     }
   },
 
   hideOne: async (req, res) => {
     try {
       const { id } = req.params;
-      if (!id) return res.status(400).json({ error: 'Missing service id' });
+      if (!id) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing service id');
 
       const { isHidden } = req.body || {};
       const updated = await prisma.service.update({
@@ -99,12 +99,12 @@ export const ServiceController = {
         }
       });
 
-      res.json({ success: true, service: updated });
+      return sendApiSuccess(res, 200, { service: updated });
     } catch (err) {
       if (err.code === 'P2025') {
-        return res.status(404).json({ error: 'Service not found' });
+        return sendApiError(res, 404, 'NOT_FOUND', 'Service not found');
       }
-      res.status(500).json({ error: 'Failed to hide service', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to hide service', err.message);
     }
   }
 };

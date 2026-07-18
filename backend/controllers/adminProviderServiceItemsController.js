@@ -1,6 +1,5 @@
 import prisma from '../prisma/client.js';
-
-const normalize = (s) => (s || '').toString().trim().toLowerCase();
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const AdminProviderServiceItemsController = {
   getAll: async (req, res) => {
@@ -61,9 +60,9 @@ export const AdminProviderServiceItemsController = {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
 
-      res.json(combined);
+      return sendApiSuccess(res, 200, combined);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch provider service items', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider service items', err.message);
     }
   }
 };

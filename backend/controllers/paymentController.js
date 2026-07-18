@@ -1,16 +1,16 @@
 import prisma from '../prisma/client.js';
 import { normalizePaymentStatus } from '../utils/workflow.js';
 import { notifyPaymentReceived } from '../services/notificationService.js';
-import { sendApiError } from '../utils/response.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const PaymentController = {
   getAll: async (req, res) => {
     try {
       const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
       const payments = await prisma.payment.findMany({ where, include: { booking: true, user: true } });
-      res.json(payments);
+      return sendApiSuccess(res, 200, payments);
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch payments', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch payments', err.message);
     }
   },
 
@@ -28,7 +28,7 @@ export const PaymentController = {
       }
 
       const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
-      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+      if (!booking) return sendApiError(res, 404, 'NOT_FOUND', 'Booking not found.');
 
       if (role === 'customer' && booking.customerId !== userId) {
         return sendApiError(res, 403, 'FORBIDDEN', 'You can only pay for your own bookings.');
@@ -55,9 +55,9 @@ export const PaymentController = {
         await notifyPaymentReceived(userId, bookingId);
       }
 
-      res.status(201).json(payment);
+      return sendApiSuccess(res, 201, payment);
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create payment record', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create payment record', err.message);
     }
   }
 };

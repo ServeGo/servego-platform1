@@ -28,56 +28,55 @@ export const validate = (validations) => {
 export const registerValidation = [
   body('name')
     .trim()
-    .notEmpty().withMessage('Name is required')
-    .isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters')
+    .notEmpty().withMessage('Please enter your full name')
+    .isLength({ min: 2, max: 100 }).withMessage('Name must be at least 2 characters')
     .escape(),
   body('email')
     .trim()
-    .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Invalid email format')
+    .notEmpty().withMessage('Please enter your email address')
+    .isEmail().withMessage('Please enter a valid email address')
     .normalizeEmail()
-    .isLength({ max: 255 }).withMessage('Email too long'),
+    .isLength({ max: 255 }).withMessage('Email address is too long'),
   body('phone')
     .trim()
-    .notEmpty().withMessage('Phone number is required')
-    .matches(/^[+]?[\d\s-]{10,15}$/).withMessage('Invalid phone number format'),
+    .notEmpty().withMessage('Please enter your phone number')
+    .matches(/^[+]?[\d\s-]{10,15}$/).withMessage('Please enter a valid phone number'),
   body('password')
-    .notEmpty().withMessage('Password is required')
-    .isLength({ min: 8, max: 128 }).withMessage('Password must be between 8 and 128 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .notEmpty().withMessage('Please enter a password')
+    .isLength({ min: 8, max: 128 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase letters and a number'),
   body('confirmPassword')
-    .notEmpty().withMessage('Confirm password is required'),
+    .notEmpty().withMessage('Please confirm your password'),
   body('role')
-    .notEmpty().withMessage('Role is required')
-    .isIn(['customer', 'provider']).withMessage('Role must be either customer or provider'),
+    .notEmpty().withMessage('Please select your account type')
+    .isIn(['customer', 'provider']).withMessage('Account type must be customer or provider'),
   body('address')
     .optional()
     .trim()
-    .isLength({ max: 500 }).withMessage('Address too long')
+    .isLength({ max: 500 }).withMessage('Address is too long')
     .escape(),
   body('pincode')
     .optional()
     .trim()
-    .matches(/^[0-9]{5,6}$/).withMessage('Invalid pincode format'),
+    .matches(/^[0-9]{5,6}$/).withMessage('Please enter a valid 5-6 digit pincode'),
   body('acceptedTerms')
     .optional()
     .custom((value) => {
-      // Accept boolean true, string 'true', or number 1
       if (value === true || value === 'true' || value === 1 || value === '1') {
         return true;
       }
-      throw new Error('You must accept the terms and conditions');
+      throw new Error('Please accept the Terms & Conditions');
     })
 ];
 
 export const loginValidation = [
   body('email')
     .trim()
-    .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Invalid email format')
+    .notEmpty().withMessage('Please enter your email address')
+    .isEmail().withMessage('Please enter a valid email address')
     .normalizeEmail(),
   body('password')
-    .notEmpty().withMessage('Password is required')
+    .notEmpty().withMessage('Please enter your password')
 ];
 
 // ==================== Booking Validations ====================

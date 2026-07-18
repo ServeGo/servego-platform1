@@ -13,6 +13,7 @@ import { seedServicesIfEmpty } from './seeders/servicesSeed.js';
 import { getCorsConfig, resolvePort } from './utils/runtimeConfig.js';
 import { helmetConfig, hppConfig, generalRateLimiter, requestSizeLimit } from './middleware/security.js';
 import { requestLogger, errorHandler, requestTimeout } from './middleware/logging.js';
+import { sendApiSuccess } from './utils/response.js';
 
 dotenv.config();
 
@@ -89,7 +90,6 @@ async function bootstrap() {
     };
 
     try {
-      // Import lazily to avoid pulling Prisma during early boot if not needed.
       const prisma = (await import('./prisma/client.js')).default;
       await prisma.$queryRaw`SELECT 1 AS ok`;
       health.dbStatus = 'reachable';
@@ -102,7 +102,7 @@ async function bootstrap() {
       health.dbError = dbErr?.message || String(dbErr);
     }
 
-    res.json(health);
+    return sendApiSuccess(res, 200, health);
   });
 
   // Socket.io connection handling with enhanced reconnection support

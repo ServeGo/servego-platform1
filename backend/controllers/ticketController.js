@@ -1,32 +1,27 @@
 import prisma from '../prisma/client.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const TicketController = {
   getAll: async (req, res) => {
     try {
       if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return sendApiError(res, 401, 'UNAUTHORIZED', 'Authentication required');
       }
 
       const role = req.user.role;
-      const requesterEmail = req.user.email;
 
-      // Admins can read every ticket. Non-admin callers may only read their own
-      // tickets, and must scope the request to their email address.
       if (role !== 'admin') {
-        if (!requesterEmail) {
-          return res.status(403).json({ error: 'Admin access required' });
-        }
         const tickets = await prisma.ticket.findMany({
-          where: { requesterEmail },
+          where: { requesterEmail: req.user.email },
           orderBy: { createdAt: 'desc' }
         });
-        return res.json(tickets);
+        return sendApiSuccess(res, 200, tickets);
       }
 
       const tickets = await prisma.ticket.findMany({ orderBy: { createdAt: 'desc' } });
-      res.json(tickets);
+      return sendApiSuccess(res, 200, tickets);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve support tickets', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve support tickets', err.message);
     }
   },
 
@@ -35,7 +30,7 @@ export const TicketController = {
     try {
       const { name, email, subject, message } = req.body;
       if (!name || !email || !subject || !message) {
-        return res.status(400).json({ error: 'Missing support claim parameters' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing support claim parameters (name, email, subject, message)');
       }
 
       const ticket = await prisma.ticket.create({
@@ -47,26 +42,26 @@ export const TicketController = {
           status: 'OPEN'
         }
       });
-      res.status(201).json(ticket);
+      return sendApiSuccess(res, 201, ticket);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to file support ticket', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to file support ticket', err.message);
     }
   },
 
   resolve: async (req, res) => {
     try {
       if (!req.user) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return sendApiError(res, 401, 'UNAUTHORIZED', 'Authentication required');
       }
 
       const role = req.user.role;
-      if (role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+      if (role !== 'admin') return sendApiError(res, 403, 'FORBIDDEN', 'Admin access required');
 
       const { id } = req.params;
       const { response } = req.body;
 
       if (!response) {
-        return res.status(400).json({ error: 'An admin resolution comment string is required.' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'An admin resolution comment string is required.');
       }
 
       const ticket = await prisma.ticket.update({
@@ -77,12 +72,12 @@ export const TicketController = {
           resolvedAt: new Date()
         }
       });
-      res.json(ticket);
+      return sendApiSuccess(res, 200, ticket);
     } catch (err) {
       if (err.code === 'P2025') {
-        return res.status(404).json({ error: 'Support ticket not found' });
+        return sendApiError(res, 404, 'NOT_FOUND', 'Support ticket not found');
       }
-      res.status(500).json({ error: 'Failed to resolve support ticket', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to resolve support ticket', err.message);
     }
   }
 };

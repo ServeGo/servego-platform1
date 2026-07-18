@@ -4,7 +4,7 @@ import { notifyBookingCreated, notifyBookingStatusChanged } from '../services/no
 import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
 import { buildStatusHistory, isValidBookingTransition, normalizeBookingStatus, normalizePaymentStatus } from '../utils/workflow.js';
 import { canPerformAction } from '../utils/permissions.js';
-import { sendApiError } from '../utils/response.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 const BOOKING_INCLUDE = {
   customer: { select: { id: true, name: true, email: true, phone: true } },
@@ -28,9 +28,7 @@ export const BookingController = {
       if (providerId) where.providerId = providerId;
       if (customerId) where.customerId = customerId;
 
-      // Filter based on user role
       if (req.user.role === 'provider') {
-        // Provider should only see their bookings
         const provider = await prisma.provider.findFirst({
           where: { userId: req.user.id },
           select: { id: true }
@@ -39,7 +37,6 @@ export const BookingController = {
           where.providerId = provider.id;
         }
       } else if (req.user.role === 'customer') {
-        // Customer should only see their bookings
         where.customerId = req.user.id;
       }
 
@@ -54,7 +51,7 @@ export const BookingController = {
         prisma.booking.count({ where })
       ]);
 
-      res.json({
+      return sendApiSuccess(res, 200, {
         bookings,
         pagination: {
           page: parseInt(page),
@@ -65,7 +62,7 @@ export const BookingController = {
       });
     } catch (err) {
       console.error('[BookingController.getAll] Error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve bookings', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve bookings', err.message);
     }
   },
 
@@ -79,10 +76,9 @@ export const BookingController = {
       });
       
       if (!booking) {
-        return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+        return sendApiError(res, 404, 'NOT_FOUND', 'Booking not found.');
       }
 
-      // Authorization check - ensure user can only view their own bookings or providers can view assigned bookings
       if (req.user.role === 'customer' && booking.customerId !== req.user.id) {
         return sendApiError(res, 403, 'FORBIDDEN', 'You can only view your own bookings.');
       }
@@ -97,10 +93,10 @@ export const BookingController = {
         }
       }
 
-      res.json(booking);
+      return sendApiSuccess(res, 200, booking);
     } catch (err) {
       console.error('[BookingController.getById] Error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch booking details', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch booking details', err.message);
     }
   },
 
@@ -128,7 +124,6 @@ export const BookingController = {
         return sendApiError(res, 400, 'INVALID_DATE', 'A valid booking date is required.');
       }
 
-      // Validate booking date is not in the past
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (parsedBookingDate < today) {
@@ -147,7 +142,6 @@ export const BookingController = {
         return sendApiError(res, 404, 'NOT_FOUND', 'Customer or provider not found.');
       }
 
-      // Check provider availability
       const slotTaken = await isProviderSlotTaken(
         bookingData.providerId,
         parsedBookingDate,
@@ -157,7 +151,6 @@ export const BookingController = {
         return sendApiError(res, 409, 'SLOT_UNAVAILABLE', 'This provider is already booked for the selected date and time slot.');
       }
 
-      // One-active-booking-per-provider rule
       const activePendingBookingForSameService = await prisma.booking.findFirst({
         where: {
           customerId,
@@ -193,7 +186,6 @@ export const BookingController = {
 
       const timestamp = new Date();
       
-      // Use Prisma's create with auto-generated ID instead of manual counting
       const result = await prisma.$transaction(async (tx) => {
         const booking = await tx.booking.create({
           data: {
@@ -223,10 +215,10 @@ export const BookingController = {
       const io = req.app.get('socketio');
       await notifyBookingCreated(io, result, customer, provider?.user?.id);
 
-      res.status(201).json(result);
+      return sendApiSuccess(res, 201, result);
     } catch (err) {
       console.error('[BookingController.create] Error:', err.message, err.stack);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create booking.', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create booking.', err.message);
     }
   },
 
@@ -241,17 +233,15 @@ export const BookingController = {
 
       const updatedStatus = normalizeBookingStatus(status);
       
-      // Validate status transition
       if (!['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(updatedStatus)) {
         return sendApiError(res, 400, 'INVALID_STATUS', 'Invalid booking status provided.');
       }
 
       const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+      if (!booking) return sendApiError(res, 404, 'NOT_FOUND', 'Booking not found.');
 
       const currentStatus = normalizeBookingStatus(booking.status);
       
-      // Prevent redundant status update
       if (currentStatus === updatedStatus) {
         return sendApiError(res, 400, 'NO_CHANGE', 'Booking is already in this status.');
       }
@@ -287,7 +277,6 @@ export const BookingController = {
         include: BOOKING_INCLUDE
       });
 
-      // Refresh provider reputation after completion
       if (updatedStatus === 'COMPLETED') {
         await refreshProviderReputation(booking.providerId);
       }
@@ -295,10 +284,10 @@ export const BookingController = {
       const io = req.app.get('socketio');
       await notifyBookingStatusChanged(io, booking, updatedStatus, provider?.userId);
 
-      res.json(updated);
+      return sendApiSuccess(res, 200, updated);
     } catch (err) {
       console.error('[BookingController.updateStatus] Error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', err.message);
     }
   },
 
@@ -319,9 +308,8 @@ export const BookingController = {
       }
 
       const booking = await prisma.booking.findUnique({ where: { id } });
-      if (!booking) return sendApiError(res, 404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+      if (!booking) return sendApiError(res, 404, 'NOT_FOUND', 'Booking not found.');
 
-      // Authorization check
       if (req.user.role === 'customer' && booking.customerId !== req.user.id) {
         return sendApiError(res, 403, 'FORBIDDEN', 'You can only send messages on your own bookings.');
       }
@@ -353,17 +341,16 @@ export const BookingController = {
       const io = req.app.get('socketio');
       if (io) {
         io.to(`booking:${id}`).emit('chatMessageReceived', { bookingId: id, message: messageObj });
-        // Also emit to the other party's room
         const otherPartyId = req.user.role === 'customer' ? booking.provider?.user?.id : booking.customerId;
         if (otherPartyId) {
           io.to(`user:${otherPartyId}`).emit('bookingMessage', { bookingId: id, message: messageObj });
         }
       }
 
-      res.status(201).json(updated);
+      return sendApiSuccess(res, 201, updated);
     } catch (err) {
       console.error('[BookingController.addMessage] Error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', err.message);
     }
   }
 };

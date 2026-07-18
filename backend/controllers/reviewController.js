@@ -1,7 +1,7 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
 import { notifyReviewPublished } from '../services/notificationService.js';
-import { sendApiError } from '../utils/response.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const ReviewController = {
   getAll: async (req, res) => {
@@ -13,9 +13,9 @@ export const ReviewController = {
           reviewer: { select: { name: true, email: true } }
         }
       });
-      res.json(reviews);
+      return sendApiSuccess(res, 200, reviews);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch reviews', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch reviews', err.message);
     }
   },
 
@@ -24,8 +24,7 @@ export const ReviewController = {
       const { reviewerId, reviewerName, rating, comment, serviceCategory, providerId, bookingId } = req.body;
 
       if (!reviewerId || !reviewerName || rating === undefined || !providerId) {
-        return res.status(400).json({
-          error: 'Missing core review parameters (reviewerId, reviewerName, rating, providerId)',
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing core review parameters (reviewerId, reviewerName, rating, providerId)', {
           missing: {
             reviewerId: !reviewerId,
             reviewerName: !reviewerName,
@@ -37,10 +36,10 @@ export const ReviewController = {
 
       const parsedRating = Number(rating);
       if (Number.isNaN(parsedRating)) {
-        return res.status(400).json({ error: 'rating must be a valid number' });
+        return sendApiError(res, 400, 'INVALID_RATING', 'rating must be a valid number');
       }
       if (parsedRating < 1 || parsedRating > 5) {
-        return res.status(400).json({ error: 'rating must be between 1 and 5' });
+        return sendApiError(res, 400, 'INVALID_RATING', 'rating must be between 1 and 5');
       }
 
       if (bookingId) {
@@ -49,19 +48,18 @@ export const ReviewController = {
           select: { id: true, providerId: true, customerId: true, status: true }
         });
 
-        if (!booking) return res.status(400).json({ error: 'Invalid bookingId' });
+        if (!booking) return sendApiError(res, 400, 'INVALID_BOOKING', 'Invalid bookingId');
         if (booking.providerId !== providerId) {
-          return res.status(400).json({ error: 'bookingId does not belong to the given providerId' });
+          return sendApiError(res, 400, 'INVALID_BOOKING', 'bookingId does not belong to the given providerId');
         }
         if (booking.customerId !== reviewerId) {
-          return res.status(403).json({ error: 'Only the customer who booked the service can leave a review.' });
+          return sendApiError(res, 403, 'FORBIDDEN', 'Only the customer who booked the service can leave a review.');
         }
         if (!['COMPLETED', 'REVIEWED'].includes(booking.status)) {
-          return res.status(409).json({ error: 'Reviews can only be submitted after the booking is completed.' });
+          return sendApiError(res, 409, 'BOOKING_NOT_COMPLETED', 'Reviews can only be submitted after the booking is completed.');
         }
       }
 
-      // Basic shape validation: comment is optional but if provided must be a string.
       const safeComment = comment === undefined ? null : String(comment);
 
       const review = await prisma.review.create({
@@ -88,9 +86,9 @@ export const ReviewController = {
 
       await notifyReviewPublished(reviewerId);
 
-      res.status(201).json({ success: true, review });
+      return sendApiSuccess(res, 201, { review });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to record customer review log', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to record customer review log', err.message);
     }
   }
 };
