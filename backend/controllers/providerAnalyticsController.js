@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 const toMonthKey = (d) => {
   const dt = d instanceof Date ? d : new Date(d);
@@ -21,7 +22,6 @@ export const ProviderAnalyticsController = {
       const providerId = req.params.id;
       const { range = '90d' } = req.query || {};
 
-      // Compute time window
       const now = new Date();
       let since;
       if (range === '7d') since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -33,14 +33,12 @@ export const ProviderAnalyticsController = {
         providerId,
       };
       if (since) {
-        // Prefer bookingDate if present; fall back to createdAt.
         whereBookings.OR = [
           { bookingDate: { gte: since } },
           { createdAt: { gte: since } }
         ];
       }
 
-      // Pull bookings (with minimal fields) + payments (for earnings)
       const [bookings, payments] = await Promise.all([
         prisma.booking.findMany({
           where: whereBookings,
@@ -56,7 +54,6 @@ export const ProviderAnalyticsController = {
         }),
         prisma.payment.findMany({
           where: {
-            user: undefined,
             booking: {
               providerId,
               ...(since
@@ -74,20 +71,16 @@ export const ProviderAnalyticsController = {
             paidAt: true,
             createdAt: true,
             bookingId: true,
-            // NOTE: schema has no amount fields in Payment model.
-            // We'll derive earnings using booking.paymentStatus only.
           },
         })
       ]);
 
-      // Earnings: since Payment has no amount fields, approximate by PAID bookings count.
       const paidBookingIds = new Set(
         payments
           .filter((p) => p.status === 'PAID')
           .map((p) => p.bookingId)
       );
 
-      const terminalStatuses = new Set(['COMPLETED', 'CANCELLED']);
       const completedCount = bookings.filter((b) => b.status === 'COMPLETED').length;
       const cancelledCount = bookings.filter((b) => b.status === 'CANCELLED').length;
 
@@ -97,7 +90,6 @@ export const ProviderAnalyticsController = {
         return completedCount / denom;
       })();
 
-      // Acceptance rate: treats CONFIRMED/ONGOING/COMPLETED as accepted vs all non-pending offers.
       const acceptedLike = new Set(['CONFIRMED', 'ONGOING', 'COMPLETED']);
       const offerCount = bookings.length;
       const acceptedCount = bookings.filter((b) => acceptedLike.has(b.status)).length;
@@ -105,8 +97,6 @@ export const ProviderAnalyticsController = {
 
       const cancellationRate = offerCount ? cancelledCount / offerCount : 0;
 
-      // Average response time: time from booking createdAt to first status update away from PENDING.
-      // With current schema, we only have booking-level fields; approximate using updatedAt.
       const pendingBookings = bookings.filter((b) => b.status !== 'PENDING');
       const responseTimesMs = pendingBookings
         .map((b) => {
@@ -120,7 +110,6 @@ export const ProviderAnalyticsController = {
 
       const avgResponseTimeMs = safeAvg(responseTimesMs);
 
-      // Retention & repeat customers: based on number of distinct bookings per customer.
       const byCustomer = new Map();
       for (const b of bookings) {
         const arr = byCustomer.get(b.customerId) || [];
@@ -131,7 +120,6 @@ export const ProviderAnalyticsController = {
       const repeatCustomers = Array.from(byCustomer.values()).filter((arr) => arr.length >= 2).length;
       const retentionRate = customerCount ? repeatCustomers / customerCount : 0;
 
-      // Booking trends by month (using bookingDate when available)
       const bookingTrendsByMonth = new Map();
       const revenueSeriesByMonth = new Map();
 
@@ -156,7 +144,6 @@ export const ProviderAnalyticsController = {
         if (b.status === 'CANCELLED') existing.cancelled += 1;
         bookingTrendsByMonth.set(key, existing);
 
-        // Revenue series approximation: count of PAID bookings.
         const revExisting = revenueSeriesByMonth.get(key) || { month: key, paidBookings: 0 };
         if (paidBookingIds.has(b.id) || b.paymentStatus === 'PAID') revExisting.paidBookings += 1;
         revenueSeriesByMonth.set(key, revExisting);
@@ -165,10 +152,9 @@ export const ProviderAnalyticsController = {
       const bookingTrends = Array.from(bookingTrendsByMonth.values()).sort((a, b) => (a.month < b.month ? -1 : 1));
       const revenueSeries = Array.from(revenueSeriesByMonth.values()).sort((a, b) => (a.month < b.month ? -1 : 1));
 
-      // Total earnings approximation: number of PAID bookings.
       const paidCount = paidBookingIds.size || bookings.filter((b) => b.paymentStatus === 'PAID').length;
 
-      res.json({
+      return sendApiSuccess(res, 200, {
         providerId,
         range,
         totals: {
@@ -187,10 +173,7 @@ export const ProviderAnalyticsController = {
         revenueSeriesByMonth: revenueSeries,
       });
     } catch (err) {
-      res.status(500).json({
-        error: 'Failed to load provider analytics',
-        details: err.message,
-      });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to load provider analytics', err.message);
     }
   },
 };

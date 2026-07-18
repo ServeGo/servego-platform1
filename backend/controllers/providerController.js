@@ -2,16 +2,13 @@ import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
 import { canPerformAction } from '../utils/permissions.js';
 import { writeAuditLog } from '../services/auditLogService.js';
-import { sendApiError } from '../utils/response.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const ProviderController = {
   getProviderServices: async (req, res) => {
     try {
       const { id } = req.params;
 
-      // Provider sees:
-      // - approved links (ProviderService)
-      // - pending/denied requests (ProviderServiceRequest)
       const [approvedLinks, requests] = await Promise.all([
         prisma.providerService.findMany({
           where: { providerId: id },
@@ -56,19 +53,13 @@ export const ProviderController = {
           createdAt: r.createdAt
         }));
 
-      // sort newest first across both arrays
       const combined = [...formattedApproved, ...formattedRequests].sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
 
-      res.json(combined);
+      return sendApiSuccess(res, 200, combined);
     } catch (err) {
-      res.status(500).json({
-        error: 'Failed to fetch provider services',
-        details: err.message,
-        // helps identify if the request providerId is wrong type/value
-        providerId: req.params?.id
-      });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider services', err.message);
     }
   },
 
@@ -79,29 +70,28 @@ export const ProviderController = {
       const role = req.user?.role || req.body?.role || 'provider';
 
       if (!req.user?.id && role !== 'admin') {
-        return res.status(401).json({ success: false, code: 'UNAUTHORIZED', message: 'Authentication required.' });
+        return sendApiError(res, 401, 'UNAUTHORIZED', 'Authentication required.');
       }
 
       if (role !== 'provider' && role !== 'admin') {
-        return res.status(403).json({ error: 'You are not allowed to register a provider service.' });
+        return sendApiError(res, 403, 'FORBIDDEN', 'You are not allowed to register a provider service.');
       }
 
       if (!serviceName) {
-        return res.status(400).json({ error: 'Missing required field: serviceName' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: serviceName');
       }
       if (!description || !String(description).trim()) {
-        return res.status(400).json({ error: 'Missing required field: description' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: description');
       }
 
       const provider = await prisma.provider.findUnique({ where: { id } });
-      if (!provider) return res.status(404).json({ error: 'Service provider not found' });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
       if (role !== 'admin' && provider.userId !== req.user?.id) {
-        return res.status(403).json({ error: 'You can only manage your own provider profile.' });
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only manage your own provider profile.');
       }
 
       const requestedService = String(serviceName).trim();
 
-      // 1) If already approved for this provider+service -> return 409
       const existingApproved = await prisma.providerService.findFirst({
         where: {
           providerId: provider.id,
@@ -112,10 +102,9 @@ export const ProviderController = {
         select: { id: true }
       });
       if (existingApproved) {
-        return res.status(409).json({ error: 'Service already registered for this provider.' });
+        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Service already registered for this provider.');
       }
 
-      // 2) If already pending for this provider+service -> return 409
       const existingPending = await prisma.providerServiceRequest.findFirst({
         where: {
           providerId: provider.id,
@@ -125,11 +114,9 @@ export const ProviderController = {
         select: { id: true }
       });
       if (existingPending) {
-        return res.status(409).json({ error: 'Service request already pending approval.' });
+        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Service request already pending approval.');
       }
 
-      // 3) If any prior request exists and is not denied -> block
-      // (This ensures that ONLY denied requests allow re-submission.)
       const existingRequest = await prisma.providerServiceRequest.findFirst({
         where: {
           providerId: provider.id,
@@ -139,10 +126,9 @@ export const ProviderController = {
       });
 
       if (existingRequest && existingRequest.status !== 'DENIED') {
-        return res.status(409).json({ error: 'Service request already submitted for this provider.' });
+        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Service request already submitted for this provider.');
       }
 
-      // Create a provider service request in PENDING state.
       const created = await prisma.providerServiceRequest.create({
         data: {
           providerId: provider.id,
@@ -157,7 +143,6 @@ export const ProviderController = {
         }
       });
 
-      // Optionally update experienceYears on provider profile from request
       if (
         experienceYears !== undefined &&
         experienceYears !== null &&
@@ -170,9 +155,9 @@ export const ProviderController = {
         });
       }
 
-      res.status(201).json(created);
+      return sendApiSuccess(res, 201, created);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to register provider service', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to register provider service', err.message);
     }
   },
 
@@ -188,9 +173,9 @@ export const ProviderController = {
           badges: true
         }
       });
-      res.json(providers);
+      return sendApiSuccess(res, 200, providers);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch service partners', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch service partners', err.message);
     }
   },
 
@@ -208,11 +193,11 @@ export const ProviderController = {
         }
       });
       if (!provider) {
-        return res.status(404).json({ error: 'Service provider not found' });
+        return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
       }
-      res.json(provider);
+      return sendApiSuccess(res, 200, provider);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to retrieve provider details', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve provider details', err.message);
     }
   },
 
@@ -223,7 +208,7 @@ export const ProviderController = {
 
       const existing = await prisma.provider.findUnique({ where: { id } });
       if (!existing) {
-        return res.status(404).json({ error: 'Service provider profile missing' });
+        return sendApiError(res, 404, 'NOT_FOUND', 'Service provider profile missing');
       }
 
       const updated = await prisma.provider.update({
@@ -238,9 +223,9 @@ export const ProviderController = {
         include: { reviews: true }
       });
 
-      res.json(updated);
+      return sendApiSuccess(res, 200, updated);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to update partner profile', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update partner profile', err.message);
     }
   },
 
@@ -257,9 +242,9 @@ export const ProviderController = {
           timeSlots: Array.isArray(timeSlots) ? timeSlots : undefined
         }
       });
-      res.json(updated);
+      return sendApiSuccess(res, 200, updated);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to update calendar availability schedule', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update calendar availability schedule', err.message);
     }
   },
 
@@ -285,9 +270,9 @@ export const ProviderController = {
         ip: req.ip
       });
 
-      res.json(updated);
+      return sendApiSuccess(res, 200, updated);
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to verify provider credentials', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to verify provider credentials', err.message);
     }
   }
 };

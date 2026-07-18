@@ -1,19 +1,16 @@
 import prisma from '../prisma/client.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const ProviderServiceDiscoveryController = {
-  // Returns providers who have an APPROVED ProviderService link for the given Service name.
-  // Used for customer-facing category sectors (Plumber/Electrician etc.).
   getApprovedProvidersByServiceName: async (req, res) => {
     try {
       const rawServiceName = req.query?.serviceName;
       if (!rawServiceName || !String(rawServiceName).trim()) {
-        return res.status(400).json({ error: 'Missing required query: serviceName' });
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required query: serviceName');
       }
 
       const serviceName = String(rawServiceName).trim();
 
-      // Note: We filter Approved via providerService rows existing.
-      // (There is no approvalStatus field on ProviderService; approval implies the link exists.)
       const providerServices = await prisma.providerService.findMany({
         where: {
           service: {
@@ -72,15 +69,14 @@ export const ProviderServiceDiscoveryController = {
         reviews: p.reviews || []
       }));
 
-      res.json(formatted);
+      return sendApiSuccess(res, 200, formatted);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to discover approved providers', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to discover approved providers', err.message);
     }
   }
 };
 
 function linkSafeCategory(_provider, requestedServiceName) {
-  // Keep UI consistent with existing category string comparisons.
   return requestedServiceName;
 }
 

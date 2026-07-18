@@ -1,10 +1,6 @@
 import prisma from '../prisma/client.js';
 import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
-import { sendApiError } from '../utils/response.js';
-
-// NOTE: This project currently stores provider working pattern as JSON
-// fields on Provider: availableDays + timeSlots.
-// This controller derives "blocked/busy" status in real-time from Booking table.
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 function normalizeDowInput(day) {
   if (!day) return null;
@@ -32,14 +28,11 @@ function normalizeDowInput(day) {
 }
 
 function dayOfWeekShort(date) {
-  // 0=Sun..6=Sat
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return days[date.getDay()];
 }
 
 export const ProviderAvailabilityController = {
-  // GET /providers/:id/availability?date=YYYY-MM-DD
-  // Returns computed slots with busy=true/false based on existing bookings.
   getAvailabilityForDate: async (req, res) => {
     try {
       const providerId = req.params.id;
@@ -52,7 +45,6 @@ export const ProviderAvailabilityController = {
         return sendApiError(res, 400, 'INVALID_DATE', 'Invalid date query param.');
       }
 
-      // Normalize to local date boundaries for consistent day comparisons
       const dayStart = new Date(parsed);
       dayStart.setHours(0, 0, 0, 0);
 
@@ -73,7 +65,7 @@ export const ProviderAvailabilityController = {
       const isWorkingDay = normalizedProviderDays.includes(dow);
 
       if (!isWorkingDay) {
-        return res.json({
+        return sendApiSuccess(res, 200, {
           providerId,
           date,
           isWorkingDay: false,
@@ -81,14 +73,9 @@ export const ProviderAvailabilityController = {
         });
       }
 
-      // timeSlots is currently stored as JSON on Provider.
-      // If empty/undefined, default to 1 placeholder "Flexible" slot.
       const rawSlots = Array.isArray(provider.timeSlots) ? provider.timeSlots : [];
       const slots = rawSlots.length ? rawSlots : ['Flexible'];
 
-      // Compute busy per slot in "real-time" from bookings.
-      // This uses the existing isProviderSlotTaken logic which unblocks automatically
-      // once booking status is COMPLETED/CANCELLED.
       const slotResults = await Promise.all(
         slots.map(async (slot) => {
           const busy = await isProviderSlotTaken(providerId, dayStart, slot);
@@ -96,7 +83,7 @@ export const ProviderAvailabilityController = {
         })
       );
 
-      return res.json({
+      return sendApiSuccess(res, 200, {
         providerId,
         date,
         isWorkingDay: true,

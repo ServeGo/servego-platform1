@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma/client.js';
 import { generateTokenPair, verifyRefreshToken, isAuthBlocked, recordFailedAuthAttempt } from '../utils/auth.js';
-import { sendApiError } from '../utils/response.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 import { validatePasswordStrength } from '../utils/validation.js';
 
 export const UserController = {
@@ -55,7 +55,7 @@ export const UserController = {
         prisma.user.count({ where })
       ]);
 
-      res.json({
+      return sendApiSuccess(res, 200, {
         users,
         pagination: {
           page: parseInt(page),
@@ -65,7 +65,7 @@ export const UserController = {
         }
       });
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve users', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve users', err.message);
     }
   },
 
@@ -85,45 +85,45 @@ export const UserController = {
         acceptedTerms
       } = req.body;
 
-      // Validation
+      // Basic validation
       if (!name || !email || !phone || !role || !password) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required signup parameters (name, email, phone, role, password)');
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please fill in all required fields');
       }
 
       // Accept boolean true, string 'true', or number 1
       if (acceptedTerms !== true && acceptedTerms !== 'true' && acceptedTerms !== 1 && acceptedTerms !== '1') {
-        return sendApiError(res, 400, 'TERMS_NOT_ACCEPTED', 'You must agree to the Terms & Conditions to continue.');
+        return sendApiError(res, 400, 'TERMS_NOT_ACCEPTED', 'Please accept the Terms & Conditions to continue');
       }
 
       if (!confirmPassword) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Confirm Password is required.');
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please confirm your password');
       }
 
       if (password !== confirmPassword) {
-        return sendApiError(res, 400, 'PASSWORD_MISMATCH', 'Password and Confirm Password must match.');
+        return sendApiError(res, 400, 'PASSWORD_MISMATCH', 'Passwords do not match. Please try again.');
       }
 
       // Password strength validation
       const passwordErrors = validatePasswordStrength(password);
       if (passwordErrors.length > 0) {
-        return sendApiError(res, 400, 'WEAK_PASSWORD', 'Password does not meet security requirements', passwordErrors);
+        return sendApiError(res, 400, 'WEAK_PASSWORD', 'Password must be at least 8 characters with uppercase, lowercase, and a number', passwordErrors);
       }
 
       if (role === 'customer') {
         if (!address || !pincode) {
-          return sendApiError(res, 400, 'MISSING_FIELDS', 'Address and pincode are required for customer signup.');
+          return sendApiError(res, 400, 'MISSING_FIELDS', 'Please enter your address and pincode');
         }
         if (!/^[0-9]{5,6}$/.test(String(pincode))) {
-          return sendApiError(res, 400, 'INVALID_PINCDE', 'Invalid pincode. Expected 5-6 digits.');
+          return sendApiError(res, 400, 'INVALID_PINCODE', 'Please enter a valid 5-6 digit pincode');
         }
       } else if (role !== 'provider') {
-        return sendApiError(res, 400, 'INVALID_ROLE', 'Signup role must be either customer or provider.');
+        return sendApiError(res, 400, 'INVALID_ROLE', 'Please select either Customer or Provider as your account type');
       }
 
       const normalizedEmail = String(email).trim().toLowerCase();
       const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
       if (existingUser) {
-        return sendApiError(res, 400, 'EMAIL_EXISTS', 'An account with this email address already exists. Please choose another email.');
+        return sendApiError(res, 400, 'EMAIL_EXISTS', 'An account with this email already exists. Try logging in instead.');
       }
 
       const hashedPassword = await bcrypt.hash(password, 12);
@@ -217,14 +217,10 @@ export const UserController = {
 
       const tokens = generateTokenPair(newUser);
 
-      res.status(201).json({ 
-        success: true, 
-        user: safeUser, 
-        ...tokens 
-      });
+      return sendApiSuccess(res, 201, { user: safeUser, ...tokens });
     } catch (err) {
       console.error('Signup registration error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed', err.message);
     }
   },
 
@@ -233,12 +229,12 @@ export const UserController = {
       const { email, password } = req.body;
       
       if (!email || !password) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please enter both your email address and password.');
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please enter your email and password');
       }
 
       const clientIp = req.ip || req.connection?.remoteAddress;
       if (isAuthBlocked(clientIp)) {
-        return sendApiError(res, 429, 'AUTH_BLOCKED', 'Too many failed attempts. Please try again in 15 minutes.');
+        return sendApiError(res, 429, 'AUTH_BLOCKED', 'Too many login attempts. Please try again after 15 minutes');
       }
 
       const normalizedEmail = String(email).trim().toLowerCase();
@@ -265,17 +261,12 @@ export const UserController = {
         
         recordFailedAuthAttempt(clientIp);
         
-        return sendApiError(res, 401, 'INVALID_CREDENTIALS', 'Incorrect email address or password. Please verify and try again.');
+        return sendApiError(res, 401, 'INVALID_CREDENTIALS', 'Invalid email or password');
       }
 
       if (user.status !== 'ACTIVE') {
         const blockedReason = user.status === 'INACTIVE' || user.status === 'SUSPENDED' ? 'inactive_or_suspended' : 'under_review';
-        return res.status(403).json({
-          success: false,
-          error: 'Your account is currently under review. Please wait for approval.',
-          blockedReason,
-          needsReview: true
-        });
+        return sendApiError(res, 403, 'ACCOUNT_NOT_ACTIVE', 'Your account is not active. Please contact support for assistance', { blockedReason });
       }
 
       await prisma.authEvent.create({
@@ -292,10 +283,10 @@ export const UserController = {
       const { password: _, ...safeUser } = user;
       const tokens = generateTokenPair(user);
       
-      res.json({ success: true, user: safeUser, ...tokens });
+      return sendApiSuccess(res, 200, { user: safeUser, ...tokens });
     } catch (err) {
       console.error('Login error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Server authentication login failed', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again later', err.message);
     }
   },
 
@@ -328,13 +319,10 @@ export const UserController = {
 
       const tokens = generateTokenPair(user);
 
-      res.json({ 
-        success: true, 
-        ...tokens 
-      });
+      return sendApiSuccess(res, 200, tokens);
     } catch (err) {
       console.error('Token refresh error:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token', err.message);
     }
   },
 
@@ -392,10 +380,10 @@ export const UserController = {
         include: { customerProfile: true, providerProfile: true }
       });
       const { password: __, ...safeUser } = refreshed;
-      res.json({ success: true, user: safeUser });
+      return sendApiSuccess(res, 200, { user: safeUser });
     } catch (err) {
       console.error('Failed to update user profile:', err);
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile', err.message);
     }
   }
 };

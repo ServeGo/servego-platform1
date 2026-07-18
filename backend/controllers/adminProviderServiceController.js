@@ -20,9 +20,9 @@ export const AdminProviderServiceController = {
           }
         }
       });
-      res.json(requests);
+      return sendApiSuccess(res, 200, requests);
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider service requests', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider service requests', err.message);
     }
   },
 

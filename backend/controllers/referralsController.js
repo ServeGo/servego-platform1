@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 const normalizeCode = (code) => (code || '').toString().trim();
 
@@ -6,8 +7,8 @@ export const ReferralsController = {
   applyReferral: async (req, res) => {
     try {
       const { userId, code } = req.body || {};
-      if (!userId) return res.status(400).json({ error: 'Missing required field: userId' });
-      if (!code) return res.status(400).json({ error: 'Missing required field: code' });
+      if (!userId) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: userId');
+      if (!code) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: code');
 
       const normalized = normalizeCode(code);
       const sponsor = await prisma.user.findUnique({
@@ -15,21 +16,18 @@ export const ReferralsController = {
         select: { id: true, referralCode: true, referralsCount: true }
       });
 
-      if (!sponsor) return res.status(404).json({ error: 'Invalid referral code' });
+      if (!sponsor) return sendApiError(res, 404, 'NOT_FOUND', 'Invalid referral code');
 
       if (sponsor.id === userId) {
-        return res.status(400).json({ error: 'You cannot apply your own referral code.' });
+        return sendApiError(res, 400, 'INVALID_REFERRAL', 'You cannot apply your own referral code.');
       }
 
-      // Prevent applying multiple times
       const applicant = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, referredBy: true } });
-      if (!applicant) return res.status(404).json({ error: 'User not found' });
+      if (!applicant) return sendApiError(res, 404, 'NOT_FOUND', 'User not found');
       if (applicant.referredBy) {
-        return res.status(409).json({ error: 'Referral code already applied.' });
+        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Referral code already applied.');
       }
 
-      // Create/record referral relationship and immediate onboarding bonus credit.
-      // (Your UI expects: referredBy, referredCount, bonusEarned)
       const BONUS_EARNED = 250;
 
       const result = await prisma.$transaction(async (tx) => {
@@ -55,25 +53,25 @@ export const ReferralsController = {
         };
       });
 
-      return res.json({ success: true, ...result });
+      return sendApiSuccess(res, 200, result);
     } catch (err) {
-      return res.status(500).json({ error: 'Failed to apply referral code', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to apply referral code', err.message);
     }
   },
 
   getMeReferral: async (req, res) => {
     try {
       const userId = req.query?.userId;
-      if (!userId) return res.status(400).json({ error: 'Missing required query param: userId' });
+      if (!userId) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required query param: userId');
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { referredBy: true, referralCode: true, referralsCount: true, referralDiscountBalance: true, referralBonusEarned: true }
       });
 
-      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user) return sendApiError(res, 404, 'NOT_FOUND', 'User not found');
 
-      res.json({
+      return sendApiSuccess(res, 200, {
         referralCode: user.referralCode,
         referredBy: user.referredBy,
         referredCount: user.referralsCount,
@@ -81,7 +79,7 @@ export const ReferralsController = {
         discountBalance: user.referralDiscountBalance || 0
       });
     } catch (err) {
-      return res.status(500).json({ error: 'Failed to fetch referral info', details: err.message });
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch referral info', err.message);
     }
   }
 };

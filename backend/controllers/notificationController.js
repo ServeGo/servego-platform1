@@ -1,5 +1,5 @@
 import prisma from '../prisma/client.js';
-import { sendApiError } from '../utils/response.js';
+import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const NotificationController = {
   getAll: async (req, res) => {
@@ -9,9 +9,9 @@ export const NotificationController = {
         where,
         orderBy: { createdAt: 'desc' }
       });
-      res.json(notifications);
+      return sendApiSuccess(res, 200, notifications);
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch notifications', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch notifications', err.message);
     }
   },
 
@@ -24,9 +24,9 @@ export const NotificationController = {
       const notif = await prisma.notification.create({
         data: { userId, title, message, type: type || 'SYSTEM', isRead: false }
       });
-      res.status(201).json(notif);
+      return sendApiSuccess(res, 201, notif);
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create notification', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create notification', err.message);
     }
   },
 
@@ -34,21 +34,20 @@ export const NotificationController = {
     try {
       const { id } = req.params;
       const notif = await prisma.notification.update({ where: { id }, data: { isRead: true } });
-      res.json(notif);
+      return sendApiSuccess(res, 200, notif);
     } catch (err) {
       if (err.code === 'P2025') return sendApiError(res, 404, 'NOT_FOUND', 'Notification not found.');
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to mark notification as read', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to mark notification as read', err.message);
     }
   },
 
   clearAll: async (req, res) => {
     try {
-      // Admins can clear all; others only clear their own
       const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
       await prisma.notification.deleteMany({ where });
-      res.json({ success: true, message: 'Notifications cleared.' });
+      return sendApiSuccess(res, 200, { message: 'Notifications cleared.' });
     } catch (err) {
-      sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to clear notifications', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to clear notifications', err.message);
     }
   }
 };
