@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AchievementList, VerificationLevelPill } from './ProviderReputation';
-
-const API_BASE_URL = import.meta?.env?.VITE_API_BASE_URL || import.meta?.env?.VITE_API_URL || 'https://servego-backend.onrender.com/api';
+import { api } from '../utils/apiClient';
 
 export default function ProviderProfileView() {
   const { currentUser, providers, logout, updateProviderAvailability, updateProviderProfile } = useApp();
@@ -48,8 +47,8 @@ export default function ProviderProfileView() {
     const fetchLatest = async () => {
       if (!activeProvider?.id) return;
       try {
-        const res = await fetch(`${API_BASE_URL}/providers/${activeProvider.id}`);
-        const data = await res.json();
+        const res = await api.get(`/providers/${activeProvider.id}`);
+        const data = res.data;
         if (alive && res.ok) setProvider(data);
       } catch {
         // keep cached

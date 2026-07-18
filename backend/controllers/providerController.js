@@ -5,6 +5,19 @@ import { writeAuditLog } from '../services/auditLogService.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const ProviderController = {
+  registerOwnProviderService: async (req, res) => {
+    const provider = await prisma.provider.findFirst({
+      where: { userId: req.user.id },
+      select: { id: true, profileComplete: true }
+    });
+    if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
+    if (!provider.profileComplete) {
+      return sendApiError(res, 403, 'PROFILE_INCOMPLETE', 'Complete your provider profile before submitting services.');
+    }
+    req.params.id = provider.id;
+    return ProviderController.registerProviderService(req, res);
+  },
+
   getProviderServices: async (req, res) => {
     try {
       const { id } = req.params;
@@ -61,6 +74,13 @@ export const ProviderController = {
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider services', err.message);
     }
+  },
+
+  getMyProviderServices: async (req, res) => {
+    const provider = await prisma.provider.findUnique({ where: { userId: req.user.id }, select: { id: true } });
+    if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
+    req.params.id = provider.id;
+    return ProviderController.getProviderServices(req, res);
   },
 
   registerProviderService: async (req, res) => {
@@ -143,6 +163,15 @@ export const ProviderController = {
         }
       });
 
+      // Notify admin room of new approval request
+      const io = req.app?.get('socketio');
+      if (io) {
+        io.to('room:admin').emit('newApprovalRequest', {
+          requestId: created.id,
+          providerId: provider.id,
+          serviceName: requestedService
+        });
+      }
       if (
         experienceYears !== undefined &&
         experienceYears !== null &&
@@ -170,7 +199,8 @@ export const ProviderController = {
             select: { id: true, name: true, email: true, phone: true, avatar: true }
           },
           reviews: true,
-          badges: true
+          badges: true,
+          availabilitySlots: true
         }
       });
       return sendApiSuccess(res, 200, providers);
@@ -189,7 +219,8 @@ export const ProviderController = {
             select: { id: true, name: true, email: true, phone: true, avatar: true }
           },
           reviews: true,
-          badges: true
+          badges: true,
+          availabilitySlots: true
         }
       });
       if (!provider) {
@@ -210,15 +241,23 @@ export const ProviderController = {
       if (!existing) {
         return sendApiError(res, 404, 'NOT_FOUND', 'Service provider profile missing');
       }
+      if (req.user.role !== 'admin' && existing.userId !== req.user.id) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own provider profile.');
+      }
 
+      const nextBio = bio ?? existing.bio;
+      const nextSpecialties = Array.isArray(specialties) ? specialties : existing.specialties;
+      const nextAreas = Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas;
+      const profileComplete = Boolean(String(nextBio || '').trim() && Array.isArray(nextSpecialties) && nextSpecialties.length && Array.isArray(nextAreas) && nextAreas.length);
       const updated = await prisma.provider.update({
         where: { id },
         data: {
-          bio: bio ?? existing.bio,
-          specialties: Array.isArray(specialties) ? specialties : existing.specialties,
-          serviceAreas: Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas,
+          bio: nextBio,
+          specialties: nextSpecialties,
+          serviceAreas: nextAreas,
           experienceYears: Number.isFinite(Number(experienceYears)) ? Number(experienceYears) : existing.experienceYears,
-          isVerified: typeof isVerified === 'boolean' ? isVerified : existing.isVerified
+          isVerified: typeof isVerified === 'boolean' ? isVerified : existing.isVerified,
+          profileComplete
         },
         include: { reviews: true }
       });
@@ -233,14 +272,38 @@ export const ProviderController = {
   updateAvailability: async (req, res) => {
     try {
       const { id } = req.params;
-      const { availableDays, timeSlots } = req.body;
-
-      const updated = await prisma.provider.update({
-        where: { id },
-        data: {
-          availableDays: Array.isArray(availableDays) ? availableDays : undefined,
-          timeSlots: Array.isArray(timeSlots) ? timeSlots : undefined
+      const { availableDays, timeSlots, availabilitySlots } = req.body;
+      const provider = await prisma.provider.findUnique({ where: { id }, select: { userId: true } });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Service provider profile missing');
+      if (req.user.role !== 'admin' && provider.userId !== req.user.id) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own availability.');
+      }
+      const slots = Array.isArray(availabilitySlots)
+        ? availabilitySlots.map((slot) => ({ dayOfWeek: String(slot?.dayOfWeek || '').trim(), startTime: String(slot?.startTime || '').trim(), endTime: String(slot?.endTime || '').trim() }))
+        : null;
+      if (slots) {
+        if (slots.some((slot) => !slot.dayOfWeek || !/^\d{2}:\d{2}$/.test(slot.startTime) || !/^\d{2}:\d{2}$/.test(slot.endTime) || slot.startTime >= slot.endTime)) {
+          return sendApiError(res, 400, 'INVALID_AVAILABILITY', 'Each slot needs a day and valid start/end times (HH:MM).');
         }
+        const ordered = [...slots].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.startTime.localeCompare(b.startTime));
+        if (ordered.some((slot, index) => index > 0 && ordered[index - 1].dayOfWeek === slot.dayOfWeek && ordered[index - 1].endTime > slot.startTime)) {
+          return sendApiError(res, 409, 'OVERLAPPING_AVAILABILITY', 'Availability slots cannot overlap on the same day.');
+        }
+      }
+      const updated = await prisma.$transaction(async (tx) => {
+        if (slots) {
+          await tx.availabilitySlot.deleteMany({ where: { providerId: id } });
+          if (slots.length) await tx.availabilitySlot.createMany({ data: slots.map((slot) => ({ ...slot, providerId: id })) });
+        }
+        return tx.provider.update({
+          where: { id },
+          data: {
+            availableDays: Array.isArray(availableDays) ? availableDays : undefined,
+            timeSlots: Array.isArray(timeSlots) ? timeSlots : undefined
+          },
+          include: { availabilitySlots: true }
+        });
+        io.to('room:admin').emit('adminAlert:newServiceRequest', { providerServiceRequestId: created.id });
       });
       return sendApiSuccess(res, 200, updated);
     } catch (err) {

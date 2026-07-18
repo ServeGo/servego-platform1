@@ -113,6 +113,8 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [savedProsData, setSavedProsData] = useState([]); // full provider objects from API
+
   // UI state filters
   const [selectedCity, setSelectedCity] = useState('Hyderabad');
   const [selectedArea, setSelectedArea] = useState('');
@@ -121,10 +123,12 @@ export const AppProvider = ({ children }) => {
 
   const socketRef = useRef(null);
 
-  const fetchProvidersByApprovedServiceName = useCallback(async (serviceName) => {
+  const fetchProvidersByApprovedServiceName = useCallback(async (serviceName, { location = '', sort = 'rating' } = {}) => {
     if (!serviceName) return [];
     try {
-      const res = await api(`${API_BASE_URL}/providers/by-approved-service?serviceName=${encodeURIComponent(serviceName)}`);
+      const params = new URLSearchParams({ serviceName, sort });
+      if (location) params.set('location', location);
+      const res = await api(`${API_BASE_URL}/providers/by-approved-service?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
         console.error('Failed to fetch providers by approved service:', data);
@@ -146,6 +150,20 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('servego_favorites', JSON.stringify(favoriteProviders));
   }, [favoriteProviders]);
 
+  const fetchSavedPros = useCallback(async () => {
+    if (!currentUser?.id || currentUser?.role !== 'customer') return;
+    try {
+      const res = await api(`${API_BASE_URL}/saved-pros`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setSavedProsData(data);
+        setFavoriteProviders(data.map(sp => sp.providerId || sp.provider?.id).filter(Boolean));
+      }
+    } catch (err) {
+      console.error('Failed to fetch saved pros:', err);
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
   const fetchProviders = async () => {
     try {
       const res = await api(`${API_BASE_URL}/providers`);
@@ -160,11 +178,26 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await api(`${API_BASE_URL}/services`);
       const data = await res.json();
-      setServices(data);
+      setServices(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch services:', err);
     }
   };
+
+  const searchServices = useCallback(async (query = '', location = '') => {
+    try {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('query', query.trim());
+      if (location.trim()) params.set('location', location.trim());
+      const suffix = params.toString();
+      const res = await api(`${API_BASE_URL}/services/search${suffix ? `?${suffix}` : ''}`);
+      const data = await res.json();
+      return res.ok && Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.error('Failed to search services:', err);
+      return [];
+    }
+  }, []);
 
 
   const fetchBookings = useCallback(async () => {
@@ -174,9 +207,14 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      const res = await api(`${API_BASE_URL}/bookings`);
+      // Use customer-scoped endpoint to avoid any frontend/customerId normalization mismatch
+      const res = await api(`${API_BASE_URL}/bookings/mine`);
       const data = await res.json();
+
+
+
       const bookingsArray = normalizeBookings(data);
+
 
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
@@ -198,8 +236,13 @@ export const AppProvider = ({ children }) => {
         return;
       }
 
-      setBookings(bookingsArray.filter((b) => b.customerId === currentUser.id));
+      const filtered = bookingsArray.filter((b) => b.customerId === currentUser.id);
+      // eslint-disable-next-line no-console
+      console.log('[AppContext.fetchBookings] customer filtered count:', filtered.length);
+
+      setBookings(filtered);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Failed to fetch bookings:', err);
       setBookings([]);
     }
@@ -234,9 +277,14 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await api(`${API_BASE_URL}/users`);
       const data = await res.json();
-      setUsers(data);
+
+      // Backend returns: { users, pagination }.
+      // Keep state compatible with callers that expect `users` to be an array.
+      const usersArray = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
+      setUsers(usersArray);
     } catch (err) {
       console.error('Failed to fetch users:', err);
+      setUsers([]);
     }
   };
 
@@ -328,7 +376,7 @@ export const AppProvider = ({ children }) => {
       // Use the new API client for better error handling and retry
       const response = await apiClient.post('/auth/login', { email, password }, { retryConfig: { maxRetries: 2 } });
       
-      if (response.ok && response.data.success) {
+      if (response.ok && response.data?.user) {
         // Store tokens using the new token management system
         if (response.data.accessToken) {
           setTokens(response.data.accessToken, response.data.refreshToken);
@@ -338,9 +386,9 @@ export const AppProvider = ({ children }) => {
       } else {
         return {
           success: false,
-          error: response.data?.error || 'Login failed',
-          blockedReason: response.data?.blockedReason,
-          needsReview: response.data?.needsReview
+          error: response.data?.message || 'Login failed',
+          blockedReason: response.data?.details?.blockedReason,
+          needsReview: response.data?.details?.needsReview
         };
       }
     } catch (err) {
@@ -357,7 +405,7 @@ export const AppProvider = ({ children }) => {
       const response = await apiClient.post('/auth/register', payload, { retryConfig: { maxRetries: 2 } });
       const data = response.data;
       
-      if (response.ok && data.success) {
+      if (response.ok && data?.user) {
         // Store tokens using the new token management system
         if (data.accessToken) {
           setTokens(data.accessToken, data.refreshToken);
@@ -367,7 +415,7 @@ export const AppProvider = ({ children }) => {
       } else {
         return {
           success: false,
-          error: data?.error || 'Registration failed',
+          error: data?.message || 'Registration failed',
           details: data?.details
         };
       }
@@ -407,22 +455,20 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Never expose provider/service catalog details unless authenticated.
+    // Always fetch public catalog (services) so the home page works unauthenticated.
+    fetchServices();
+
     if (currentUser?.id) {
       fetchProviders();
-      fetchServices();
-
       fetchNotifications();
       fetchBookings();
       fetchTickets();
+      if (currentUser?.role === 'customer') fetchSavedPros();
     } else {
       setNotifications([]);
       setBookings([]);
       setTickets([]);
-
-      // Optional privacy: clear any previously loaded catalog data.
       setProviders([]);
-      setServices([]);
       setProvidersByApprovedService([]);
     }
 
@@ -457,6 +503,12 @@ export const AppProvider = ({ children }) => {
       socket.on('newJobLead', () => fetchBookings());
       socket.on('bookingUpdated', () => fetchBookings());
       socket.on('bookingStatusChanged', () => fetchBookings());
+      // Refresh service catalog when a provider service is approved (active-specialist count changes)
+      socket.on('serviceApproved', () => fetchServices());
+      // Admin: refresh pending service requests when a new one arrives
+      if (currentUser?.role === 'admin') {
+        socket.on('newApprovalRequest', () => fetchProviderServiceRequests());
+      }
 
     socket.on('notification', (notif) => {
       if (notif.userId === currentUser.id) {
@@ -566,7 +618,7 @@ export const AppProvider = ({ children }) => {
         })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok) {
         fetchProviders(); // Refresh providers to show new rating
         fetchBookings(); // Refresh bookings to show reviewed status
       }
@@ -592,12 +644,12 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const updateProviderAvailability = async (providerId, availableDays, timeSlots) => {
+  const updateProviderAvailability = async (providerId, availableDays, timeSlots, availabilitySlots = []) => {
     try {
       const res = await api(`${API_BASE_URL}/providers/${providerId}/availability`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ availableDays, timeSlots })
+        body: JSON.stringify({ availableDays, timeSlots, availabilitySlots })
       });
       const data = await res.json();
       if (data.id) {
@@ -644,14 +696,30 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const toggleFavoriteProvider = (providerId) => {
-    setFavoriteProviders(prev => {
-      if (prev.includes(providerId)) {
-        return prev.filter(id => id !== providerId);
+  const toggleFavoriteProvider = async (providerId) => {
+    const isSaved = favoriteProviders.includes(providerId);
+    // Optimistic update
+    setFavoriteProviders(prev =>
+      isSaved ? prev.filter(id => id !== providerId) : [...prev, providerId]
+    );
+    try {
+      if (isSaved) {
+        await api(`${API_BASE_URL}/saved-pros/${providerId}`, { method: 'DELETE' });
       } else {
-        return [...prev, providerId];
+        await api(`${API_BASE_URL}/saved-pros`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providerId })
+        });
       }
-    });
+      await fetchSavedPros();
+    } catch (err) {
+      console.error('Failed to toggle saved pro:', err);
+      // Revert optimistic update on error
+      setFavoriteProviders(prev =>
+        isSaved ? [...prev, providerId] : prev.filter(id => id !== providerId)
+      );
+    }
   };
 
   const submitSupportTicket = async (ticketData) => {
@@ -700,6 +768,15 @@ export const AppProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await api(`${API_BASE_URL}/notifications/read-all`, { method: 'PATCH' });
+      setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
     }
   };
 
@@ -947,12 +1024,14 @@ export const AppProvider = ({ children }) => {
       submitSupportTicket,
       respondToTicket,
       markNotificationAsRead,
+      markAllNotificationsRead,
       clearNotifications,
       addSystemNotification,
       applyReferralCode,
       getCustomerLoyaltyTier,
       sendChatMessage,
       services,
+      searchServices,
       createService,
       updateService,
       deleteService,
@@ -968,6 +1047,8 @@ export const AppProvider = ({ children }) => {
       denyProviderServiceRequest,
       fetchProvidersByApprovedServiceName,
       fetchProviderAvailability,
+      savedProsData,
+      fetchSavedPros,
 
       // global async action spinner
       actionSpinner,

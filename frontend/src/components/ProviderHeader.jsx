@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ReputationBadgeStrip, VerificationLevelPill } from './ProviderReputation';
-
-const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL || 'https://servego-backend.onrender.com') + '/api';
+import { api } from '../utils/apiClient';
 
 function ServiceChip({ name }) {
   return (
@@ -27,8 +26,9 @@ export default function ProviderHeader({ provider, completedJobs = 0 }) {
       if (!isEnabled) return;
       setLoadingServices(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/providers/${providerId}/services`);
-        const data = await res.json();
+        const res = await api.get(`/providers/${providerId}/services`);
+        const data = res.data;
+        if (!res.ok) throw new Error(data?.message || 'Failed to load services');
         if (!alive) return;
         const arr = Array.isArray(data) ? data : [];
         setApprovedServices(arr.filter(s => s?.approvalStatus === 'APPROVED'));

@@ -66,28 +66,15 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   useEffect(() => {
     if (categoryMeta?.name) {
-      fetchProvidersByApprovedServiceName(categoryMeta.name);
+      fetchProvidersByApprovedServiceName(categoryMeta.name, { location: filterArea, sort: sortBy });
     }
-  }, [categoryMeta.name, fetchProvidersByApprovedServiceName]);
+  }, [categoryMeta.name, filterArea, sortBy, fetchProvidersByApprovedServiceName]);
 
-  // Filter & Sort logic
+  // Filtering and sorting are performed by the discovery API so results remain
+  // correct when a category has more providers than a single client payload.
   const categoryProviders = useMemo(() => {
-    let list = Array.isArray(providersByApprovedService) ? providersByApprovedService : [];
-
-    if (filterArea) {
-      list = list.filter(p => Array.isArray(p.serviceAreas) && p.serviceAreas.includes(filterArea));
-    }
-
-    switch (sortBy) {
-      case 'rating': list.sort((a, b) => b.rating - a.rating); break;
-      case 'experience': list.sort((a, b) => b.experienceYears - a.experienceYears); break;
-      case 'priceAsc': list.sort((a, b) => a.hourlyRate - b.hourlyRate); break;
-      case 'priceDesc': list.sort((a, b) => b.hourlyRate - a.hourlyRate); break;
-      default: break;
-    }
-
-    return list;
-  }, [providersByApprovedService, filterArea, sortBy]);
+    return Array.isArray(providersByApprovedService) ? providersByApprovedService : [];
+  }, [providersByApprovedService]);
 
   // Loyalty calculation
   const customerCompletedBookingsCount = useMemo(() => {
@@ -107,6 +94,12 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   const handleStartBooking = (prov) => {
     if (!currentUser) {
+      // Store booking intent so we can resume after login
+      sessionStorage.setItem('servego_booking_intent', JSON.stringify({
+        providerId: prov.id,
+        categoryName: categoryMeta.name,
+        catId
+      }));
       onNavigate('login');
       return;
     }
@@ -127,6 +120,38 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     setAddress('');
     setErrorText('');
   };
+
+  // Resume booking intent after login
+  useEffect(() => {
+    if (!currentUser) return;
+    const raw = sessionStorage.getItem('servego_booking_intent');
+    if (!raw) return;
+    try {
+      const intent = JSON.parse(raw);
+      if (intent.catId === catId && intent.providerId) {
+        const prov = categoryProviders.find(p => p.id === intent.providerId);
+        if (prov) {
+          sessionStorage.removeItem('servego_booking_intent');
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          setBookingDate(tomorrow.toISOString().split('T')[0]);
+          setBookingType('contract');
+          setBookingEndDate('');
+          setContractYears('0');
+          setContractDays('1');
+          setContractHours('0');
+          setPaymentMethod('UPI');
+          setAddress('');
+          setErrorText('');
+          setSelectedProvider(prov);
+          setBookingStep(1);
+        }
+      }
+    } catch {
+      sessionStorage.removeItem('servego_booking_intent');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, categoryProviders]);
 
   const handleCompleteCheckout = async (e) => {
     

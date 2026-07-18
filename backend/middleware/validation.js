@@ -44,7 +44,7 @@ export const registerValidation = [
   body('password')
     .notEmpty().withMessage('Please enter a password')
     .isLength({ min: 8, max: 128 }).withMessage('Password must be at least 8 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase letters and a number'),
+    .matches(/^(?=.*[a-z])(?=.*\d)/).withMessage('Password must contain a lowercase letter and a number'),
   body('confirmPassword')
     .notEmpty().withMessage('Please confirm your password'),
   body('role')
@@ -142,9 +142,6 @@ export const updateBookingStatusValidation = [
 // ==================== Review Validations ====================
 
 export const createReviewValidation = [
-  body('reviewerId')
-    .trim()
-    .notEmpty().withMessage('Reviewer ID is required'),
   body('reviewerName')
     .trim()
     .notEmpty().withMessage('Reviewer name is required')
@@ -157,8 +154,8 @@ export const createReviewValidation = [
     .trim()
     .notEmpty().withMessage('Provider ID is required'),
   body('bookingId')
-    .optional()
-    .trim(),
+    .trim()
+    .notEmpty().withMessage('Booking ID is required'),
   body('comment')
     .optional()
     .trim()

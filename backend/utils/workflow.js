@@ -1,7 +1,7 @@
 const BOOKING_TRANSITIONS = {
   PENDING: ['CONFIRMED', 'CANCELLED', 'REJECTED'],
-  CONFIRMED: ['ONGOING', 'CANCELLED'],
-  ONGOING: ['COMPLETED', 'CANCELLED'],
+  CONFIRMED: ['ONGOING', 'CANCELLED', 'REJECTED'],
+  ONGOING: ['COMPLETED', 'CANCELLED', 'REJECTED'],
   COMPLETED: [],
   CANCELLED: [],
   REJECTED: []
@@ -12,9 +12,10 @@ const STATUS_ALIASES = {
   CONFIRMED: ['CONFIRMED', 'ACCEPTED', 'APPROVED'],
   ONGOING: ['ONGOING', 'IN_PROGRESS', 'EN_ROUTE', 'WORK_IN_PROGRESS'],
   COMPLETED: ['COMPLETED', 'DONE', 'FINISHED', 'REVIEWED'],
-  CANCELLED: ['CANCELLED', 'CANCELED', 'REJECTED', 'DECLINED'],
-  REJECTED: ['REJECTED', 'DECLINED']
+  CANCELLED: ['CANCELLED', 'CANCELED', 'DECLINED'],
+  REJECTED: ['REJECTED']
 };
+
 
 export function normalizeBookingStatus(status) {
   const value = String(status || '').trim().toUpperCase();
@@ -23,6 +24,7 @@ export function normalizeBookingStatus(status) {
   const matched = Object.entries(STATUS_ALIASES).find(([, aliases]) => aliases.includes(value));
   return matched ? matched[0] : 'PENDING';
 }
+
 
 export function normalizePaymentStatus(status) {
   const value = String(status || '').trim().toUpperCase();

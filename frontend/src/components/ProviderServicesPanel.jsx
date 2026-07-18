@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Save } from 'lucide-react';
+import { api } from '../utils/apiClient';
 
 function FilterButton({ label, active, onClick }) {
   return (
@@ -41,9 +42,6 @@ export default function ProviderServicesPanel({ provider }) {
 
   const providerId = provider?.id;
 
-  const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL || 'https://servego-backend.onrender.com/api');
-
-
   const filteredServices = useMemo(() => {
     if (!Array.isArray(myServices)) return [];
 
@@ -77,9 +75,8 @@ export default function ProviderServicesPanel({ provider }) {
 
   const fetchAllServices = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/services`);
-      const data = await res.json();
-      setAllServices(Array.isArray(data) ? data : []);
+      const res = await api.get('/services');
+      setAllServices(res.ok && Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       setAllServices([]);
     }
@@ -90,22 +87,12 @@ export default function ProviderServicesPanel({ provider }) {
     if (!providerId) return;
     try {
       setLoadingMyServices(true);
-      const url = `${API_BASE_URL}/providers/${providerId}/services`;
-      console.log('[ProviderServicesPanel] GET', url);
-
-      const res = await fetch(url, { method: 'GET' });
-      const text = await res.text();
-
-      let data;
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = { raw: text };
-      }
+      const res = await api.get(`/providers/${providerId}/services`);
+      const data = res.data;
 
       if (!res.ok) {
         console.log('[ProviderServicesPanel] GET failed', res.status, data);
-        setServicesError(data?.error || `Failed to load your services. (${res.status})`);
+        setServicesError(data?.message || `Failed to load your services. (${res.status})`);
         setMyServices([]);
         return;
       }
@@ -165,25 +152,15 @@ export default function ProviderServicesPanel({ provider }) {
     setServicesError('');
 
     try {
-      const token = localStorage.getItem('servego_token');
-      const res = await fetch(`${API_BASE_URL}/providers/${providerId}/services/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
+      const res = await api.post(`/providers/${providerId}/services/register`, {
           serviceName: selectedName.trim(),
           description: description.trim(),
           popularIssues: [],
           experienceYears: Number(experienceYears ?? 0)
-        })
       });
-
-
-      const data = await res.json();
+      const data = res.data;
       if (!res.ok) {
-        setServicesError(data?.error || 'Failed to register service.');
+        setServicesError(data?.message || 'Failed to register service.');
         setSubmitting(false);
         return;
       }

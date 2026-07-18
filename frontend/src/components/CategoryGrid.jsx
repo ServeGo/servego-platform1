@@ -3,6 +3,9 @@ import { ChevronRight } from 'lucide-react';
 import CategoryIcon from './CategoryIcon';
 
 export default function CategoryGrid({ categories, providers, onCategoryClick, onSeeAll }) {
+  // `categories` may come from static data.js (home page) or live API services.
+  // Live API services include `activeSpecialistCount` derived server-side.
+  // Static entries fall back to counting from the providers list.
   const safeProviders = Array.isArray(providers) ? providers : [];
   const safeCategories = Array.isArray(categories) ? categories : [];
   return (
@@ -25,14 +28,17 @@ export default function CategoryGrid({ categories, providers, onCategoryClick, o
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {safeCategories.map((cat) => {
-          const pCount = safeProviders.filter(
-            (p) => (p.category || '').toLowerCase() === cat.name.toLowerCase() && p.isVerified
-          ).length;
+          // Prefer server-derived count; fall back to client-side count for static entries
+          const activeCount = typeof cat.activeSpecialistCount === 'number'
+            ? cat.activeSpecialistCount
+            : safeProviders.filter(
+                (p) => (p.category || '').toLowerCase() === (cat.name || '').toLowerCase() && p.isVerified
+              ).length;
           
           return (
             <div 
               key={cat.id}
-              onClick={() => onCategoryClick(cat.id)}
+              onClick={() => onCategoryClick(cat.name || cat.id)}
               className="bg-white p-6 rounded-2xl border border-slate-200 hover:border-teal-300 hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
@@ -44,8 +50,8 @@ export default function CategoryGrid({ categories, providers, onCategoryClick, o
               </div>
               
               <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs mt-4">
-                <span className="text-slate-500 font-medium">{pCount} Active Specialists</span>
-                <span className="text-teal-700 font-extrabold">Starts from ₹{cat.basePrice}</span>
+                <span className="text-slate-500 font-medium">{activeCount} Active Specialists</span>
+                {cat.basePrice && <span className="text-teal-700 font-extrabold">Starts from ₹{cat.basePrice}</span>}
               </div>
             </div>
           );

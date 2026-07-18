@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { CITIES } from '../data';
-import { normalizeProviderIsVerified, isOpenTicket } from '../utils/normalizeAdminData';
+import { isOpenTicket } from '../utils/normalizeAdminData';
 
 
 const normalize = (s) => (s || '').toString().trim().toLowerCase();
@@ -84,8 +84,8 @@ export function useAdminPanelController() {
   }, [bookings, platformCommission]);
 
   const pendingPartnersCount = useMemo(() => {
-    return (providers || []).filter((p) => !normalizeProviderIsVerified(p)).length;
-  }, [providers]);
+    return (Array.isArray(providerServiceRequests) ? providerServiceRequests : []).filter(r => r.status === 'PENDING').length;
+  }, [providerServiceRequests]);
 
   const activeTicketsCount = useMemo(() => {
     return (Array.isArray(tickets) ? tickets : []).filter((t) => isOpenTicket(t)).length;
@@ -112,6 +112,10 @@ export function useAdminPanelController() {
 
   const partnerCountForService = (serviceName) => {
     const sn = normalize(serviceName);
+    const svc = (Array.isArray(services) ? services : []).find(s => normalize(s.name) === sn);
+    // Prefer the derived activeSpecialistCount from the backend (correct per spec)
+    if (svc && typeof svc.activeSpecialistCount === 'number') return svc.activeSpecialistCount;
+    // Fallback: count providers whose category matches
     return (providers || []).filter((p) => normalize(p.category) === sn).length;
   };
 

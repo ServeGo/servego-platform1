@@ -29,7 +29,10 @@ async function clearDatabase() {
   // Delete in FK-safe order.
   await prisma.payment.deleteMany();
   await prisma.review.deleteMany();
+  await prisma.bookingEvent.deleteMany();
   await prisma.booking.deleteMany();
+  await prisma.savedPro.deleteMany();
+  await prisma.availabilitySlot.deleteMany();
   await prisma.providerService.deleteMany();
   await prisma.providerServiceRequest.deleteMany();
   await prisma.providerBadge.deleteMany();
@@ -52,6 +55,7 @@ async function createAdmin() {
       role: 'admin',
       password,
       status: 'ACTIVE',
+      profileComplete: true,
       avatar: avatarFor('ServeGo Admin'),
       referralCode: 'SERVEGO-ADMIN-001',
       referralsCount: 0,
@@ -64,7 +68,7 @@ async function createAdmin() {
  * Create a provider (User + Provider profile) and link it to one bookable
  * Service so it shows up in customer-facing category discovery.
  */
-async function createProvider({ name, email, phone, serviceName, serviceId, rating, reviewCount, experienceYears, jobsCompleted, verificationLevel, isFeatured, specialties }) {
+async function createProvider({ name, email, phone, serviceName, serviceId, rating, reviewCount, experienceYears, jobsCompleted, verificationLevel, isFeatured, specialties, accountStatus = 'ACTIVE', serviceApprovalStatus = 'APPROVED' }) {
   const password = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const user = await prisma.user.create({
@@ -75,6 +79,7 @@ async function createProvider({ name, email, phone, serviceName, serviceId, rati
       role: 'provider',
       password,
       status: 'ACTIVE',
+      profileComplete: true,
       avatar: avatarFor(name),
       referralCode: `SERVEGO-PRO-${name.substring(0, 3).toUpperCase().replace(/\s/g, 'X')}${Math.floor(10 + Math.random() * 90)}`,
     },
@@ -94,6 +99,8 @@ async function createProvider({ name, email, phone, serviceName, serviceId, rati
       serviceAreas: HYD_AREAS,
       photo: null,
       serviceInterested: serviceName,
+      accountStatus,
+      profileComplete: true,
       isVerified: true,
       isFeatured,
       availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -103,13 +110,33 @@ async function createProvider({ name, email, phone, serviceName, serviceId, rati
 
   await prisma.user.update({ where: { id: user.id }, data: { providerId: provider.id } });
 
-  // Approved service link => provider becomes discoverable/bookable for this service.
-  await prisma.providerService.create({
-    data: {
-      providerId: provider.id,
-      serviceId,
-      description: `${serviceName} services including diagnosis, repair, installation and routine maintenance.`,
-    },
+  if (serviceApprovalStatus === 'APPROVED') {
+    // An approved service link makes an active provider discoverable/bookable.
+    await prisma.providerService.create({
+      data: {
+        providerId: provider.id,
+        serviceId,
+        description: `${serviceName} services including diagnosis, repair, installation and routine maintenance.`,
+      },
+    });
+  } else {
+    await prisma.providerServiceRequest.create({
+      data: {
+        providerId: provider.id,
+        requestedServiceName: serviceName,
+        requestedServiceId: serviceId,
+        description: `${serviceName} registration awaiting admin review.`,
+        experienceYears,
+        status: serviceApprovalStatus,
+      },
+    });
+  }
+
+  await prisma.availabilitySlot.createMany({
+    data: [
+      { providerId: provider.id, dayOfWeek: 'MONDAY', startTime: '09:00', endTime: '17:00' },
+      { providerId: provider.id, dayOfWeek: 'WEDNESDAY', startTime: '09:00', endTime: '17:00' },
+    ],
   });
 
   return { user, provider };
@@ -125,6 +152,7 @@ async function createCustomer({ name, email, phone, address, pincode }) {
       role: 'customer',
       password,
       status: 'ACTIVE',
+      profileComplete: true,
       avatar: avatarFor(name),
       address,
       pincode,
@@ -182,8 +210,8 @@ async function main() {
 
   const providerSpecs = [
     { name: 'Srinivas Rao Electricals', email: 'srinivas.electrician@servego.com', phone: '9876500001', serviceName: 'Electrician', serviceId: 'electrician', rating: 4.8, reviewCount: 124, experienceYears: 9, jobsCompleted: 540, verificationLevel: 'GOLD', isFeatured: true, specialties: ['Wiring & Rewiring', 'Smart Switchboards', 'Inverter Setup'] },
-    { name: 'Rahim Electronics', email: 'rahim.electrician@servego.com', phone: '9876500002', serviceName: 'Electrician', serviceId: 'electrician', rating: 4.5, reviewCount: 67, experienceYears: 6, jobsCompleted: 310, verificationLevel: 'SILVER', isFeatured: false, specialties: ['Appliance Wiring', 'Lighting', 'Fault Diagnosis'] },
-    { name: 'Sanjay Kumar Plumbing', email: 'sanjay.plumber@servego.com', phone: '9876500003', serviceName: 'Plumber', serviceId: 'plumber', rating: 4.9, reviewCount: 98, experienceYears: 11, jobsCompleted: 612, verificationLevel: 'GOLD', isFeatured: true, specialties: ['Leak Detection', 'Bathroom Fittings', 'Pipe Replacement'] },
+    { name: 'Rahim Electronics', email: 'rahim.electrician@servego.com', phone: '9876500002', serviceName: 'Electrician', serviceId: 'electrician', rating: 4.5, reviewCount: 67, experienceYears: 6, jobsCompleted: 310, verificationLevel: 'SILVER', isFeatured: false, specialties: ['Appliance Wiring', 'Lighting', 'Fault Diagnosis'], serviceApprovalStatus: 'PENDING' },
+    { name: 'Sanjay Kumar Plumbing', email: 'sanjay.plumber@servego.com', phone: '9876500003', serviceName: 'Plumber', serviceId: 'plumber', rating: 4.9, reviewCount: 98, experienceYears: 11, jobsCompleted: 612, verificationLevel: 'GOLD', isFeatured: true, specialties: ['Leak Detection', 'Bathroom Fittings', 'Pipe Replacement'], accountStatus: 'ON_HOLD' },
     { name: 'Reddy Plumbing Services', email: 'reddy.plumber@servego.com', phone: '9876500004', serviceName: 'Plumber', serviceId: 'plumber', rating: 4.4, reviewCount: 41, experienceYears: 5, jobsCompleted: 188, verificationLevel: 'BRONZE', isFeatured: false, specialties: ['Blockage Removal', 'Tap Repair', 'Motor Installation'] },
     { name: 'Apex Aircon Solutions', email: 'apex.acrepair@servego.com', phone: '9876500005', serviceName: 'AC Repair', serviceId: 'ac-repair', rating: 4.7, reviewCount: 76, experienceYears: 8, jobsCompleted: 402, verificationLevel: 'GOLD', isFeatured: true, specialties: ['Jet Cleaning', 'Gas Refilling', 'Compressor Repair'] },
     { name: 'Sparkle Home Cleaners', email: 'sparkle.cleaning@servego.com', phone: '9876500006', serviceName: 'Home Cleaning', serviceId: 'home-cleaning', rating: 4.6, reviewCount: 53, experienceYears: 4, jobsCompleted: 233, verificationLevel: 'SILVER', isFeatured: false, specialties: ['Deep Cleaning', 'Kitchen Cleaning', 'Sofa Shampoo'] },

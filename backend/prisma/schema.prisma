@@ -24,6 +24,7 @@ model User {
   referralDiscountBalance Float          @default(0)
   referralBonusEarned     Float          @default(0)
   providerId              String?
+  profileComplete         Boolean        @default(false)
 
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
@@ -42,6 +43,7 @@ model User {
   providerProfile         Provider?
   customerProfile         Customer?
   reviews                 Review[]       @relation("ReviewerReviews")
+  savedPros               SavedPro[]
 }
 
 model Customer {
@@ -57,14 +59,15 @@ model Customer {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  message   String
-  type      String   @default("SYSTEM")
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String
+  title            String
+  message          String
+  type             String   @default("SYSTEM")
+  isRead           Boolean  @default(false)
+  relatedBookingId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Indexes for common queries
   @@index([userId])
@@ -76,20 +79,23 @@ model Notification {
 }
 
 model Ticket {
-  id             String       @id @default(cuid())
-  requesterName  String
-  requesterEmail String
-  subject        String
-  message        String
-  status         TicketStatus @default(OPEN)
-  adminResponse  String?
-  resolvedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String       @id @default(cuid())
+  userId           String?
+  requesterName    String
+  requesterEmail   String
+  subject          String
+  message          String
+  status           TicketStatus @default(OPEN)
+  adminResponse    String?
+  relatedBookingId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   // Indexes for common queries
   @@index([status])
   @@index([requesterEmail])
+  @@index([userId])
   @@index([createdAt])
 }
 
@@ -112,6 +118,8 @@ model Provider {
   rating            Float     @default(0)
   reviewCount       Int       @default(0)
   verificationLevel VerificationLevel @default(BRONZE)
+  accountStatus     ProviderAccountStatus @default(ACTIVE)
+  profileComplete   Boolean   @default(false)
 
   experienceYears   Int       @default(3)
   jobsCompleted     Int       @default(0)
@@ -139,9 +147,11 @@ model Provider {
   user              User      @relation(fields: [userId], references: [id])
   reviews           Review[]  @relation("ProviderReviews")
   badges            ProviderBadge[]
+  savedByCustomers  SavedPro[]
 
   providerServices        ProviderService[]
   providerServiceRequests ProviderServiceRequest[]
+  availabilitySlots       AvailabilitySlot[]
 }
 
 model ProviderBadge {
@@ -201,7 +211,9 @@ model ProviderServiceRequest {
   popularIssues        Json          @default("[]")
   experienceYears      Int?
   status                ApprovalStatus @default(PENDING)
-  denialReason         String? // reason when admin denies
+  denialReason         String?
+  reviewedBy           String?
+  reviewedAt           DateTime?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
@@ -224,6 +236,15 @@ model Booking {
   locationAddress String
   city            String
   instructions    String?
+
+  cancelledBy     String?
+  cancelledReason String?
+  scheduledStart  DateTime?
+  durationType    DurationType  @default(CONTRACT)
+  durationYears   Int           @default(0)
+  durationDays    Int           @default(1)
+  durationHours   Int           @default(0)
+  amount          Float?
 
   bookingTime     DateTime
   messages        Json          @default("[]")
@@ -248,6 +269,22 @@ model Booking {
   service         Service?      @relation(fields: [serviceId], references: [id])
   payment         Payment?
   reviews         Review[]
+  events          BookingEvent[]
+}
+
+model BookingEvent {
+  id         String   @id @default(cuid())
+  bookingId  String
+  actorRole  String
+  actorId    String?
+  action     String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId])
+  @@index([createdAt])
 }
 
 model Review {
@@ -264,6 +301,8 @@ model Review {
   booking         Booking? @relation(fields: [bookingId], references: [id])
   provider        Provider @relation("ProviderReviews", fields: [providerId], references: [id])
   reviewer        User     @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+
+  @@unique([bookingId])
 }
 
 model Payment {
@@ -290,6 +329,8 @@ enum AccountStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  ON_HOLD
+  BLOCKED
 }
 
 enum AuthEventType {
@@ -323,6 +364,12 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   DENIED
+  REJECTED
+}
+
+enum DurationType {
+  CONTRACT
+  PERMANENT
 }
 
 enum VerificationLevel {
@@ -330,6 +377,39 @@ enum VerificationLevel {
   SILVER
   GOLD
   ELITE
+}
+
+enum ProviderAccountStatus {
+  ACTIVE
+  ON_HOLD
+  BLOCKED
+}
+
+model AvailabilitySlot {
+  id         String   @id @default(cuid())
+  providerId String
+  dayOfWeek  String
+  startTime  String
+  endTime    String
+
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  @@unique([providerId, dayOfWeek, startTime])
+  @@index([providerId])
+}
+
+model SavedPro {
+  id         String   @id @default(cuid())
+  customerId String
+  providerId String
+  createdAt  DateTime @default(now())
+
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, providerId])
+  @@index([customerId])
+  @@index([providerId])
 }
 
 enum BadgeType {

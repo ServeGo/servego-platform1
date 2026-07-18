@@ -4,9 +4,15 @@ import { notifyPaymentReceived } from '../services/notificationService.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const PaymentController = {
+  webhook: async (_req, res) => {
+    // Accepting unsigned callbacks would let callers alter payment state.
+    return sendApiError(res, 501, 'PAYMENT_GATEWAY_UNAVAILABLE', 'No payment gateway webhook is configured.');
+  },
+
   getAll: async (req, res) => {
     try {
       const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
+      if (req.query.bookingId) where.bookingId = String(req.query.bookingId);
       const payments = await prisma.payment.findMany({ where, include: { booking: true, user: true } });
       return sendApiSuccess(res, 200, payments);
     } catch (err) {
@@ -27,6 +33,11 @@ export const PaymentController = {
         return sendApiError(res, 403, 'FORBIDDEN', 'You are not allowed to process this payment.');
       }
 
+      const normalizedMethod = String(paymentMethod).trim().toUpperCase();
+      if (['UPI', 'CARD', 'CARDS'].includes(normalizedMethod)) {
+        return sendApiError(res, 501, 'PAYMENT_GATEWAY_UNAVAILABLE', 'UPI and card payments are not available until a payment gateway is configured. Choose Cash After Job.');
+      }
+
       const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
       if (!booking) return sendApiError(res, 404, 'NOT_FOUND', 'Booking not found.');
 
@@ -39,7 +50,7 @@ export const PaymentController = {
         data: {
           bookingId,
           userId,
-          paymentMethod,
+          paymentMethod: normalizedMethod,
           status: normalizedStatus,
           transactionId,
           paidAt: normalizedStatus === 'PAID' ? new Date() : null
@@ -48,7 +59,7 @@ export const PaymentController = {
 
       await prisma.booking.update({
         where: { id: bookingId },
-        data: { paymentStatus: normalizedStatus, paymentMethod }
+        data: { paymentStatus: normalizedStatus, paymentMethod: normalizedMethod }
       });
 
       if (normalizedStatus === 'PAID') {

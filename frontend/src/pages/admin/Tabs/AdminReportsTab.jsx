@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 
-const API_BASE_URL = import.meta?.env?.VITE_API_BASE_URL || import.meta?.env?.VITE_API_URL || 'https://servego-backend.onrender.com/api';
-const getToken = () => { try { return localStorage.getItem('servego_token'); } catch { return null; } };
-
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 export default function AdminReportsTab() {
@@ -13,21 +10,10 @@ export default function AdminReportsTab() {
   const [tab, setTab] = useState('bookings'); // bookings | providers | audit
 
   useEffect(() => {
-    // Backend currently doesn't expose this route on Render.
-    // Avoid repeated failing network calls that spam the console.
-    return;
-
-    fetch(`${API_BASE_URL}/admin/audit-logs`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    })
-      .then(async (r) => {
-        // If endpoint isn't implemented on the backend, keep UI functional.
-        if (!r.ok) return [];
-        const json = await r.json();
-        return Array.isArray(json) ? json : (json?.data || []);
-      })
-      .then((d) => { setAuditLogs(Array.isArray(d) ? d : []); setAuditLoading(false); })
-      .catch(() => setAuditLoading(false));
+    // Audit events are not exposed by this backend yet. Keep the report tab
+    // usable rather than leaving it in a permanent loading state.
+    setAuditLogs([]);
+    setAuditLoading(false);
   }, []);
 
   const tabs = [

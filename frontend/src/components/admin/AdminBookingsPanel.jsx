@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Search, X, Clock } from 'lucide-react';
+import { api } from '../../utils/apiClient';
 
 const STATUS_BADGES = {
-  pending: { label: 'Awaiting partner', cls: 'bg-amber-150 text-amber-800 border-amber-300' },
-  confirmed: { label: 'Dispatch set', cls: 'bg-indigo-50 text-indigo-850 border-indigo-200' },
-  ongoing: { label: 'Transit diagnostics', cls: 'bg-purple-100 text-purple-800 border-purple-200' },
-  completed: { label: 'Settled', cls: 'bg-emerald-50 text-emerald-800 border-emerald-250' },
+  pending: { label: 'Awaiting partner', cls: 'bg-amber-50 text-amber-800 border-amber-300' },
+  confirmed: { label: 'Dispatch set', cls: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  ongoing: { label: 'In progress', cls: 'bg-purple-100 text-purple-800 border-purple-200' },
+  completed: { label: 'Settled', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
   cancelled: { label: 'Cancelled', cls: 'bg-rose-50 text-rose-800 border-rose-200' },
 };
 
 function StatusBadge({ status }) {
-  const meta = STATUS_BADGES[status];
-  if (!meta) return null;
+  const key = (status || '').toLowerCase();
+  const meta = STATUS_BADGES[key];
+  if (!meta) return <span className="text-slate-400 text-[9px] uppercase font-bold">{status}</span>;
   return (
     <span className={`${meta.cls} border px-2 py-0.5 rounded text-[9px] font-extrabold uppercase`}>
       {meta.label}
@@ -18,58 +21,203 @@ function StatusBadge({ status }) {
   );
 }
 
-function CancelAction({ bk, onOverrideCancel }) {
-  if (bk.status !== 'completed' && bk.status !== 'cancelled') {
-    return (
-      <button
-        onClick={() => onOverrideCancel(bk.id)}
-        className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold p-1 px-3 text-[10px] rounded-lg transition-colors cursor-pointer"
-      >
-        Overrule Cancel
-      </button>
-    );
-  }
-  return <span className="text-slate-400 text-[10px] italic">No active override</span>;
+function TimelineModal({ bookingId, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.get(`/bookings/${bookingId}/timeline`)
+      .then(res => {
+        if (cancelled) return;
+        if (res.ok) setData(res.data);
+        else setError(res.data?.message || 'Failed to load timeline.');
+      })
+      .catch(() => { if (!cancelled) setError('Network error.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [bookingId]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-extrabold text-slate-900">Booking Timeline</h3>
+            <p className="text-[11px] text-slate-500 font-mono mt-0.5">{bookingId}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5">
+          {loading && <p className="text-xs text-slate-400 text-center py-8">Loading timeline...</p>}
+          {error && <p className="text-xs text-rose-600 font-semibold">{error}</p>}
+          {data && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Customer</span>
+                  <span className="font-bold text-slate-800">{data.customer?.name || '—'}</span>
+                  <span className="block text-slate-500 text-[10px]">{data.customer?.email}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Provider</span>
+                  <span className="font-bold text-slate-800">{data.provider?.name || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Service</span>
+                  <span className="font-bold text-slate-800">{data.serviceCategory}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Current Status</span>
+                  <StatusBadge status={data.currentStatus} />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[9px] uppercase font-bold text-slate-400 block mb-3">Event Log</span>
+                {(!data.timeline || data.timeline.length === 0) ? (
+                  <p className="text-xs text-slate-400 italic">No events recorded.</p>
+                ) : (
+                  <ol className="relative border-l border-slate-200 space-y-4 ml-2">
+                    {data.timeline.map((event, i) => (
+                      <li key={i} className="ml-4">
+                        <span className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full bg-teal-500 border-2 border-white" />
+                        <div className="flex items-start gap-2">
+                          <Clock className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" />
+                          <div>
+                            <span className="text-[10px] font-extrabold uppercase text-slate-700">{event.status}</span>
+                            {event.note && <p className="text-[11px] text-slate-500 mt-0.5">{event.note}</p>}
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {event.timestamp ? new Date(event.timestamp).toLocaleString() : ''}
+                            </p>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminBookingsPanel({ bookings, onOverrideCancel }) {
+  const [searchId, setSearchId] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [timelineBookingId, setTimelineBookingId] = useState(null);
+
+  const filtered = React.useMemo(() => {
+    let arr = Array.isArray(bookings) ? bookings : [];
+    if (searchId.trim()) {
+      const q = searchId.trim().toLowerCase();
+      arr = arr.filter(bk =>
+        bk.id?.toLowerCase().includes(q) ||
+        bk.customerName?.toLowerCase().includes(q) ||
+        bk.providerName?.toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter !== 'all') {
+      arr = arr.filter(bk => (bk.status || '').toLowerCase() === statusFilter);
+    }
+    return arr;
+  }, [bookings, searchId, statusFilter]);
+
+  const STATUS_FILTERS = ['all', 'pending', 'confirmed', 'ongoing', 'completed', 'cancelled'];
+
   return (
     <div className="space-y-6">
+      {timelineBookingId && (
+        <TimelineModal bookingId={timelineBookingId} onClose={() => setTimelineBookingId(null)} />
+      )}
+
       <div>
-        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Global Transaction Escrows list</h2>
-        <p className="text-slate-500 text-xs">Live dispatch tracker, schedule audits, security escrow validations, and order cancellations.</p>
+        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Global Transaction Escrows</h2>
+        <p className="text-slate-500 text-xs">Live dispatch tracker, schedule audits, and order cancellations. Search by Booking ID to view the full event timeline.</p>
       </div>
 
-      {/* Desktop / tablet table */}
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+          <input
+            value={searchId}
+            onChange={e => setSearchId(e.target.value)}
+            placeholder="Search by Booking ID, customer, provider..."
+            className="w-full bg-slate-50 border border-slate-200 focus:border-teal-500 rounded-xl pl-9 pr-3 py-2 text-xs font-bold outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {STATUS_FILTERS.map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border transition-colors ${statusFilter === s ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop table */}
       <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-semibold">
             <thead>
               <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px] bg-slate-50/50">
-                <th className="py-3 px-6">Code ID</th>
-                <th className="py-3 px-6">Customer Representative</th>
-                <th className="py-3 px-6">Allocated Specialist</th>
-                <th className="py-3 px-6">Schedule detail</th>
-                <th className="py-3 px-6">Safety status</th>
-                <th className="py-3 px-6 text-center">Operational action</th>
+                <th className="py-3 px-5">Code ID</th>
+                <th className="py-3 px-5">Customer</th>
+                <th className="py-3 px-5">Specialist</th>
+                <th className="py-3 px-5">Schedule</th>
+                <th className="py-3 px-5">Status</th>
+                <th className="py-3 px-5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-150 text-slate-700">
-              {bookings.map((bk) => (
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-xs text-slate-400 italic">No bookings match your filter.</td>
+                </tr>
+              )}
+              {filtered.map(bk => (
                 <tr key={bk.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-4 px-6 font-mono font-bold text-slate-900">{bk.id}</td>
-                  <td className="py-4 px-6">
-                    <span className="text-slate-950 block font-extrabold text-sm leading-tight">{bk.customerName}</span>
-                    <span className="text-[10px] text-slate-400 font-normal font-mono">{bk.customerPhone}</span>
+                  <td className="py-4 px-5 font-mono font-bold text-slate-900 text-[11px]">{bk.id}</td>
+                  <td className="py-4 px-5">
+                    <span className="text-slate-950 block font-extrabold leading-tight">{bk.customerName}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{bk.customerPhone}</span>
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-4 px-5">
                     <span className="text-slate-900 block font-extrabold leading-tight">{bk.providerName}</span>
-                    <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">{bk.serviceCategory} Division</span>
+                    <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">{bk.serviceCategory}</span>
                   </td>
-                  <td className="py-4 px-6">{bk.bookingDateLabel || bk.bookingDate} • {bk.bookingTimeSlot}</td>
-                  <td className="py-4 px-6"><StatusBadge status={bk.status} /></td>
-                  <td className="py-4 px-6 text-center">
-                    <CancelAction bk={bk} onOverrideCancel={onOverrideCancel} />
+                  <td className="py-4 px-5">{bk.bookingDateLabel || bk.bookingDate} · {bk.bookingTimeSlot}</td>
+                  <td className="py-4 px-5"><StatusBadge status={bk.status} /></td>
+                  <td className="py-4 px-5 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => setTimelineBookingId(bk.id)}
+                        className="bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 font-bold px-3 py-1.5 text-[10px] rounded-lg transition-colors"
+                      >
+                        Timeline
+                      </button>
+                      {bk.status !== 'completed' && bk.status !== 'cancelled' && (
+                        <button
+                          onClick={() => onOverrideCancel(bk.id)}
+                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 text-[10px] rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -78,12 +226,12 @@ export default function AdminBookingsPanel({ bookings, onOverrideCancel }) {
         </div>
       </div>
 
-      {/* Mobile stacked cards */}
+      {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {bookings.length === 0 && (
-          <p className="text-xs text-slate-400 italic text-center py-8">No bookings on record.</p>
+        {filtered.length === 0 && (
+          <p className="text-xs text-slate-400 italic text-center py-8">No bookings match your filter.</p>
         )}
-        {bookings.map((bk) => (
+        {filtered.map(bk => (
           <div key={bk.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
             <div className="flex items-center justify-between gap-2">
               <span className="font-mono font-bold text-slate-900 text-xs">{bk.id}</span>
@@ -91,21 +239,33 @@ export default function AdminBookingsPanel({ bookings, onOverrideCancel }) {
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
               <div>
-                <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Customer</span>
+                <span className="block text-[9px] uppercase font-bold text-slate-400">Customer</span>
                 <span className="font-extrabold text-slate-900">{bk.customerName}</span>
-                <span className="block text-[10px] text-slate-400 font-mono">{bk.customerPhone}</span>
               </div>
               <div>
-                <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Specialist</span>
+                <span className="block text-[9px] uppercase font-bold text-slate-400">Specialist</span>
                 <span className="font-extrabold text-slate-900">{bk.providerName}</span>
                 <span className="block text-[10px] text-indigo-700 font-bold uppercase">{bk.serviceCategory}</span>
               </div>
             </div>
             <div className="mt-3 text-[11px] text-slate-600 font-semibold">
-              {bk.bookingDateLabel || bk.bookingDate} • {bk.bookingTimeSlot}
+              {bk.bookingDateLabel || bk.bookingDate} · {bk.bookingTimeSlot}
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
-              <CancelAction bk={bk} onOverrideCancel={onOverrideCancel} />
+            <div className="mt-3 pt-3 border-t border-slate-100 flex gap-2 justify-end">
+              <button
+                onClick={() => setTimelineBookingId(bk.id)}
+                className="bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 font-bold px-3 py-1.5 text-[10px] rounded-lg"
+              >
+                Timeline
+              </button>
+              {bk.status !== 'completed' && bk.status !== 'cancelled' && (
+                <button
+                  onClick={() => onOverrideCancel(bk.id)}
+                  className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 text-[10px] rounded-lg"
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
         ))}

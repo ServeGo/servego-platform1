@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 
 // Components
@@ -12,12 +12,36 @@ export const Services = ({ onNavigate }) => {
     searchQuery,
     setSearchQuery,
     setCategory,
-    providers,
     selectedArea,
-    services
+    setArea,
+    searchServices
   } = useApp();
 
   const [inputSearch, setInputSearch] = useState(searchQuery);
+  const [results, setResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // On mount: read ?query= and ?location= from URL and seed the search state
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlQuery = params.get('query') || '';
+    setInputSearch(urlQuery);
+    setSearchQuery(urlQuery);
+    setArea(params.get('location') || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    searchServices(searchQuery, selectedArea).then((data) => {
+      if (!cancelled) {
+        setResults(data);
+        setIsLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [searchQuery, selectedArea, searchServices]);
 
   // Live filtering: every keystroke updates the searchQuery
   const handleSearchChange = (value) => {
@@ -27,26 +51,12 @@ export const Services = ({ onNavigate }) => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    // no-op (filtering already happens on change)
+    const params = new URLSearchParams();
+    if (inputSearch.trim()) params.set('query', inputSearch.trim());
+    if (selectedArea) params.set('location', selectedArea);
+    window.history.replaceState({}, '', `/services${params.toString() ? `?${params}` : ''}`);
+    setSearchQuery(inputSearch);
   };
-
-  const filteredCategories = useMemo(() => {
-    const list = Array.isArray(services) ? services : [];
-
-    return list.filter((cat) => {
-      // Hide logic (backend returns boolean, but handle both boolean/1 for safety)
-      const isHidden = cat.isHidden === true || cat.isHidden === 1;
-      if (isHidden) return false;
-
-      const matchSearch =
-        (cat.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (cat.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (Array.isArray(cat.popularIssues) ? cat.popularIssues : [])
-          .some((issue) => (issue || '').toLowerCase().includes(searchQuery.toLowerCase()));
-
-      return matchSearch;
-    });
-  }, [services, searchQuery]);
 
   const handleSelectCategory = (catId) => {
     setCategory(catId);
@@ -69,7 +79,9 @@ export const Services = ({ onNavigate }) => {
           onSearchChange={handleSearchChange}
         />
 
-        {filteredCategories.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-20 text-sm font-semibold text-slate-500">Loading services…</div>
+        ) : results.length === 0 && searchQuery.trim() ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-xs max-w-xl mx-auto">
             <h3 className="text-xl font-bold text-slate-900">No Services Match "{searchQuery}"</h3>
             <p className="text-slate-500 text-sm mt-2">Try querying something else, like 'electrician' or 'AC repair'.</p>
@@ -83,13 +95,18 @@ export const Services = ({ onNavigate }) => {
               Reset Search Filter
             </button>
           </div>
+        ) : results.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-xs max-w-xl mx-auto">
+            <h3 className="text-xl font-bold text-slate-900">No Services Available</h3>
+            <p className="text-slate-500 text-sm mt-2">Check back soon — new services are being added.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCategories.map((cat) => (
+            {results.map((cat) => (
               <ServiceCard
                 key={cat.id}
                 category={cat}
-                providers={providers}
+                providers={[]}
                 onSelect={(id) => handleSelectCategory(id)}
                 onIssueClick={handleIssueClick}
               />

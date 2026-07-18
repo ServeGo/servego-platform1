@@ -39,8 +39,10 @@ export const generalRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for health check endpoints
-    return req.path === '/api/health';
+    // Dashboard and catalog reads are frequent (initial hydration, socket
+    // refreshes and polling) and must not consume the write-abuse budget.
+    // Auth, booking and review routes retain their own stricter limiters.
+    return req.path === '/api/health' || ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
   }
 });
 
@@ -57,8 +59,7 @@ export const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    // Use IP address as the key, or combined with email for more granular control
-    return req.ip || req.connection.remoteAddress || 'unknown';
+    return req.ip || req.socket?.remoteAddress || 'unknown';
   }
 });
 
@@ -91,6 +92,16 @@ export const reviewRateLimiter = rateLimit({
     message: 'Too many review submissions. Please wait before submitting another review.',
     retryAfter: '1 minute'
   },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Public contact forms are intentionally available without a JWT and need a
+// dedicated abuse budget separate from authenticated API traffic.
+export const supportTicketRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.SUPPORT_TICKET_RATE_LIMIT_MAX || '5', 10),
+  message: { success: false, code: 'SUPPORT_TICKET_RATE_LIMIT_EXCEEDED', message: 'Too many support requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false
 });

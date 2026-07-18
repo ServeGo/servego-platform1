@@ -2,6 +2,24 @@ import prisma from '../prisma/client.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const ProviderServiceDiscoveryController = {
+  getApprovedProvidersByCategory: async (req, res) => {
+    const slugName = String(req.params.slug || '').replace(/-/g, ' ').trim();
+    const normalized = slugName.toLowerCase();
+    const service = await prisma.service.findFirst({
+      where: {
+        isHidden: false,
+        OR: [
+          { nameNormalized: normalized },
+          { name: { equals: slugName, mode: 'insensitive' } }
+        ]
+      },
+      select: { name: true }
+    });
+    if (!service) return sendApiError(res, 404, 'NOT_FOUND', 'Service category not found.');
+    req.query = { ...req.query, serviceName: service.name, location: req.query.zone || req.query.location || '' };
+    return ProviderServiceDiscoveryController.getApprovedProvidersByServiceName(req, res);
+  },
+
   getApprovedProvidersByServiceName: async (req, res) => {
     try {
       const rawServiceName = req.query?.serviceName;
@@ -10,6 +28,16 @@ export const ProviderServiceDiscoveryController = {
       }
 
       const serviceName = String(rawServiceName).trim();
+      const location = String(req.query?.location || '').trim();
+      const sort = String(req.query?.sort || 'rating').trim();
+
+      const orderBy = sort === 'experience'
+        ? { experienceYears: 'desc' }
+        : sort === 'priceAsc' || sort === 'priceDesc'
+          // A provider rate is not modelled yet, so keep the API ordering stable
+          // until Part 3 introduces the payment/rate source of truth.
+          ? { rating: 'desc' }
+          : { rating: 'desc' };
 
       const providerServices = await prisma.providerService.findMany({
         where: {
@@ -17,12 +45,13 @@ export const ProviderServiceDiscoveryController = {
             name: { equals: serviceName, mode: 'insensitive' }
           },
           provider: {
+            accountStatus: 'ACTIVE',
             isVerified: true,
-            user: {
-              status: 'ACTIVE'
-            }
+            user: { status: 'ACTIVE' },
+            ...(location ? { serviceAreas: { array_contains: location } } : {})
           }
         },
+        orderBy: { provider: orderBy },
         include: {
           provider: {
             include: {

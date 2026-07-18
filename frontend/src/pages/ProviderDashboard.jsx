@@ -326,6 +326,14 @@ function LeadsPage({
                 Active
               </button>
               <button
+                onClick={() => setStatusFilter('completed')}
+                className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                  statusFilter === 'completed' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                Completed
+              </button>
+              <button
                 onClick={() => setStatusFilter('all')}
                 className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
                   statusFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-800'

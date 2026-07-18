@@ -28,20 +28,26 @@ export const TicketController = {
 
   create: async (req, res) => {
     try {
-      const { name, email, subject, message } = req.body;
+      const { subject, message, relatedBookingId } = req.body;
+      const name = req.user?.name || req.body?.name;
+      const email = req.user?.email || req.body?.email;
       if (!name || !email || !subject || !message) {
         return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing support claim parameters (name, email, subject, message)');
       }
 
       const ticket = await prisma.ticket.create({
         data: {
+          userId: req.user?.id || null,
           requesterName: name,
           requesterEmail: email,
           subject,
           message,
+          relatedBookingId: relatedBookingId || null,
           status: 'OPEN'
         }
       });
+      const io = req.app?.get('socketio');
+      if (io) io.to('room:admin').emit('adminAlert:newSupportTicket', { ticketId: ticket.id });
       return sendApiSuccess(res, 201, ticket);
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to file support ticket', err.message);
@@ -78,6 +84,21 @@ export const TicketController = {
         return sendApiError(res, 404, 'NOT_FOUND', 'Support ticket not found');
       }
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to resolve support ticket', err.message);
+    }
+  }
+  ,
+  setStatus: async (req, res) => {
+    try {
+      const { status, response } = req.body || {};
+      if (!['OPEN', 'RESOLVED', 'CLOSED'].includes(String(status).toUpperCase())) return sendApiError(res, 400, 'INVALID_STATUS', 'Status must be OPEN, RESOLVED, or CLOSED.');
+      const data = { status: String(status).toUpperCase() };
+      if (response !== undefined) data.adminResponse = String(response).trim() || null;
+      if (data.status === 'RESOLVED') data.resolvedAt = new Date();
+      const ticket = await prisma.ticket.update({ where: { id: req.params.id }, data });
+      return sendApiSuccess(res, 200, ticket);
+    } catch (err) {
+      if (err.code === 'P2025') return sendApiError(res, 404, 'NOT_FOUND', 'Support ticket not found.');
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update support ticket', err.message);
     }
   }
 };

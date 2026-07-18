@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { SERVICE_CATEGORIES } from '../data';
 
 // Components
 import Hero from '../components/Hero';
@@ -13,7 +12,7 @@ import PartnerCTA from '../components/PartnerCTA';
 export const Home = ({ onNavigate }) => {
   const { 
     selectedArea, setArea, 
-    searchQuery, setSearchQuery, setCategory, providers
+    searchQuery, setSearchQuery, setCategory, providers, services
   } = useApp();
 
   const [inputQuery, setInputQuery] = useState(searchQuery);
@@ -22,12 +21,18 @@ export const Home = ({ onNavigate }) => {
     e.preventDefault();
     setSearchQuery(inputQuery);
     setCategory(null);
+    // Encode query params into the URL so the Services page can read them on mount
+    const params = new URLSearchParams();
+    if (inputQuery.trim()) params.set('query', inputQuery.trim());
+    if (selectedArea) params.set('location', selectedArea);
+    const qs = params.toString();
+    window.history.pushState({}, '', `/services${qs ? `?${qs}` : ''}`);
     onNavigate('services');
   };
 
-  const handleCategoryClick = (catId) => {
-    setCategory(catId);
-    onNavigate('service-details', catId);
+  const handleCategoryClick = (catNameOrId) => {
+    setCategory(catNameOrId);
+    onNavigate('service-details', catNameOrId);
   };
 
   const handleQuickSearch = (term) => {
@@ -35,6 +40,9 @@ export const Home = ({ onNavigate }) => {
     setSearchQuery(term);
     onNavigate('services');
   };
+
+  // Use live services from API (includes activeSpecialistCount); fall back to empty while loading
+  const displayCategories = Array.isArray(services) && services.length > 0 ? services : [];
 
   return (
     <div id="home-page" className="bg-slate-50 min-h-screen">
@@ -47,24 +55,20 @@ export const Home = ({ onNavigate }) => {
         onQuickSearch={handleQuickSearch}
       />
 
-
-
       <CategoryGrid 
-        categories={SERVICE_CATEGORIES}
+        categories={displayCategories}
         providers={providers}
         onCategoryClick={handleCategoryClick}
         onSeeAll={() => { setCategory(null); onNavigate('services'); }}
       />
 
-      <TrustBanner onBookAC={() => handleCategoryClick('ac-repair')} />
+      <TrustBanner onBookAC={() => handleCategoryClick('AC Repair')} />
 
       <HowItWorks />
 
       <AppPromo />
 
       <PartnerCTA onApply={() => onNavigate('partner')} />
-
-
     </div>
   );
 };
