@@ -1,4 +1,5 @@
 import prisma from '../prisma/client.js';
+import { parseCalendarDate } from '../utils/availability.js';
 
 // Generic slot labels that are not real time slots — skip conflict check for these.
 // These labels must be treated as real blocking slots for the
@@ -14,17 +15,17 @@ const GENERIC_SLOTS = new Set(['flexible', 'ongoing']);
  * Generic slot types (Contract, Permanent, Flexible) are skipped
  * because multiple bookings of those types are valid.
  */
-export async function isProviderSlotTaken(providerId, bookingDate, bookingTimeSlot) {
+export async function isProviderSlotTaken(providerId, bookingDate, bookingTimeSlot, db = prisma) {
   if (!bookingTimeSlot || GENERIC_SLOTS.has(String(bookingTimeSlot).trim().toLowerCase())) {
     return false;
   }
 
-  const dayStart = new Date(bookingDate);
+  const dayStart = parseCalendarDate(bookingDate);
   dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(bookingDate);
+  const dayEnd = parseCalendarDate(bookingDate);
   dayEnd.setHours(23, 59, 59, 999);
 
-  const conflict = await prisma.booking.findFirst({
+  const conflict = await db.booking.findFirst({
     where: {
       providerId,
       bookingTimeSlot,

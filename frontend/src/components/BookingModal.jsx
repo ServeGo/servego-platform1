@@ -8,6 +8,8 @@ export default function BookingModal({
   availabilityBusyError,
 
   bookingDate, setBookingDate, 
+  bookingTimeSlot, setBookingTimeSlot,
+  availableSlots, availabilityLoading,
   bookingType, setBookingType,
   bookingEndDate, setBookingEndDate,
   contractYears, setContractYears,
@@ -120,6 +122,23 @@ export default function BookingModal({
                 </div>
                 <p className="text-[11px] text-slate-500 mt-2">Choose the contract duration that fits your service requirement. At least one of years, days, or hours must be selected.</p>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
+                Appointment Window <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={bookingTimeSlot}
+                onChange={(e) => setBookingTimeSlot(e.target.value)}
+                disabled={availabilityLoading || !availableSlots.length}
+                required
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none disabled:opacity-60"
+              >
+                <option value="">{availabilityLoading ? 'Loading availability…' : 'Select an available window'}</option>
+                {availableSlots.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
+              </select>
+              {!availabilityLoading && bookingDate && !availableSlots.length ? <p className="text-[11px] text-rose-600 mt-1">No appointment windows are available for this date.</p> : null}
             </div>
 
             <div>

@@ -5,6 +5,7 @@ import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
 import { buildStatusHistory, isValidBookingTransition, normalizeBookingStatus, normalizePaymentStatus } from '../utils/workflow.js';
 import { canPerformAction } from '../utils/permissions.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
+import { isProviderAvailableForSlot, parseCalendarDate } from '../utils/availability.js';
 
 const BOOKING_INCLUDE = {
   customer: { select: { id: true, name: true, email: true, phone: true } },
@@ -36,9 +37,15 @@ export const BookingController = {
           where: { userId: req.user.id },
           select: { id: true }
         });
-        if (provider) {
-          where.providerId = provider.id;
+        // A provider account without a profile must never fall through to an
+        // unfiltered query and receive every booking in the system.
+        if (!provider) {
+          return sendApiSuccess(res, 200, {
+            bookings: [],
+            pagination: { page: parseInt(page), limit: Math.min(100, Math.max(1, parseInt(limit))), total: 0, pages: 0 }
+          });
         }
+        where.providerId = provider.id;
       } else if (req.user.role === 'customer') {
         where.customerId = req.user.id;
       }
@@ -92,7 +99,7 @@ export const BookingController = {
           where: { userId: req.user.id },
           select: { id: true }
         });
-        if (provider && booking.providerId !== provider.id) {
+        if (!provider || booking.providerId !== provider.id) {
           return sendApiError(res, 403, 'FORBIDDEN', 'You can only view your assigned bookings.');
         }
       }
@@ -124,7 +131,7 @@ export const BookingController = {
       const customerId = actorRole === 'customer' ? actorId : bookingData.customerId;
       if (!customerId) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: customerId.');
 
-      const parsedBookingDate = new Date(bookingData.bookingDate);
+      const parsedBookingDate = parseCalendarDate(bookingData.bookingDate);
       if (!bookingData.bookingDate || Number.isNaN(parsedBookingDate.getTime())) {
         return sendApiError(res, 400, 'INVALID_DATE', 'A valid booking date is required.');
       }
@@ -139,7 +146,10 @@ export const BookingController = {
         prisma.user.findUnique({ where: { id: customerId }, select: { id: true, name: true } }),
         prisma.provider.findUnique({ 
           where: { id: bookingData.providerId }, 
-          include: { user: { select: { id: true, name: true, status: true } } }
+          include: {
+            user: { select: { id: true, name: true, status: true } },
+            availabilitySlots: true
+          }
         })
       ]);
 
@@ -148,6 +158,9 @@ export const BookingController = {
       }
       if (provider.accountStatus !== 'ACTIVE' || provider.user?.status !== 'ACTIVE') {
         return sendApiError(res, 409, 'PROVIDER_UNAVAILABLE', 'This provider is not currently accepting new bookings.');
+      }
+      if (!isProviderAvailableForSlot(provider, parsedBookingDate, bookingData.bookingTimeSlot)) {
+        return sendApiError(res, 409, 'SLOT_UNAVAILABLE', 'This provider is not available for the selected date and time slot.');
       }
       const approvedService = await prisma.providerService.findFirst({
         where: {
@@ -196,6 +209,13 @@ export const BookingController = {
       const timestamp = new Date();
       
       const result = await prisma.$transaction(async (tx) => {
+        // Recheck inside a serializable transaction so simultaneous requests
+        // cannot both reserve the same provider/date/slot.
+        if (await isProviderSlotTaken(bookingData.providerId, parsedBookingDate, bookingData.bookingTimeSlot, tx)) {
+          const error = new Error('Selected slot is no longer available.');
+          error.code = 'SLOT_UNAVAILABLE';
+          throw error;
+        }
         const booking = await tx.booking.create({
           data: {
             customerId,
@@ -246,7 +266,7 @@ export const BookingController = {
           }
         });
         return { booking, providerNotification };
-      });
+      }, { isolationLevel: 'Serializable' });
 
       const io = req.app.get('socketio');
       if (io) {
@@ -259,6 +279,9 @@ export const BookingController = {
 
       return sendApiSuccess(res, 201, result.booking);
     } catch (err) {
+      if (err.code === 'SLOT_UNAVAILABLE' || err.code === 'P2034') {
+        return sendApiError(res, 409, 'SLOT_UNAVAILABLE', 'This provider is already booked for the selected date and time slot.');
+      }
       console.error('[BookingController.create] Error:', err.message, err.stack);
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to create booking.',
         process.env.NODE_ENV !== 'production' ? err.message : undefined);
@@ -276,7 +299,7 @@ export const BookingController = {
 
       const updatedStatus = normalizeBookingStatus(status);
       
-      if (!['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED'].includes(updatedStatus)) {
+      if (!['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED'].includes(updatedStatus)) {
         return sendApiError(res, 400, 'INVALID_STATUS', 'Invalid booking status provided.');
       }
 
@@ -463,7 +486,7 @@ export const BookingController = {
           where: { userId: req.user.id },
           select: { id: true }
         });
-        if (provider && booking.providerId !== provider.id) {
+        if (!provider || booking.providerId !== provider.id) {
           return sendApiError(res, 403, 'FORBIDDEN', 'You can only send messages on your assigned bookings.');
         }
       }

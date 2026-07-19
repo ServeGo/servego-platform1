@@ -19,7 +19,7 @@ import { SavedProController } from '../controllers/savedProController.js';
 import prisma from '../prisma/client.js';
 import { requireAuth, requireRole, optionalAuth } from '../utils/auth.js';
 import { authRateLimiter, bookingRateLimiter, reviewRateLimiter, supportTicketRateLimiter } from '../middleware/security.js';
-import { validate, registerValidation, loginValidation, createBookingValidation, createReviewValidation, createTicketValidation } from '../middleware/validation.js';
+import { validate, registerValidation, loginValidation, createBookingValidation, createReviewValidation, createTicketValidation, createAuthenticatedTicketValidation, createServiceValidation, updateServiceValidation, updateAvailabilityValidation, registerProviderServiceValidation, updateProviderProfileValidation, updateUserProfileValidation } from '../middleware/validation.js';
 
 const apiRouter = Router();
 
@@ -32,16 +32,16 @@ apiRouter.post('/auth/reset-password', authRateLimiter, UserController.resetPass
 apiRouter.post('/auth/refresh', UserController.refreshToken);
 apiRouter.get('/auth/me', requireAuth, UserController.getMe);
 apiRouter.get('/users', requireAuth, requireRole('admin'), UserController.getUsers);
-apiRouter.patch('/users/:id/profile', requireAuth, UserController.updateProfile);
+apiRouter.patch('/users/:id/profile', requireAuth, validate(updateUserProfileValidation), UserController.updateProfile);
 
 // --- Service Providers (Partners) ---
-apiRouter.get('/providers', ProviderController.getAll);
+apiRouter.get('/providers', optionalAuth, ProviderController.getAll);
 apiRouter.get('/providers/by-approved-service', ProviderServiceDiscoveryController.getApprovedProvidersByServiceName);
-apiRouter.get('/providers/:id', ProviderController.getById);
-apiRouter.get('/providers/:id/services', ProviderController.getProviderServices);
+apiRouter.get('/providers/:id', optionalAuth, ProviderController.getById);
+apiRouter.get('/providers/:id/services', optionalAuth, ProviderController.getProviderServices);
 apiRouter.get('/providers/:id/availability', ProviderAvailabilityController.getAvailability);
 
-apiRouter.put('/providers/me/availability', requireAuth, requireRole('provider'), (req, res, next) => {
+apiRouter.put('/providers/me/availability', requireAuth, requireRole('provider'), validate(updateAvailabilityValidation), (req, res, next) => {
   prisma.provider.findUnique({ where: { userId: req.user.id }, select: { id: true } }).then((provider) => {
     if (!provider) return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Provider profile not found.' });
     req.params.id = provider.id;
@@ -49,12 +49,12 @@ apiRouter.put('/providers/me/availability', requireAuth, requireRole('provider')
   }).catch(next);
 });
 
-apiRouter.post('/providers/:id/services/register', requireAuth, ProviderController.registerProviderService);
-apiRouter.patch('/providers/:id/profile', requireAuth, ProviderController.updateProfile);
-apiRouter.patch('/providers/:id/availability', requireAuth, ProviderController.updateAvailability);
-apiRouter.put('/providers/:id/availability', requireAuth, ProviderController.updateAvailability);
+apiRouter.post('/providers/:id/services/register', requireAuth, validate(registerProviderServiceValidation), ProviderController.registerProviderService);
+apiRouter.patch('/providers/:id/profile', requireAuth, validate(updateProviderProfileValidation), ProviderController.updateProfile);
+apiRouter.patch('/providers/:id/availability', requireAuth, validate(updateAvailabilityValidation), ProviderController.updateAvailability);
+apiRouter.put('/providers/:id/availability', requireAuth, validate(updateAvailabilityValidation), ProviderController.updateAvailability);
 apiRouter.patch('/providers/:id/verify', requireAuth, requireRole('admin'), ProviderController.verify);
-apiRouter.post('/provider-services', requireAuth, requireRole('provider'), ProviderController.registerOwnProviderService);
+apiRouter.post('/provider-services', requireAuth, requireRole('provider'), validate(registerProviderServiceValidation), ProviderController.registerOwnProviderService);
 apiRouter.get('/provider-services/mine', requireAuth, requireRole('provider'), ProviderController.getMyProviderServices);
 apiRouter.get('/provider-services', requireAuth, requireRole('admin'), AdminProviderServiceController.getPendingRequests);
 
@@ -83,13 +83,13 @@ apiRouter.delete('/notifications', requireAuth, NotificationController.clearAll)
 
 // --- Support Tickets ---
 apiRouter.get('/tickets', requireAuth, TicketController.getAll);
-apiRouter.post('/tickets', requireAuth, validate(createTicketValidation), TicketController.create);
+apiRouter.post('/tickets', requireAuth, validate(createAuthenticatedTicketValidation), TicketController.create);
 apiRouter.patch('/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
 apiRouter.get('/admin/tickets', requireAuth, requireRole('admin'), TicketController.getAll);
 apiRouter.patch('/admin/tickets/:id/resolve', requireAuth, requireRole('admin'), TicketController.resolve);
 apiRouter.get('/support-tickets/mine', requireAuth, TicketController.getAll);
 apiRouter.get('/support-tickets', requireAuth, requireRole('admin'), TicketController.getAll);
-apiRouter.post('/support-tickets', supportTicketRateLimiter, optionalAuth, TicketController.create);
+apiRouter.post('/support-tickets', supportTicketRateLimiter, optionalAuth, validate(createTicketValidation), TicketController.create);
 apiRouter.patch('/support-tickets/:id/status', requireAuth, requireRole('admin'), TicketController.setStatus);
 
 // --- Reviews ---
@@ -116,12 +116,12 @@ apiRouter.get('/services', ServiceController.getAll);
 apiRouter.get('/categories', ServiceController.getAll);
 apiRouter.get('/categories/:slug', ServiceController.getCategoryBySlug);
 apiRouter.get('/categories/:slug/providers', ProviderServiceDiscoveryController.getApprovedProvidersByCategory);
-apiRouter.post('/services', requireAuth, requireRole('admin'), ServiceController.create);
-apiRouter.post('/categories', requireAuth, requireRole('admin'), ServiceController.create);
+apiRouter.post('/services', requireAuth, requireRole('admin'), validate(createServiceValidation), ServiceController.create);
+apiRouter.post('/categories', requireAuth, requireRole('admin'), validate(createServiceValidation), ServiceController.create);
 apiRouter.delete('/services/:id', requireAuth, requireRole('admin'), ServiceController.deleteOne);
 apiRouter.delete('/categories/:id', requireAuth, requireRole('admin'), ServiceController.deleteOne);
-apiRouter.patch('/services/:id', requireAuth, requireRole('admin'), ServiceController.updateOne);
-apiRouter.patch('/categories/:id', requireAuth, requireRole('admin'), ServiceController.updateOne);
+apiRouter.patch('/services/:id', requireAuth, requireRole('admin'), validate(updateServiceValidation), ServiceController.updateOne);
+apiRouter.patch('/categories/:id', requireAuth, requireRole('admin'), validate(updateServiceValidation), ServiceController.updateOne);
 apiRouter.patch('/services/:id/hide', requireAuth, requireRole('admin'), ServiceController.hideOne);
 apiRouter.get('/categories/:id/active-count', ServiceController.getActiveCount);
 

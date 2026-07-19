@@ -10,8 +10,11 @@ export const AdminProviderServiceController = {
   getPendingRequests: async (req, res) => {
     try {
       const requestedStatus = String(req.query.status || 'PENDING').toUpperCase();
+      if (!['PENDING', 'APPROVED', 'DENIED', 'REJECTED'].includes(requestedStatus)) {
+        return sendApiError(res, 400, 'INVALID_STATUS', 'status must be PENDING, APPROVED, DENIED, or REJECTED.');
+      }
       const requests = await prisma.providerServiceRequest.findMany({
-        where: { status: ['PENDING', 'APPROVED', 'DENIED', 'REJECTED'].includes(requestedStatus) ? requestedStatus : 'PENDING' },
+        where: { status: requestedStatus },
         orderBy: { createdAt: 'desc' },
         include: {
           provider: {
@@ -36,6 +39,9 @@ export const AdminProviderServiceController = {
         include: { provider: { include: { user: true } } }
       });
       if (!request) return sendApiError(res, 404, 'NOT_FOUND', 'Service request not found.');
+      if (request.status !== 'PENDING' && request.status !== 'APPROVED') {
+        return sendApiError(res, 409, 'INVALID_STATE', 'Only pending service requests can be approved.');
+      }
 
       const wasAlreadyApproved = request.status === 'APPROVED';
       const requestedName = request.requestedServiceName;
@@ -141,6 +147,9 @@ export const AdminProviderServiceController = {
         include: { provider: { include: { user: true } } }
       });
       if (!request) return sendApiError(res, 404, 'NOT_FOUND', 'Service request not found.');
+      if (request.status !== 'PENDING') {
+        return sendApiError(res, 409, 'INVALID_STATE', 'Only pending service requests can be denied.');
+      }
 
       await prisma.providerServiceRequest.update({
         where: { id },

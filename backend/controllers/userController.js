@@ -180,7 +180,9 @@ export const UserController = {
             specialties: ['Residential Services', 'Routine Maintenance'],
             serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills'],
             photo: photo || null,
-            isVerified: true,
+            // Providers are deliberately hidden from public discovery until
+            // an administrator verifies their account.
+            isVerified: false,
             isFeatured: false,
             availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
             timeSlots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM']

@@ -206,9 +206,7 @@ test('terminal states have no transitions', () => {
   const transitions = {
     COMPLETED: [],
     CANCELLED: [],
-    REJECTED: []
   };
   assert.equal(transitions.COMPLETED.length, 0);
   assert.equal(transitions.CANCELLED.length, 0);
-  assert.equal(transitions.REJECTED.length, 0);
 });

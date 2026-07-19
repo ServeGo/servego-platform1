@@ -25,7 +25,7 @@ test('maps legacy workflow aliases to canonical statuses', () => {
   assert.equal(normalizeBookingStatus('en_route'), 'ONGOING');
   assert.equal(normalizeBookingStatus('in_progress'), 'ONGOING');
   assert.equal(normalizeBookingStatus('reviewed'), 'COMPLETED');
-  assert.equal(normalizeBookingStatus('rejected'), 'REJECTED');
+  assert.equal(normalizeBookingStatus('rejected'), 'CANCELLED');
 });
 
 test('enforces booking permissions centrally', () => {

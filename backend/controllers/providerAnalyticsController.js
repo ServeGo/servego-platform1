@@ -22,6 +22,19 @@ export const ProviderAnalyticsController = {
       const providerId = req.params.id;
       const { range = '90d' } = req.query || {};
 
+      if (!['7d', '30d', '90d'].includes(range)) {
+        return sendApiError(res, 400, 'INVALID_RANGE', 'range must be one of: 7d, 30d, 90d.');
+      }
+
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+        select: { id: true, userId: true }
+      });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
+      if (req.user.role === 'provider' && provider.userId !== req.user.id) {
+        return sendApiError(res, 403, 'FORBIDDEN', 'You can only view your own analytics.');
+      }
+
       const now = new Date();
       let since;
       if (range === '7d') since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

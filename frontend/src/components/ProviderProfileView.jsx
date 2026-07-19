@@ -29,7 +29,6 @@ export default function ProviderProfileView() {
   // Form fields
   const [bio, setBio] = useState('');
   const [phone, setPhone] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
   const [specialtiesText, setSpecialtiesText] = useState('');
   const [serviceAreasText, setServiceAreasText] = useState('');
@@ -70,7 +69,6 @@ export default function ProviderProfileView() {
 
     setBio(provider.bio || '');
     setPhone(provider.phone || provider.user?.phone || '');
-    setHourlyRate(provider.hourlyRate !== undefined && provider.hourlyRate !== null ? String(provider.hourlyRate) : '');
     setExperienceYears(provider.experienceYears !== undefined && provider.experienceYears !== null ? String(provider.experienceYears) : '');
 
     setSpecialtiesText(
@@ -98,9 +96,6 @@ export default function ProviderProfileView() {
 
   const validate = () => {
     const errors = [];
-
-    const rateNum = hourlyRate === '' ? NaN : Number(hourlyRate);
-    if (!Number.isFinite(rateNum) || rateNum <= 0) errors.push('Hourly rate must be a number > 0');
 
     const expNum = experienceYears === '' ? NaN : Number(experienceYears);
     if (!Number.isFinite(expNum) || expNum < 0) errors.push('Experience must be a number >= 0');
@@ -137,7 +132,6 @@ export default function ProviderProfileView() {
       await updateProviderProfile(provider.id, {
         bio: bio || '',
         phone: phone || '',
-        hourlyRate: Number(hourlyRate),
         experienceYears: Number(experienceYears),
         specialties: nextSpecialties,
         serviceAreas: nextAreas
@@ -244,7 +238,6 @@ export default function ProviderProfileView() {
 
               <InputField label="Phone" value={phone} onChange={setPhone} placeholder="e.g. 9876543210" />
               <TextAreaField label="Bio" value={bio} onChange={setBio} placeholder="Write a short bio about your services..." />
-              <InputField label="Hourly Rate" value={hourlyRate} onChange={setHourlyRate} placeholder="e.g. 350" />
               <InputField label="Experience (Years)" value={experienceYears} onChange={setExperienceYears} placeholder="e.g. 3" />
               <InputField label="Specialties" value={specialtiesText} onChange={setSpecialtiesText} placeholder="Comma separated: Plumbing, AC repair" />
               <InputField label="Service Areas" value={serviceAreasText} onChange={setServiceAreasText} placeholder="Comma separated: Hyderabad, Secunderabad" />
@@ -271,7 +264,6 @@ export default function ProviderProfileView() {
             <Field label="Category / Sector" value={provider.category} />
             <Field label="Phone" value={provider.phone || user.phone} />
             <Field label="Bio" value={provider.bio} />
-            <Field label="Hourly Rate" value={provider.hourlyRate} />
             <Field label="Experience (Years)" value={provider.experienceYears} />
             <Field
               label="Specialties"

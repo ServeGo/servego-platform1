@@ -29,7 +29,10 @@ export const SavedProController = {
       const { providerId } = req.body;
       if (!providerId) return sendApiError(res, 400, 'MISSING_FIELDS', 'providerId is required.');
 
-      const provider = await prisma.provider.findUnique({ where: { id: providerId }, select: { id: true } });
+      const provider = await prisma.provider.findFirst({
+        where: { id: providerId, accountStatus: 'ACTIVE', isVerified: true, user: { status: 'ACTIVE' } },
+        select: { id: true }
+      });
       if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
 
       const saved = await prisma.savedPro.upsert({

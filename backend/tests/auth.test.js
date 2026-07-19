@@ -51,6 +51,7 @@ test('requires authentication and role', async () => {
   const req3 = { headers: { authorization: `Bearer ${generateAuthToken({ id: 'u2', role: 'customer' })}` } };
   const res3 = { status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; return this; } };
   let called3 = false;
+  await requireAuth(req3, res3, () => {});
   await requireRole('admin')(req3, res3, () => { called3 = true; });
   assert.equal(res3.statusCode, 403);
   assert.equal(called3, false);

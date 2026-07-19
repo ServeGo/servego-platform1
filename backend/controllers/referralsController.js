@@ -11,9 +11,9 @@ export const ReferralsController = {
       if (!code) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: code');
 
       const normalized = normalizeCode(code);
-      const sponsor = await prisma.user.findUnique({
+      const sponsor = await prisma.user.findFirst({
         where: { referralCode: normalized },
-        select: { id: true, referralCode: true, referralsCount: true }
+        select: { id: true, referralCode: true }
       });
 
       if (!sponsor) return sendApiError(res, 404, 'NOT_FOUND', 'Invalid referral code');
@@ -38,7 +38,7 @@ export const ReferralsController = {
 
         await tx.user.update({
           where: { id: sponsor.id },
-          data: { referralsCount: sponsor.referralsCount + 1 }
+          data: { referralsCount: { increment: 1 } }
         });
 
         const sponsorUpdated = await tx.user.findUnique({
