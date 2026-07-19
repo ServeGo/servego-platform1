@@ -12,7 +12,7 @@ export const TicketController = {
 
       if (role !== 'admin') {
         const tickets = await prisma.ticket.findMany({
-          where: { requesterEmail: req.user.email },
+          where: { OR: [{ userId: req.user.id }, { userId: null, requesterEmail: req.user.email }] },
           orderBy: { createdAt: 'desc' }
         });
         return sendApiSuccess(res, 200, tickets);
@@ -29,10 +29,19 @@ export const TicketController = {
   create: async (req, res) => {
     try {
       const { subject, message, relatedBookingId } = req.body;
-      const name = req.user?.name || req.body?.name;
-      const email = req.user?.email || req.body?.email;
+      const account = req.user
+        ? await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true, email: true } })
+        : null;
+      const name = account?.name || req.body?.name;
+      const email = account?.email || req.body?.email;
       if (!name || !email || !subject || !message) {
         return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing support claim parameters (name, email, subject, message)');
+      }
+      if (relatedBookingId && req.user) {
+        const booking = await prisma.booking.findUnique({ where: { id: relatedBookingId }, select: { customerId: true } });
+        if (!booking || (req.user.role === 'customer' && booking.customerId !== req.user.id)) {
+          return sendApiError(res, 403, 'FORBIDDEN', 'You can only link your own booking to a support ticket.');
+        }
       }
 
       const ticket = await prisma.ticket.create({
@@ -91,6 +100,7 @@ export const TicketController = {
     try {
       const { status, response } = req.body || {};
       if (!['OPEN', 'RESOLVED', 'CLOSED'].includes(String(status).toUpperCase())) return sendApiError(res, 400, 'INVALID_STATUS', 'Status must be OPEN, RESOLVED, or CLOSED.');
+      if (response !== undefined && String(response).trim().length > 2000) return sendApiError(res, 400, 'VALIDATION_ERROR', 'Response cannot exceed 2000 characters.');
       const data = { status: String(status).toUpperCase() };
       if (response !== undefined) data.adminResponse = String(response).trim() || null;
       if (data.status === 'RESOLVED') data.resolvedAt = new Date();

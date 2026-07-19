@@ -1,6 +1,7 @@
 import prisma from '../prisma/client.js';
 import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
+import { parseCalendarDate } from '../utils/availability.js';
 
 function normalizeDowInput(day) {
   if (!day) return null;
@@ -40,9 +41,10 @@ export const ProviderAvailabilityController = {
       if (req.query.date) return ProviderAvailabilityController.getAvailabilityForDate(req, res);
       const provider = await prisma.provider.findUnique({
         where: { id: providerId },
-        select: { userId: true, availableDays: true, timeSlots: true, availabilitySlots: true }
+        select: { userId: true, availableDays: true, timeSlots: true, availabilitySlots: true, accountStatus: true, isVerified: true, user: { select: { status: true } } }
       });
       if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
+      if (provider.accountStatus !== 'ACTIVE' || !provider.isVerified || provider.user?.status !== 'ACTIVE') return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
       return sendApiSuccess(res, 200, {
         providerId,
         availableDays: provider.availableDays,
@@ -61,7 +63,7 @@ export const ProviderAvailabilityController = {
 
       if (!date) return sendApiError(res, 400, 'MISSING_FIELDS', 'Query param "date" is required (YYYY-MM-DD).');
 
-      const parsed = new Date(date);
+      const parsed = parseCalendarDate(date);
       if (Number.isNaN(parsed.getTime())) {
         return sendApiError(res, 400, 'INVALID_DATE', 'Invalid date query param.');
       }
@@ -71,10 +73,11 @@ export const ProviderAvailabilityController = {
 
       const provider = await prisma.provider.findUnique({
         where: { id: providerId },
-        select: { availableDays: true, timeSlots: true, availabilitySlots: true },
+        select: { availableDays: true, timeSlots: true, availabilitySlots: true, accountStatus: true, isVerified: true, user: { select: { status: true } } },
       });
 
       if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
+      if (provider.accountStatus !== 'ACTIVE' || !provider.isVerified || provider.user?.status !== 'ACTIVE') return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
 
       const dow = dayOfWeekShort(dayStart);
       const providerDays = Array.isArray(provider.availableDays) ? provider.availableDays : [];

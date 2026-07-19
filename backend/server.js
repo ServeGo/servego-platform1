@@ -81,7 +81,10 @@ async function bootstrap() {
       }
     }
 
-    return sendApiSuccess(res, 200, health);
+    // A process that cannot reach its primary datastore is alive but not
+    // ready to serve traffic. Returning 503 lets load balancers and monitors
+    // distinguish that state from a healthy deployment.
+    return sendApiSuccess(res, health.dbStatus === 'reachable' ? 200 : 503, health);
   });
 
   // API routes

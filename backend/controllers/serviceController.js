@@ -30,7 +30,7 @@ export const ServiceController = {
       const activeSpecialistCount = await prisma.providerService.count({
         where: {
           serviceId: service.id,
-          provider: { accountStatus: 'ACTIVE', user: { status: 'ACTIVE' } }
+          provider: { accountStatus: 'ACTIVE', isVerified: true, user: { status: 'ACTIVE' } }
         }
       });
       return sendApiSuccess(res, 200, { serviceId: service.id, activeSpecialistCount });
@@ -57,6 +57,7 @@ export const ServiceController = {
         where: {
           provider: {
             accountStatus: 'ACTIVE',
+            isVerified: true,
             user: { status: 'ACTIVE' }
           }
         }
@@ -100,6 +101,7 @@ export const ServiceController = {
         where: {
           provider: {
             accountStatus: 'ACTIVE',
+            isVerified: true,
             user: { status: 'ACTIVE' },
             ...(location ? { serviceAreas: { array_contains: location } } : {})
           }
@@ -166,6 +168,9 @@ export const ServiceController = {
       await prisma.service.delete({ where: { id } });
       return sendApiSuccess(res, 200, { message: 'Service deleted successfully' });
     } catch (err) {
+      if (err.code === 'P2002') {
+        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'A service with this name already exists');
+      }
       if (err.code === 'P2025') {
         return sendApiError(res, 404, 'NOT_FOUND', 'Service not found');
       }
@@ -207,6 +212,9 @@ export const ServiceController = {
       if (!id) return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing service id');
 
       const { isHidden } = req.body || {};
+      if (![true, false, 'true', 'false'].includes(isHidden)) {
+        return sendApiError(res, 400, 'INVALID_VALUE', 'isHidden must be true or false.');
+      }
       const updated = await prisma.service.update({
         where: { id },
         data: {

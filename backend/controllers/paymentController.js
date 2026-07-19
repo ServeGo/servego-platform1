@@ -13,7 +13,13 @@ export const PaymentController = {
     try {
       const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
       if (req.query.bookingId) where.bookingId = String(req.query.bookingId);
-      const payments = await prisma.payment.findMany({ where, include: { booking: true, user: true } });
+      const payments = await prisma.payment.findMany({
+        where,
+        include: {
+          booking: true,
+          user: { select: { id: true, name: true, email: true, phone: true } }
+        }
+      });
       return sendApiSuccess(res, 200, payments);
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch payments', err.message);
@@ -46,10 +52,19 @@ export const PaymentController = {
       }
 
       const normalizedStatus = normalizePaymentStatus(status);
+      // This API does not have a verified online payment gateway.  A caller
+      // must not be able to mark a cash booking as paid by supplying status.
+      // Cash payments are settled only when the assigned provider completes
+      // the booking in BookingController.updateStatus.
+      if (normalizedStatus === 'PAID') {
+        return sendApiError(res, 400, 'INVALID_PAYMENT_STATUS', 'Payments can only be marked paid after verified completion.');
+      }
       const payment = await prisma.payment.create({
         data: {
           bookingId,
-          userId,
+          // A payment always belongs to the booking customer, including when
+          // an administrator creates the pending record on their behalf.
+          userId: booking.customerId,
           paymentMethod: normalizedMethod,
           status: normalizedStatus,
           transactionId,

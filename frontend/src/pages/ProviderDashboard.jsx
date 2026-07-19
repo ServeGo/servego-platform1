@@ -34,7 +34,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
     const byProviderId = providerIdCandidate ? providers.find(p => p.id === providerIdCandidate) : null;
     const byUserId = providerUserIdCandidate ? providers.find(p => p.userId === providerUserIdCandidate) : null;
 
-    return byProviderId || byUserId || providers[0];
+    return byProviderId || byUserId || null;
   }, [providers, currentUser]);
 
   const [internalActiveTab, setInternalActiveTab] = useState('leads');

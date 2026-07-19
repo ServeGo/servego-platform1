@@ -22,6 +22,10 @@ export const ProviderController = {
     try {
       const { id } = req.params;
 
+      const provider = await prisma.provider.findUnique({ where: { id }, select: { userId: true } });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
+      const canViewRequests = req.user?.role === 'admin' || req.user?.id === provider.userId;
+
       const [approvedLinks, requests] = await Promise.all([
         prisma.providerService.findMany({
           where: { providerId: id },
@@ -31,7 +35,9 @@ export const ProviderController = {
         prisma.providerServiceRequest.findMany({
           where: {
             providerId: id,
-            status: { not: 'APPROVED' }
+            // Pending/denied applications are private to the provider and
+            // admins. Public provider profiles expose approved services only.
+            ...(canViewRequests ? { status: { not: 'APPROVED' } } : { id: '__not_visible__' })
           },
           orderBy: { createdAt: 'desc' }
         })
@@ -193,16 +199,24 @@ export const ProviderController = {
 
   getAll: async (req, res) => {
     try {
+      const isAdmin = req.user?.role === 'admin';
+      const publicProviderWhere = { accountStatus: 'ACTIVE', isVerified: true, user: { status: 'ACTIVE' } };
       const providers = await prisma.provider.findMany({
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, phone: true, avatar: true }
-          },
-          reviews: true,
-          badges: true,
-          availabilitySlots: true
-        }
-      });
+        // Providers retain access to their own profile even while it awaits
+        // verification or an admin account-status decision.
+        where: isAdmin ? {} : req.user?.role === 'provider' ? { OR: [publicProviderWhere, { userId: req.user.id }] } : publicProviderWhere,
+          include: {
+            user: {
+              // Public provider cards do not need contact details. Admins keep
+              // those fields for account management.
+              select: isAdmin
+                ? { id: true, name: true, email: true, phone: true, avatar: true }
+                : { id: true, name: true, avatar: true }
+            },
+            reviews: true,
+            badges: true
+          }
+        });
       return sendApiSuccess(res, 200, providers);
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch service partners', err.message);
@@ -212,6 +226,7 @@ export const ProviderController = {
   getById: async (req, res) => {
     try {
       const { id } = req.params;
+      const isAdmin = req.user?.role === 'admin';
       const provider = await prisma.provider.findUnique({
         where: { id },
         include: {
@@ -226,6 +241,14 @@ export const ProviderController = {
       if (!provider) {
         return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
       }
+      const isOwner = req.user?.role === 'provider' && provider.userId === req.user.id;
+      if (!isAdmin && !isOwner && (!provider.isVerified || provider.accountStatus !== 'ACTIVE' || provider.user?.status !== 'ACTIVE')) {
+        return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
+      }
+      if (!isAdmin && !isOwner && provider.user) {
+        delete provider.user.email;
+        delete provider.user.phone;
+      }
       return sendApiSuccess(res, 200, provider);
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve provider details', err.message);
@@ -235,7 +258,7 @@ export const ProviderController = {
   updateProfile: async (req, res) => {
     try {
       const { id } = req.params;
-      const { bio, specialties, serviceAreas, experienceYears, phone, isVerified } = req.body;
+      const { bio, specialties, serviceAreas, experienceYears, phone } = req.body;
 
       const existing = await prisma.provider.findUnique({ where: { id } });
       if (!existing) {
@@ -249,17 +272,21 @@ export const ProviderController = {
       const nextSpecialties = Array.isArray(specialties) ? specialties : existing.specialties;
       const nextAreas = Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas;
       const profileComplete = Boolean(String(nextBio || '').trim() && Array.isArray(nextSpecialties) && nextSpecialties.length && Array.isArray(nextAreas) && nextAreas.length);
-      const updated = await prisma.provider.update({
-        where: { id },
-        data: {
-          bio: nextBio,
-          specialties: nextSpecialties,
-          serviceAreas: nextAreas,
-          experienceYears: Number.isFinite(Number(experienceYears)) ? Number(experienceYears) : existing.experienceYears,
-          isVerified: typeof isVerified === 'boolean' ? isVerified : existing.isVerified,
-          profileComplete
-        },
-        include: { reviews: true }
+      const updated = await prisma.$transaction(async (tx) => {
+        if (phone !== undefined) {
+          await tx.user.update({ where: { id: existing.userId }, data: { phone: String(phone).trim() } });
+        }
+        return tx.provider.update({
+          where: { id },
+          data: {
+            bio: nextBio,
+            specialties: nextSpecialties,
+            serviceAreas: nextAreas,
+            experienceYears: Number.isFinite(Number(experienceYears)) ? Number(experienceYears) : existing.experienceYears,
+            profileComplete
+          },
+          include: { reviews: true, user: { select: { id: true, name: true, email: true, phone: true, avatar: true } } }
+        });
       });
 
       return sendApiSuccess(res, 200, updated);
@@ -303,7 +330,6 @@ export const ProviderController = {
           },
           include: { availabilitySlots: true }
         });
-        io.to('room:admin').emit('adminAlert:newServiceRequest', { providerServiceRequestId: created.id });
       });
       return sendApiSuccess(res, 200, updated);
     } catch (err) {

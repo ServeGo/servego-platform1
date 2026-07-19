@@ -131,7 +131,7 @@ export const createBookingValidation = [
 export const updateBookingStatusValidation = [
   body('status')
     .notEmpty().withMessage('Status is required')
-    .isIn(['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED']).withMessage('Invalid booking status'),
+    .isIn(['PENDING', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED']).withMessage('Invalid booking status'),
   body('note')
     .optional()
     .trim()
@@ -142,11 +142,6 @@ export const updateBookingStatusValidation = [
 // ==================== Review Validations ====================
 
 export const createReviewValidation = [
-  body('reviewerName')
-    .trim()
-    .notEmpty().withMessage('Reviewer name is required')
-    .isLength({ max: 100 }).withMessage('Name too long')
-    .escape(),
   body('rating')
     .notEmpty().withMessage('Rating is required')
     .isFloat({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
@@ -267,10 +262,28 @@ export const updateProviderProfileValidation = [
 export const updateAvailabilityValidation = [
   body('availableDays')
     .optional()
-    .isArray().withMessage('Available days must be an array'),
+    .isArray().withMessage('Available days must be an array')
+    .custom((days) => days.every((day) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(String(day).trim()))).withMessage('Available days must use Mon through Sun'),
   body('timeSlots')
     .optional()
-    .isArray().withMessage('Time slots must be an array')
+    .isArray().withMessage('Time slots must be an array'),
+  body('availabilitySlots')
+    .optional()
+    .isArray().withMessage('Availability slots must be an array')
+    .custom((slots) => slots.every((slot) => slot && ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(String(slot.dayOfWeek).trim()) && /^\d{2}:\d{2}$/.test(String(slot.startTime)) && /^\d{2}:\d{2}$/.test(String(slot.endTime)) && String(slot.startTime) < String(slot.endTime))).withMessage('Each availability slot needs a valid day and start/end time')
+];
+
+export const updateUserProfileValidation = [
+  body('name').optional().trim().isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters').escape(),
+  body('phone').optional().trim().matches(/^[+]?[\d\s-]{10,15}$/).withMessage('Invalid phone number format'),
+  body('address').optional().trim().isLength({ max: 500 }).withMessage('Address is too long').escape(),
+  body('pincode').optional().trim().matches(/^[0-9]{5,6}$/).withMessage('Please enter a valid 5-6 digit pincode')
+];
+
+export const createAuthenticatedTicketValidation = [
+  body('subject').trim().notEmpty().withMessage('Subject is required').isLength({ min: 5, max: 200 }).withMessage('Subject must be between 5 and 200 characters').escape(),
+  body('message').trim().notEmpty().withMessage('Message is required').isLength({ min: 10, max: 5000 }).withMessage('Message must be between 10 and 5000 characters').escape(),
+  body('relatedBookingId').optional().trim().isLength({ max: 100 }).withMessage('Invalid booking ID')
 ];
 
 // ==================== Service Validations ====================

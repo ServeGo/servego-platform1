@@ -49,6 +49,9 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
   // Form fields
   const [bookingDate, setBookingDate] = useState('');
+  const [bookingTimeSlot, setBookingTimeSlot] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [bookingType, setBookingType] = useState('contract');
   const [availabilityBusyError, setAvailabilityBusyError] = useState('');
 
@@ -110,6 +113,8 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const defaultDate = tomorrow.toISOString().split('T')[0];
     setBookingDate(defaultDate);
+    setBookingTimeSlot('');
+    setAvailableSlots([]);
 
     setBookingType('contract');
     setBookingEndDate('');
@@ -135,6 +140,8 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
           const tomorrow = new Date();
           tomorrow.setDate(tomorrow.getDate() + 1);
           setBookingDate(tomorrow.toISOString().split('T')[0]);
+          setBookingTimeSlot('');
+          setAvailableSlots([]);
           setBookingType('contract');
           setBookingEndDate('');
           setContractYears('0');
@@ -152,6 +159,31 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, categoryProviders]);
+
+  useEffect(() => {
+    if (bookingStep !== 1 || !selectedProvider?.id || !bookingDate) return;
+    let cancelled = false;
+    setAvailabilityLoading(true);
+    setAvailabilityBusyError('');
+    setBookingTimeSlot('');
+    fetchProviderAvailability(selectedProvider.id, bookingDate).then((availability) => {
+      if (cancelled) return;
+      if (availability?.error) {
+        setAvailableSlots([]);
+        setAvailabilityBusyError('Unable to load provider availability. Please try again.');
+        return;
+      }
+      if (!availability?.isWorkingDay) {
+        setAvailableSlots([]);
+        setAvailabilityBusyError('Provider is not available on selected day.');
+        return;
+      }
+      setAvailableSlots((availability.slots || []).filter((slot) => !slot.busy).map((slot) => slot.slot));
+    }).finally(() => {
+      if (!cancelled) setAvailabilityLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [bookingStep, selectedProvider?.id, bookingDate, fetchProviderAvailability]);
 
   const handleCompleteCheckout = async (e) => {
     
@@ -174,10 +206,13 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
       }
     }
 
-    setBookingStep(2); // still keep UI step for continuity
+    const desiredSlotLabel = bookingTimeSlot;
+    if (!desiredSlotLabel) {
+      setErrorText('Please choose an available appointment window.');
+      return;
+    }
 
-    let dayStr = bookingDate;
-    let desiredSlotLabel = bookingType === 'permanent' ? 'Permanent' : 'Contract';
+    setBookingStep(2); // still keep UI step for continuity
 
     // Show correct global action spinner while we validate + create booking
     // (We keep the step-2 UI too, but the message comes from the overlay.)
@@ -185,7 +220,13 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
     try {
       // If availability endpoint fails, do not block booking creation.
-      const avail = await fetchProviderAvailability(selectedProvider.id, dayStr);
+      const avail = await fetchProviderAvailability(selectedProvider.id, bookingDate);
+
+      if (avail?.error) {
+        setAvailabilityBusyError('Unable to verify availability. Please try again.');
+        setBookingStep(1);
+        return;
+      }
 
       // If provider is not working that day, show busy-like error.
       if (!avail?.isWorkingDay) {
@@ -266,6 +307,8 @@ export const ServiceDetails = ({ catId, onNavigate }) => {
 
             errorText={errorText}
             bookingDate={bookingDate} setBookingDate={setBookingDate}
+            bookingTimeSlot={bookingTimeSlot} setBookingTimeSlot={setBookingTimeSlot}
+            availableSlots={availableSlots} availabilityLoading={availabilityLoading}
             bookingType={bookingType} setBookingType={setBookingType}
             bookingEndDate={bookingEndDate} setBookingEndDate={setBookingEndDate}
             contractYears={contractYears} setContractYears={setContractYears}

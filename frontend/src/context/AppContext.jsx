@@ -489,15 +489,20 @@ export const AppProvider = ({ children }) => {
       return undefined;
     }
 
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 20,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      auth: { token: getStoredAuthToken() },
-      autoConnect: true,
-    });
-    socketRef.current = socket;
+    let socket;
+    let triedLocalSocket = false;
+    let disposed = false;
+
+    const connectSocket = (url) => {
+      socket = io(url, {
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 20,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        auth: { token: getStoredAuthToken() },
+        autoConnect: true,
+      });
+      socketRef.current = socket;
 
       // Real-time booking + notification updates
       socket.on('newJobLead', () => fetchBookings());
@@ -521,6 +526,14 @@ export const AppProvider = ({ children }) => {
     });
 
     socket.on('connect_error', (err) => {
+      if (!triedLocalSocket && !disposed && url === SOCKET_URL) {
+        // Keep Render as the first and only primary socket target. Localhost
+        // is attempted only after Render cannot establish a connection.
+        triedLocalSocket = true;
+        socket.disconnect();
+        connectSocket(LOCAL_SOCKET_URL);
+        return;
+      }
       setConnectionStatus('reconnecting');
       console.warn('Socket connect error:', err?.message || err);
     });
@@ -533,6 +546,9 @@ export const AppProvider = ({ children }) => {
       setConnectionStatus('offline');
       console.warn('Socket failed to reconnect after attempts');
     });
+    };
+
+    connectSocket(SOCKET_URL);
 
     // Poll bookings every 30s (reduced from 10s), no notification polling
     fetchBookings();
@@ -544,7 +560,8 @@ export const AppProvider = ({ children }) => {
 
     return () => {
       window.clearInterval(intervalId);
-      socket.disconnect();
+      disposed = true;
+      socket?.disconnect();
       socketRef.current = null;
     };
     // Socket should only reconnect when user identity/role changes.
@@ -644,19 +661,24 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const updateProviderAvailability = async (providerId, availableDays, timeSlots, availabilitySlots = []) => {
+  const updateProviderAvailability = async (providerId, availableDays, timeSlots, availabilitySlots) => {
     try {
+      const payload = { availableDays, timeSlots };
+      if (availabilitySlots !== undefined) payload.availabilitySlots = availabilitySlots;
       const res = await api(`${API_BASE_URL}/providers/${providerId}/availability`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ availableDays, timeSlots, availabilitySlots })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.id) {
         setProviders(prev => prev.map(p => p.id === providerId ? data : p));
+        return data;
       }
+      throw new Error(data?.message || data?.error || 'Failed to save availability.');
     } catch (err) {
       console.error('Failed to update availability:', err);
+      throw err;
     }
   };
 
@@ -670,11 +692,12 @@ export const AppProvider = ({ children }) => {
       const data = await res.json();
       if (data.id) {
         setProviders(prev => prev.map(p => p.id === providerId ? data : p));
+        return data;
       }
-      return data;
+      throw new Error(data?.message || data?.error || 'Failed to update provider profile.');
     } catch (err) {
       console.error('Failed to update provider profile:', err);
-      return { error: 'Network error' };
+      throw err;
     }
   };
 
@@ -686,7 +709,7 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(profileData)
       });
       const data = await res.json();
-      if (res.ok && data?.success) {
+      if (res.ok && data?.user) {
         setCurrentUser(data.user);
       }
       return data;

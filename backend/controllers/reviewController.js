@@ -51,21 +51,23 @@ export const ReviewController = {
 
   create: async (req, res) => {
     try {
-      const { reviewerName, rating, comment, serviceCategory, providerId, bookingId } = req.body;
+      const { rating, comment, serviceCategory, providerId, bookingId } = req.body;
       const reviewerId = req.user.id;
 
       if (req.user.role !== 'customer') {
         return sendApiError(res, 403, 'FORBIDDEN', 'Only customers can leave provider reviews.');
       }
-      if (!reviewerName || rating === undefined || !providerId) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing core review parameters (reviewerId, reviewerName, rating, providerId)', {
+      if (rating === undefined || !providerId) {
+        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing core review parameters (rating, providerId)', {
           missing: {
-            reviewerName: !reviewerName,
             rating: rating === undefined,
             providerId: !providerId
           }
         });
       }
+
+      const reviewer = await prisma.user.findUnique({ where: { id: reviewerId }, select: { name: true } });
+      if (!reviewer) return sendApiError(res, 404, 'NOT_FOUND', 'Customer account not found.');
 
       const parsedRating = Number(rating);
       if (Number.isNaN(parsedRating)) {
@@ -100,7 +102,7 @@ export const ReviewController = {
       const review = await prisma.review.create({
         data: {
           reviewerId,
-          reviewerName,
+          reviewerName: reviewer.name,
           rating: parsedRating,
           comment: safeComment,
           serviceCategory,

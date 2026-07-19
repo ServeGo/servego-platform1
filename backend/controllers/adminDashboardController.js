@@ -150,7 +150,8 @@ export const AdminDashboardController = {
         }
       };
 
-      const [escrow, disputedTickets] = await Promise.all([
+      // Aggregate booking amount for escrow volume (Prisma aggregate supports _sum).
+      const [escrowAgg, disputedTickets] = await Promise.all([
         prisma.booking.aggregate({
           _sum: { amount: true },
           where: { paymentStatus: { in: ['PENDING', 'PAID'] } }
@@ -159,11 +160,15 @@ export const AdminDashboardController = {
           where: { status: 'OPEN', subject: { contains: 'dispute', mode: 'insensitive' } }
         })
       ]);
+
+      const sumAmount = escrowAgg?._sum?.amount ?? 0;
+
+
       // No payout/commission model exists yet, so net payout is deliberately
       // reported as the gateway-settled gross amount rather than invented.
       summary.aggregates = {
-        grossEscrowVolume: Number(escrow._sum.amount || 0),
-        adminNetPayout: Number(escrow._sum.amount || 0),
+        grossEscrowVolume: Number(sumAmount),
+        adminNetPayout: Number(sumAmount),
         vettingBacklogCount: pendingApprovals,
         disputeTicketsCount: disputedTickets
       };
@@ -179,6 +184,9 @@ export const AdminDashboardController = {
   getAnalytics: async (req, res) => {
     try {
       const { period = '30d' } = req.query;
+      if (!['7d', '30d', '90d'].includes(period)) {
+        return sendApiError(res, 400, 'INVALID_PERIOD', 'period must be one of: 7d, 30d, 90d.');
+      }
       
       let startDate = new Date();
       if (period === '7d') {
@@ -187,8 +195,6 @@ export const AdminDashboardController = {
         startDate.setDate(startDate.getDate() - 30);
       } else if (period === '90d') {
         startDate.setDate(startDate.getDate() - 90);
-      } else {
-        startDate.setDate(startDate.getDate() - 30);
       }
 
       // Get booking trends
