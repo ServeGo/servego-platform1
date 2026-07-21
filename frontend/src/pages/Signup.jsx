@@ -3,435 +3,239 @@ import { useApp } from '../context/AppContext';
 import { User, Briefcase, Mail, Lock, Phone, ShieldAlert, Sparkles, Eye, EyeOff } from 'lucide-react';
 
 export function Signup({ onNavigate }) {
-  // Read partner application query params (set by BecomePartner page)
-  const getQueryParam = (key) => {
-    try {
-      const params = new URLSearchParams(
-        window.location.hash.includes('?') ? window.location.hash.split('?')[1] : window.location.search
-      );
-      return params.get(key);
-    } catch {
-      return null;
-    }
-  };
-
-  const partnerApplied = getQueryParam('partnerApplied');
-  const partnerMessage = decodeURIComponent(getQueryParam('partnerMessage') || '');
   const { registerUser } = useApp();
-
-
   const [signupType, setSignupType] = useState('customer');
-
-  // Customer fields
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
-
-  // Provider fields
-  const [photoDataUrl, setPhotoDataUrl] = useState(''); // base64 data URL
-
-  // Password fields
+  const [photoDataUrl, setPhotoDataUrl] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Partner application redirect notice
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const applied = params.get('partnerApplied');
-    if (applied === '1') {
+    if (params.get('partnerApplied') === '1') {
       setSignupType('provider');
       const msg = params.get('partnerMessage');
-      const decoded = msg
-        ? decodeURIComponent(msg)
-        : 'successfully submitted. Please register your account to continue.';
-      setSuccessMsg(decoded);
-      setErrorMsg('');
+      setSuccessMsg(msg ? decodeURIComponent(msg) : 'Application submitted. Please register your account.');
     }
   }, []);
 
-  const resetErrorsAndSuccess = () => {
-    setErrorMsg('');
-    setSuccessMsg('');
-  };
-
-  const validateCommon = () => {
-    if (!fullName.trim()) return 'Please enter your full name.';
-    if (!email.trim() || !email.includes('@')) return 'Please enter a valid email address.';
-    if (!mobileNumber.trim() || mobileNumber.trim().length < 10)
-      return 'Please enter a valid mobile number (at least 10 digits).';
-    if (!password || password.length < 8 || !/[a-z]/.test(password) || !/\d/.test(password)) {
-      return 'Password must be at least 8 characters and include a lowercase letter and a number.';
-    }
-    if (password !== confirmPassword) return 'Password and Confirm Password must match.';
-    if (!acceptedTerms) return 'You must agree to the Terms & Conditions to continue.';
-    return null;
-  };
-
-  const validateCustomer = () => {
-    if (!address.trim()) return 'Please enter your address.';
-    if (!pincode.trim()) return 'Please enter your pincode.';
-    if (!/^[0-9]{5,6}$/.test(pincode.trim())) return 'Please enter a valid pincode (5-6 digits).';
-    return null;
-  };
-
-  
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    resetErrorsAndSuccess();
+    setErrorMsg('');
+    setSuccessMsg('');
 
-    const commonError = validateCommon();
-
-    if (commonError) {
-      setErrorMsg(commonError);
-      return;
-    }
-
-    if (signupType === 'customer') {
-      const customerError = validateCustomer();
-      if (customerError) {
-        setErrorMsg(customerError);
-        return;
-      }
-    }
+    if (!fullName.trim()) { setErrorMsg('Please enter your full name.'); return; }
+    if (!email.trim() || !email.includes('@')) { setErrorMsg('Please enter a valid email.'); return; }
+    if (!mobileNumber.trim() || mobileNumber.trim().length < 10) { setErrorMsg('Please enter a valid mobile number.'); return; }
+    if (signupType === 'customer' && !address.trim()) { setErrorMsg('Please enter your address.'); return; }
+    if (signupType === 'customer' && (!pincode.trim() || !/^[0-9]{5,6}$/.test(pincode.trim()))) { setErrorMsg('Please enter a valid pincode.'); return; }
+    if (!password || password.length < 8) { setErrorMsg('Password must be at least 8 characters.'); return; }
+    if (password !== confirmPassword) { setErrorMsg('Passwords do not match.'); return; }
+    if (!acceptedTerms) { setErrorMsg('You must agree to the Terms & Conditions.'); return; }
 
     setIsLoading(true);
-
-
-    const payload =
-      signupType === 'customer'
-        ? {
-            name: fullName.trim(),
-            email: email.trim(),
-            phone: mobileNumber.trim(),
-            role: signupType,
-            password,
-            confirmPassword,
-            address: address.trim(),
-            pincode: pincode.trim(),
-            acceptedTerms
-          }
-        : {
-            name: fullName.trim(),
-            email: email.trim(),
-            phone: mobileNumber.trim(),
-            role: signupType,
-            password,
-            confirmPassword,
-            photo: photoDataUrl || null,
-            acceptedTerms
-          };
-
+    const payload = signupType === 'customer'
+      ? { name: fullName.trim(), email: email.trim(), phone: mobileNumber.trim(), role: signupType, password, confirmPassword, address: address.trim(), pincode: pincode.trim(), acceptedTerms }
+      : { name: fullName.trim(), email: email.trim(), phone: mobileNumber.trim(), role: signupType, password, confirmPassword, photo: photoDataUrl || null, acceptedTerms };
 
     const result = await registerUser(payload);
-
     setIsLoading(false);
 
     if (result && !result.success) {
-      setErrorMsg(result.error || 'Failed to complete registration.');
+      setErrorMsg(result.error || 'Registration failed.');
       return;
     }
-
-    setSuccessMsg(
-      `Welcome to ServeGo, ${fullName}! Your account has been registered successfully. Getting things ready...`
-    );
-
-    setTimeout(() => {
-      if (signupType === 'customer') {
-        onNavigate('dashboard-customer');
-      } else {
-        onNavigate('dashboard-provider');
-      }
-    }, 1500);
+    setSuccessMsg('Account created successfully! Redirecting...');
+    setTimeout(() => onNavigate(signupType === 'customer' ? 'dashboard-customer' : 'dashboard-provider'), 1200);
   };
 
   return (
-    <div id="signup-container-page" className="min-h-[85vh] bg-slate-50 py-12 px-4 sm:px-6 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-6 sm:p-10 shadow-lg relative">
-        
-        {/* Alerts */}
-        {errorMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-xs font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-rose-500 block shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {partnerApplied === '1' && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 block shrink-0 animate-ping" />
-            <span>{partnerMessage || 'Application submitted successfully. Please register your account.'}</span>
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 block shrink-0 animate-ping" />
-            <span>{successMsg}</span>
-          </div>
-        )}
-
-        {/* Brand Banner */}
-        <div className="text-center mb-8">
-          <div className="inline-flex w-10 h-10 rounded-xl bg-slate-900 items-center justify-center text-white font-extrabold text-lg shadow-sm mb-3">
-            S⚙
-          </div>
-          <h2 className="text-2xl font-extrabold text-slate-950 tracking-tight font-sans">
-            Create Your Account
-          </h2>
-          <p className="text-slate-500 text-xs mt-1.5 font-medium leading-relaxed">
-            Join thousands of Hyderabad residents booking trusted local experts easily.
-          </p>
-        </div>
-
-        {/* Signup Tab Selector */}
-        <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl mb-6">
-          <button
-            type="button"
-            onClick={() => {
-              setSignupType('customer');
-              setErrorMsg('');
-            }}
-            className={`py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              signupType === 'customer'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-
-            <span>As Customer</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSignupType('provider');
-              setErrorMsg('');
-            }}
-            className={`py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              signupType === 'provider'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5" />
-            <span>As Provider</span>
-          </button>
-        </div>
-
-        {/* Main form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Full Name *</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <User className="w-4 h-4" />
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-md enterprise-slide-up">
+        <div className="enterprise-card p-8 sm:p-10">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2.5 mb-4">
+              <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center">
+                <span className="text-white font-extrabold text-sm leading-none">S</span>
               </div>
-              <input
-                type="text"
-                required
-                placeholder="Enter your first and last name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
+              <span className="font-extrabold text-surface-900 text-lg tracking-tight">ServeGo</span>
             </div>
+            <h2 className="text-xl font-extrabold text-surface-900 tracking-tight">Create Your Account</h2>
+            <p className="text-surface-500 text-[13px] mt-1.5 font-medium">Join thousands booking trusted local experts.</p>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Email Address *</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Mail className="w-4 h-4" />
-              </div>
-              <input
-                type="email"
-                required
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
+          {/* Alerts */}
+          {errorMsg && (
+            <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-700 text-[12px] font-semibold flex items-start gap-2.5 enterprise-fade-in">
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1" />
+              <span>{errorMsg}</span>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Mobile Number *</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Phone className="w-4 h-4" />
-              </div>
-              <input
-                type="tel"
-                required
-                placeholder="e.g. 9848022311"
-                value={mobileNumber}
-                onChange={(e) => setMobileNumber(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
-            </div>
-          </div>
-
-          {signupType === 'customer' && (
-            <>
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Address with pincode *</label>
-                <textarea
-                  required
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="House no, Street, Locality"
-                  className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg px-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none min-h-[46px] resize-none"
-                />
-                <div className="mt-3">
-                  <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Pincode *</label>
-                  <input
-                    type="text"
-                    required
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    placeholder="e.g. 500081"
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg px-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-                  />
-                </div>
-              </div>
-            </>
           )}
-
-          {signupType === 'provider' && (
-            <div className="p-3 bg-slate-50 mb-2 rounded-xl border border-slate-200 space-y-3 animate-fade-in">
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1 font-sans">photo (optional)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) {
-                      setPhotoDataUrl('');
-                      return;
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setPhotoDataUrl(typeof reader.result === 'string' ? reader.result : '');
-                    };
-                    reader.readAsDataURL(file);
-                  }}
-                  className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-800 outline-none"
-                />
-                {photoDataUrl && (
-                  <img
-                    src={photoDataUrl}
-                    alt="provider"
-                    className="mt-3 w-16 h-16 rounded-lg object-cover border border-slate-200"
-                  />
-                )}
-              </div>
-
-
+          {successMsg && (
+            <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[12px] font-semibold flex items-start gap-2.5 enterprise-fade-in">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1 animate-pulse" />
+              <span>{successMsg}</span>
             </div>
           )}
 
-
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Password *</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Lock className="w-4 h-4" />
-              </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
-              <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-
-
-            </div>
+          {/* Role Toggle */}
+          <div className="grid grid-cols-2 p-1 bg-surface-100 rounded-xl mb-6">
+            {[
+              { key: 'customer', label: 'As Customer', icon: User },
+              { key: 'provider', label: 'As Provider', icon: Briefcase },
+            ].map((opt) => {
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => { setSignupType(opt.key); setErrorMsg(''); }}
+                  className={`py-2.5 px-3 text-[12px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    signupType === opt.key ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Confirm Password *</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Lock className="w-4 h-4" />
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            {/* Full Name */}
+            <div>
+              <label className="enterprise-label">Full Name</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400"><User className="w-4 h-4" /></div>
+                <input type="text" required placeholder="First and last name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="enterprise-input pl-10" />
               </div>
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                required
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
-              <button type="button" onClick={() => setShowConfirmPassword((value) => !value)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
-                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
             </div>
-          </div>
 
-          <label className="flex items-start gap-2 text-[10px] font-semibold text-slate-600 leading-relaxed">
-            <input
-              type="checkbox"
-              checked={acceptedTerms}
-              onChange={(e) => setAcceptedTerms(e.target.checked)}
-              className="mt-0.5 w-3.5 h-3.5 accent-teal-700"
-            />
-            <span>
-              ☐ I agree to the <span className="text-slate-900 font-extrabold">Terms &amp; Conditions</span>
-            </span>
-          </label>
+            {/* Email */}
+            <div>
+              <label className="enterprise-label">Email Address</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400"><Mail className="w-4 h-4" /></div>
+                <input type="email" required placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="enterprise-input pl-10" />
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-teal-700 hover:bg-teal-800 disabled:bg-slate-400 text-white font-bold py-3 px-4 rounded-xl text-xs tracking-wider transition-all uppercase flex items-center justify-center gap-2 shadow-xs mt-6"
-          >
-            {isLoading ? (
-              <span>Creating your account...</span>
-            ) : (
+            {/* Phone */}
+            <div>
+              <label className="enterprise-label">Mobile Number</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400"><Phone className="w-4 h-4" /></div>
+                <input type="tel" required placeholder="e.g. 9848022311" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} className="enterprise-input pl-10" />
+              </div>
+            </div>
+
+            {/* Customer Address */}
+            {signupType === 'customer' && (
               <>
-                <span>Create Account</span>
-                <Sparkles className="w-4 h-4" />
+                <div>
+                  <label className="enterprise-label">Address</label>
+                  <textarea required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House no, Street, Locality" className="enterprise-input min-h-[42px] resize-none" rows={2} />
+                </div>
+                <div>
+                  <label className="enterprise-label">Pincode</label>
+                  <input type="text" required value={pincode} onChange={(e) => setPincode(e.target.value)} placeholder="e.g. 500081" className="enterprise-input" />
+                </div>
               </>
             )}
-          </button>
 
-          {signupType === 'provider' && (
-            <div className="text-[10px] font-semibold text-slate-400 text-center leading-relaxed mt-2.5 flex items-start gap-1 justify-center bg-amber-50/50 p-2 rounded-lg border border-amber-100/50">
+            {/* Provider Photo */}
+            {signupType === 'provider' && (
+              <div className="p-3 bg-surface-50 rounded-xl border border-surface-200">
+                <label className="enterprise-label">Photo (optional)</label>
+                <input
+                  type="file" accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) { setPhotoDataUrl(''); return; }
+                    const reader = new FileReader();
+                    reader.onloadend = () => setPhotoDataUrl(typeof reader.result === 'string' ? reader.result : '');
+                    reader.readAsDataURL(file);
+                  }}
+                  className="enterprise-input !bg-white"
+                />
+                {photoDataUrl && <img src={photoDataUrl} alt="provider" className="mt-2 w-14 h-14 rounded-xl object-cover border border-surface-200" />}
+              </div>
+            )}
 
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-              <span>By registering, you confirm you have basic business eligibility under Hyderabad local guidelines.</span>
+            {/* Password */}
+            <div>
+              <label className="enterprise-label">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400"><Lock className="w-4 h-4" /></div>
+                <input type={showPassword ? 'text' : 'password'} required placeholder="Min 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="enterprise-input pl-10 pr-10" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-surface-400 hover:text-surface-600">
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          )}
 
-          <div className="text-center mt-6 pt-5 border-t border-slate-100">
-            <span className="text-slate-500 text-xs">Already have an account? </span>
-            <button
-              type="button"
-              onClick={() => onNavigate('login')}
-              className="text-teal-700 font-extrabold text-xs hover:underline"
-            >
+            {/* Confirm Password */}
+            <div>
+              <label className="enterprise-label">Confirm Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400"><Lock className="w-4 h-4" /></div>
+                <input type={showConfirmPassword ? 'text' : 'password'} required placeholder="Re-enter password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="enterprise-input pl-10 pr-10" />
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-surface-400 hover:text-surface-600">
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Terms */}
+            <label className="flex items-start gap-2.5 text-[12px] font-medium text-surface-600 leading-relaxed cursor-pointer">
+              <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+              <span>I agree to the <span className="text-surface-900 font-bold">Terms & Conditions</span></span>
+            </label>
+
+            {/* Provider Disclaimer */}
+            {signupType === 'provider' && (
+              <div className="text-[11px] font-medium text-surface-500 bg-amber-50/50 p-2.5 rounded-lg border border-amber-100/50 flex items-start gap-2">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <span>By registering, you confirm you have basic business eligibility under Hyderabad local guidelines.</span>
+              </div>
+            )}
+
+            <button type="submit" disabled={isLoading} className="enterprise-btn-primary w-full !py-3 !text-[13px] mt-2">
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Creating account...
+                </span>
+              ) : (
+                <>
+                  <span>Create Account</span>
+                  <Sparkles className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="text-center mt-6 pt-5 border-t border-surface-100">
+            <span className="text-surface-500 text-[12px]">Already have an account? </span>
+            <button onClick={() => onNavigate('login')} className="text-brand-700 font-bold text-[12px] hover:text-brand-800 transition-colors">
               Sign In
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 }
+
+export default Signup;

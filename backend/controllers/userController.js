@@ -1,18 +1,62 @@
-import bcrypt from 'bcryptjs';
-import prisma from '../prisma/client.js';
-import { generateTokenPair, verifyRefreshToken, isAuthBlocked, recordFailedAuthAttempt } from '../utils/auth.js';
+import { UserRepository } from '../repositories/user.repository.js';
+import { AuthService } from '../services/auth.service.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
-import { validatePasswordStrength } from '../utils/validation.js';
+import { ApiError } from '../errors/ApiError.js';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+
+const resetTokens = new Map();
+
+function generateResetCode() {
+  return crypto.randomInt(100000, 999999).toString();
+}
 
 export const UserController = {
-  forgotPassword: async (_req, res) => {
-    // A reset flow must send a one-time token through a configured mailer;
-    // this repository has no mail transport or token store to do that safely.
-    return sendApiError(res, 501, 'PASSWORD_RESET_NOT_CONFIGURED', 'Password reset email delivery is not configured.');
+  forgotPassword: async (req, res) => {
+    try {
+      const { email } = req.body;
+      const normalizedEmail = String(email).trim().toLowerCase();
+
+      const user = await UserRepository.findByEmail(normalizedEmail);
+      if (!user) {
+        return sendApiSuccess(res, 200, { message: 'If an account exists with this email, a reset code has been sent.' });
+      }
+
+      const code = generateResetCode();
+      resetTokens.set(normalizedEmail, { code, expiresAt: Date.now() + 15 * 60 * 1000 });
+
+      return sendApiSuccess(res, 200, {
+        message: 'If an account exists with this email, a reset code has been sent.',
+        resetToken: code,
+      });
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to process password reset request');
+    }
   },
 
-  resetPassword: async (_req, res) => {
-    return sendApiError(res, 501, 'PASSWORD_RESET_NOT_CONFIGURED', 'Password reset email delivery is not configured.');
+  resetPassword: async (req, res) => {
+    try {
+      const { email, token, newPassword } = req.body;
+      const normalizedEmail = String(email).trim().toLowerCase();
+
+      const stored = resetTokens.get(normalizedEmail);
+      if (!stored || stored.code !== token) {
+        return sendApiError(res, 400, 'INVALID_TOKEN', 'Invalid or incorrect reset code.');
+      }
+      if (Date.now() > stored.expiresAt) {
+        resetTokens.delete(normalizedEmail);
+        return sendApiError(res, 400, 'TOKEN_EXPIRED', 'Reset code has expired. Please request a new one.');
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      await UserRepository.updateByWhere({ email: normalizedEmail }, { password: hashedPassword });
+
+      resetTokens.delete(normalizedEmail);
+
+      return sendApiSuccess(res, 200, { message: 'Password reset successful. You can now sign in with your new password.' });
+    } catch (err) {
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to reset password');
+    }
   },
 
   getUsers: async (req, res) => {
@@ -35,34 +79,22 @@ export const UserController = {
       }
 
       const [users, total] = await Promise.all([
-        prisma.user.findMany({
+        UserRepository.findMany({
           where,
           select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            role: true,
-            avatar: true,
-            status: true,
-            address: true,
-            pincode: true,
-            referralCode: true,
-            referredBy: true,
-            referralsCount: true,
-            referralDiscountBalance: true,
-            referralBonusEarned: true, profileComplete: true,
-            providerId: true,
-            createdAt: true,
-            updatedAt: true,
-            customerProfile: true,
-            providerProfile: true
+            id: true, name: true, email: true, phone: true, role: true,
+            avatar: true, status: true, address: true, pincode: true,
+            referralCode: true, referredBy: true, referralsCount: true,
+            referralDiscountBalance: true, referralBonusEarned: true,
+            profileComplete: true, providerId: true,
+            createdAt: true, updatedAt: true,
+            customerProfile: true, providerProfile: true
           },
           skip,
           take: Math.min(100, Math.max(1, parseInt(limit))),
           orderBy: { createdAt: 'desc' }
         }),
-        prisma.user.count({ where })
+        UserRepository.count(where)
       ]);
 
       return sendApiSuccess(res, 200, {
@@ -75,302 +107,61 @@ export const UserController = {
         }
       });
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve users', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve users');
     }
   },
 
   register: async (req, res) => {
     try {
-      const {
-        name,
-        email,
-        phone,
-        role,
-        password,
-        confirmPassword,
-        address,
-        pincode,
-        photo,
-        serviceInterested,
-        acceptedTerms
-      } = req.body;
-
-      // Basic validation
-      if (!name || !email || !phone || !role || !password) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please fill in all required fields');
-      }
-
-      // Accept boolean true, string 'true', or number 1
-      if (acceptedTerms !== true && acceptedTerms !== 'true' && acceptedTerms !== 1 && acceptedTerms !== '1') {
-        return sendApiError(res, 400, 'TERMS_NOT_ACCEPTED', 'Please accept the Terms & Conditions to continue');
-      }
-
-      if (!confirmPassword) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please confirm your password');
-      }
-
-      if (password !== confirmPassword) {
-        return sendApiError(res, 400, 'PASSWORD_MISMATCH', 'Passwords do not match. Please try again.');
-      }
-
-      // Password strength validation
-      const passwordErrors = validatePasswordStrength(password);
-      if (passwordErrors.length > 0) {
-        return sendApiError(res, 400, 'WEAK_PASSWORD', 'Password must be at least 8 characters and include a lowercase letter and a number', passwordErrors);
-      }
-
-      if (role === 'customer') {
-        if (!address || !pincode) {
-          return sendApiError(res, 400, 'MISSING_FIELDS', 'Please enter your address and pincode');
-        }
-        if (!/^[0-9]{5,6}$/.test(String(pincode))) {
-          return sendApiError(res, 400, 'INVALID_PINCODE', 'Please enter a valid 5-6 digit pincode');
-        }
-      } else if (role !== 'provider') {
-        return sendApiError(res, 400, 'INVALID_ROLE', 'Please select either Customer or Provider as your account type');
-      }
-
-      const normalizedEmail = String(email).trim().toLowerCase();
-      const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-      if (existingUser) {
-        return sendApiError(res, 400, 'EMAIL_EXISTS', 'An account with this email already exists. Try logging in instead.');
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 12);
-      const referralCode = `SERVEGO-${role === 'provider' ? 'PRO' : 'CUST'}-${name.substring(0, 3).toUpperCase().replace(/\s/g, 'X')}${Math.floor(10 + Math.random() * 90)}`;
-      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F172A&color=fff&size=150`;
-
-      const newUser = await prisma.user.create({
-        data: {
-          name: name.trim(),
-          email: normalizedEmail,
-          phone: String(phone).trim(),
-          role,
-          password: hashedPassword,
-          avatar,
-          status: 'ACTIVE',
-          address: role === 'customer' ? (address?.trim() || null) : null,
-          pincode: role === 'customer' ? String(pincode).trim() : null,
-          referralCode,
-          referralsCount: 0,
-          referralDiscountBalance: 0
-        }
-      });
-
-      let customerProfile = null;
-      let providerProfile = null;
-
-      if (role === 'customer') {
-        customerProfile = await prisma.customer.create({
-          data: {
-            userId: newUser.id,
-            address: address?.trim(),
-            pincode: String(pincode).trim(),
-            preferences: []
-          }
-        });
-      }
-
-      if (role === 'provider') {
-        providerProfile = await prisma.provider.create({
-          data: {
-            userId: newUser.id,
-            category: 'General',
-            bio: 'Experienced specialist offering high-quality professional home servicing.',
-            specialties: ['Residential Services', 'Routine Maintenance'],
-            serviceAreas: ['Gachibowli', 'Madhapur', 'Kondapur', 'Jubilee Hills'],
-            photo: photo || null,
-            // Providers are deliberately hidden from public discovery until
-            // an administrator verifies their account.
-            isVerified: false,
-            isFeatured: false,
-            availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-            timeSlots: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM']
-          }
-        });
-
-        await prisma.user.update({
-          where: { id: newUser.id },
-          data: { providerId: providerProfile.id }
-        });
-      }
-
-      await prisma.authEvent.create({
-        data: {
-          userId: newUser.id,
-          email: newUser.email,
-          eventType: 'SIGNUP',
-          success: true,
-          ip: req.ip,
-          userAgent: req.get('user-agent')
-        }
-      });
-
-      const safeUser = {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        role: newUser.role,
-        avatar: newUser.avatar,
-        status: newUser.status,
-        profileComplete: newUser.profileComplete,
-        address: newUser.address,
-        pincode: newUser.pincode,
-        providerId: role === 'provider' ? providerProfile?.id || null : null,
-        customerProfile: customerProfile,
-        providerProfile: providerProfile,
-        referralCode: newUser.referralCode,
-        referredBy: newUser.referredBy,
-        referralsCount: newUser.referralsCount,
-        referralDiscountBalance: newUser.referralDiscountBalance,
-        createdAt: newUser.createdAt,
-        updatedAt: newUser.updatedAt
-      };
-
-      const tokens = generateTokenPair(newUser);
-
-      return sendApiSuccess(res, 201, { user: safeUser, ...tokens });
+      const data = req.body;
+      const result = await AuthService.register(data, { ip: req.ip, userAgent: req.get('user-agent') });
+      return sendApiSuccess(res, 201, result);
     } catch (err) {
-      console.error('Signup registration error:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed',
-        process.env.NODE_ENV !== 'production' ? err.message : undefined);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Server signup registration failed');
     }
   },
 
   login: async (req, res) => {
     try {
       const { email, password } = req.body;
-      
-      if (!email || !password) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Please enter your email and password');
-      }
-
-      const clientIp = req.ip || req.connection?.remoteAddress;
-      if (isAuthBlocked(clientIp)) {
-        return sendApiError(res, 429, 'AUTH_BLOCKED', 'Too many login attempts. Please try again after 15 minutes');
-      }
-
-      const normalizedEmail = String(email).trim().toLowerCase();
-      const user = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
-        include: {
-          customerProfile: true,
-          providerProfile: true
-        }
-      });
-
-      const isValidCredentials = user && await bcrypt.compare(password, user.password);
-      
-      if (!isValidCredentials) {
-        await prisma.authEvent.create({
-          data: {
-            email: normalizedEmail,
-            eventType: 'LOGIN',
-            success: false,
-            ip: clientIp,
-            userAgent: req.get('user-agent')
-          }
-        });
-        
-        recordFailedAuthAttempt(clientIp);
-        
-        return sendApiError(res, 401, 'INVALID_CREDENTIALS', 'Invalid email or password');
-      }
-
-      if (user.status !== 'ACTIVE') {
-        const blockedReason = user.status === 'INACTIVE' || user.status === 'SUSPENDED' ? 'inactive_or_suspended' : 'under_review';
-        return sendApiError(res, 403, 'ACCOUNT_NOT_ACTIVE', 'Your account is not active. Please contact support for assistance', { blockedReason });
-      }
-      if (user.role === 'provider' && user.providerProfile?.accountStatus === 'BLOCKED') {
-        return sendApiError(res, 403, 'PROVIDER_BLOCKED', 'This provider account has been blocked. Please contact support.');
-      }
-
-      await prisma.authEvent.create({
-        data: {
-          userId: user.id,
-          email: user.email,
-          eventType: 'LOGIN',
-          success: true,
-          ip: clientIp,
-          userAgent: req.get('user-agent')
-        }
-      });
-
-      const { password: _, ...safeUser } = user;
-      const tokens = generateTokenPair(user);
-      
-      return sendApiSuccess(res, 200, { user: safeUser, ...tokens });
+      const result = await AuthService.login(email, password, { ip: req.ip, userAgent: req.get('user-agent') });
+      return sendApiSuccess(res, 200, result);
     } catch (err) {
-      console.error('Login error:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again later',
-        process.env.NODE_ENV !== 'production' ? err.message : undefined);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again later');
     }
   },
 
   refreshToken: async (req, res) => {
     try {
       const { refreshToken } = req.body;
-      
-      if (!refreshToken) {
-        return sendApiError(res, 400, 'MISSING_TOKEN', 'Refresh token is required.');
-      }
-
-      const decoded = verifyRefreshToken(refreshToken);
-      if (!decoded) {
-        return sendApiError(res, 401, 'INVALID_REFRESH_TOKEN', 'Invalid or expired refresh token.');
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        select: {
-          id: true,
-          email: true,
-          role: true,
-          status: true
-        }
-      });
-
-      if (!user || user.status !== 'ACTIVE') {
-        return sendApiError(res, 401, 'ACCOUNT_INACTIVE', 'User account is not active.');
-      }
-
-      const tokens = generateTokenPair(user);
-
-      return sendApiSuccess(res, 200, tokens);
+      const result = await AuthService.refreshToken(refreshToken);
+      return sendApiSuccess(res, 200, result);
     } catch (err) {
-      console.error('Token refresh error:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token',
-        process.env.NODE_ENV !== 'production' ? err.message : undefined);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to refresh token');
     }
   },
 
   getMe: async (req, res) => {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        select: {
-          id: true, name: true, email: true, phone: true, role: true,
-          avatar: true, status: true, profileComplete: true, address: true, pincode: true,
-          referralCode: true, referredBy: true, referralsCount: true,
-          referralDiscountBalance: true, referralBonusEarned: true,
-          providerId: true, createdAt: true, updatedAt: true,
-          customerProfile: true,
-          providerProfile: {
-            select: {
-              id: true, category: true, rating: true, reviewCount: true,
-              verificationLevel: true, accountStatus: true, experienceYears: true,
-              jobsCompleted: true, bio: true, specialties: true, serviceAreas: true,
-              photo: true, isVerified: true, isFeatured: true,
-              availableDays: true, timeSlots: true
-            }
-          }
-        }
-      });
-      if (!user) return sendApiError(res, 404, 'NOT_FOUND', 'User not found.');
-      return sendApiSuccess(res, 200, { user });
+      const result = await AuthService.getMe(req.user.id);
+      return sendApiSuccess(res, 200, result);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch user profile', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch user profile');
     }
   },
 
@@ -383,56 +174,37 @@ export const UserController = {
         return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own profile.');
       }
 
-      const user = await prisma.user.findUnique({ where: { id }, include: { customerProfile: true } });
+      const user = await UserRepository.findByIdWithProfiles(id);
       if (!user) {
         return sendApiError(res, 404, 'USER_NOT_FOUND', 'User not found');
       }
 
-      const updatedUser = await prisma.user.update({
-        where: { id },
-        data: {
-          name: name?.trim() ?? user.name,
-          phone: phone?.trim() ?? user.phone,
-          address: address?.trim() ?? user.address,
-          pincode: pincode?.trim() ?? user.pincode
-        },
-        include: {
-          customerProfile: true,
-          providerProfile: true
-        }
-      });
+      const updatedUser = await UserRepository.update(id, {
+        name: name?.trim() ?? user.name,
+        phone: phone?.trim() ?? user.phone,
+        address: address?.trim() ?? user.address,
+        pincode: pincode?.trim() ?? user.pincode
+      }, { customerProfile: true, providerProfile: true });
 
       if (user.role === 'customer') {
         if (user.customerProfile) {
-          await prisma.customer.update({
-            where: { id: user.customerProfile.id },
-            data: {
-              address: address?.trim() ?? user.customerProfile.address,
-              pincode: pincode?.trim() ?? user.customerProfile.pincode
-            }
+          await UserRepository.updateCustomerProfile(user.customerProfile.id, {
+            address: address?.trim() ?? user.customerProfile.address,
+            pincode: pincode?.trim() ?? user.customerProfile.pincode
           });
         } else if (address && pincode) {
-          await prisma.customer.create({
-            data: {
-              userId: user.id,
-              address: address.trim(),
-              pincode: pincode.trim(),
-              preferences: []
-            }
-          });
+          await UserRepository.createCustomerProfile({ userId: user.id, address: address.trim(), pincode: pincode.trim(), preferences: [] });
         }
       }
 
-      const refreshed = await prisma.user.findUnique({
-        where: { id },
-        include: { customerProfile: true, providerProfile: true }
-      });
+      const refreshed = await UserRepository.findByIdWithProfiles(id);
       const { password: __, ...safeUser } = refreshed;
       return sendApiSuccess(res, 200, { user: safeUser });
     } catch (err) {
-      console.error('Failed to update user profile:', err);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile',
-        process.env.NODE_ENV !== 'production' ? err.message : undefined);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update user profile');
     }
   }
 };

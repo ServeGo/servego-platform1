@@ -1,11 +1,11 @@
-import prisma from '../prisma/client.js';
+import { NotificationRepository } from '../repositories/index.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 export const NotificationController = {
   getAll: async (req, res) => {
     try {
       const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
-      const notifications = await prisma.notification.findMany({
+      const notifications = await NotificationRepository.findMany({
         where,
         orderBy: { createdAt: 'desc' }
       });
@@ -24,9 +24,7 @@ export const NotificationController = {
       if (!userId || !title || !message) {
         return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required fields: userId, title, message.');
       }
-      const notif = await prisma.notification.create({
-        data: { userId, title, message, type: type || 'SYSTEM', isRead: false }
-      });
+      const notif = await NotificationRepository.create({ userId, title, message, type: type || 'SYSTEM', isRead: false });
       const io = req.app?.get('socketio');
       if (io) io.to(`user:${userId}`).emit('notification:new', { notificationId: notif.id, type: notif.type });
       return sendApiSuccess(res, 201, notif);
@@ -38,10 +36,10 @@ export const NotificationController = {
   read: async (req, res) => {
     try {
       const { id } = req.params;
-      const existing = await prisma.notification.findUnique({ where: { id }, select: { userId: true } });
+      const existing = await NotificationRepository.findUnique({ id }, { userId: true });
       if (!existing) return sendApiError(res, 404, 'NOT_FOUND', 'Notification not found.');
       if (req.user.role !== 'admin' && existing.userId !== req.user.id) return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own notifications.');
-      const notif = await prisma.notification.update({ where: { id }, data: { isRead: true } });
+      const notif = await NotificationRepository.update({ id }, { isRead: true });
       return sendApiSuccess(res, 200, notif);
     } catch (err) {
       if (err.code === 'P2025') return sendApiError(res, 404, 'NOT_FOUND', 'Notification not found.');
@@ -52,7 +50,7 @@ export const NotificationController = {
   clearAll: async (req, res) => {
     try {
       const where = req.user.role === 'admin' ? {} : { userId: req.user.id };
-      await prisma.notification.deleteMany({ where });
+      await NotificationRepository.deleteMany(where);
       return sendApiSuccess(res, 200, { message: 'Notifications cleared.' });
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to clear notifications', err.message);
@@ -61,10 +59,7 @@ export const NotificationController = {
 
   readAll: async (req, res) => {
     try {
-      await prisma.notification.updateMany({
-        where: { userId: req.user.id, isRead: false },
-        data: { isRead: true }
-      });
+      await NotificationRepository.updateMany({ userId: req.user.id, isRead: false }, { isRead: true });
       return sendApiSuccess(res, 200, { message: 'All notifications marked as read.' });
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to mark all notifications as read', err.message);

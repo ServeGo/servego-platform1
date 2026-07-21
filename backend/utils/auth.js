@@ -1,12 +1,10 @@
 import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
+import { config } from '../config/index.js';
 
-dotenv.config();
-
-const SECRET = process.env.JWT_SECRET || 'servego-dev-secret';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || `${SECRET}-refresh`;
-const ACCESS_TOKEN_EXPIRY = process.env.JWT_EXPIRY || '15m';
-const REFRESH_TOKEN_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
+const SECRET = config.jwtSecret;
+const REFRESH_SECRET = config.jwtRefreshSecret;
+const ACCESS_TOKEN_EXPIRY = config.jwtExpiry;
+const REFRESH_TOKEN_EXPIRY = config.jwtRefreshExpiry;
 
 /**
  * Generate access token with standard claims

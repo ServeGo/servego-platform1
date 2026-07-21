@@ -1,258 +1,305 @@
-import React from 'react';
-import { Calendar, CreditCard, DollarSign, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { X, Calendar, Clock, MapPin, CreditCard, FileText, Check } from 'lucide-react';
 
-export default function BookingModal({ 
-  provider, 
-  onClose, 
-  errorText, 
-  availabilityBusyError,
-
-  bookingDate, setBookingDate, 
-  bookingTimeSlot, setBookingTimeSlot,
-  availableSlots, availabilityLoading,
-  bookingType, setBookingType,
-  bookingEndDate, setBookingEndDate,
-  contractYears, setContractYears,
-  contractDays, setContractDays,
-  contractHours, setContractHours,
-  address, setAddress, 
-  instructions, setInstructions, 
-  paymentMethod, setPaymentMethod,
+export default function BookingModal({
+  provider,
+  onClose,
+  bookingDate,
+  setBookingDate,
+  bookingTimeSlot,
+  setBookingTimeSlot,
+  availableSlots,
+  availabilityLoading,
+  bookingType,
+  setBookingType,
+  address,
+  setAddress,
+  instructions,
+  setInstructions,
+  paymentMethod,
+  setPaymentMethod,
   billMetrics,
   loyaltyTier,
-  onSubmit
+  currentUser,
+  onSubmit,
+  errorText,
+  availabilityBusyError,
+  contractYears,
+  setContractYears,
+  contractDays,
+  setContractDays,
+  contractHours,
+  setContractHours,
+  applyReferralCredit,
+  setApplyReferralCredit,
 }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSubmit && onSubmit();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!provider) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-start justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-2xl w-full relative shadow-2xl animate-fade-in mt-6 mb-6 text-left max-h-[calc(100vh-4rem)] overflow-y-auto hide-scrollbar">
-        
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto enterprise-slide-up">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <div>
-            <h3 className="text-xl font-bold text-slate-900">Configure Your Service</h3>
-            <p className="text-slate-500 text-xs font-medium">Secure booking with {provider.name}</p>
+            <h2 className="text-lg font-bold text-slate-900">Book Service</h2>
+            <p className="text-sm text-slate-500">{provider.name}</p>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="cursor-pointer p-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold"
+            className="p-2 rounded-full hover:bg-slate-100 transition-colors"
           >
-            Exit
+            <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
-        {availabilityBusyError && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs flex items-center gap-2 font-semibold">
-            <AlertCircle className="w-4 h-4" />
-            <span>{availabilityBusyError}</span>
-          </div>
-        )}
-
-        {errorText && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs flex items-center gap-2 font-semibold">
-            <AlertCircle className="w-4 h-4" />
-            <span>{errorText}</span>
-          </div>
-        )}
-
-
-        <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Form area */}
-          <div className="md:col-span-7 space-y-4">
-            <div>
-              <span className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Service Duration</span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBookingType('contract');
-                    setBookingEndDate('');
-                    setContractDays('1');
-                    setContractHours('0');
-                  }}
-                  className={`cursor-pointer py-2 px-4 text-xs font-bold rounded-full border transition-all ${
-                    bookingType === 'contract'
-                      ? 'bg-indigo-600 border-indigo-650 text-white shadow-sm'
-                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Contract
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBookingType('permanent');
-                    setBookingEndDate('');
-                  }}
-                  className={`cursor-pointer py-2 px-4 text-xs font-bold rounded-full border transition-all ${
-                    bookingType === 'permanent'
-                      ? 'bg-indigo-600 border-indigo-650 text-white shadow-sm'
-                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Permanent
-                </button>
-              </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Error */}
+          {errorText && (
+            <div className="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3 border border-red-100">
+              {errorText}
             </div>
+          )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Start Date <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+          {/* Date */}
+          <div>
+            <label className="enterprise-label flex items-center gap-2 mb-2">
+              <Calendar className="w-4 h-4 text-sky-500" />
+              Select Date
+            </label>
+            <input
+              type="date"
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+              className="enterprise-input w-full"
+              required
+            />
+          </div>
+
+          {/* Time slots */}
+          <div>
+            <label className="enterprise-label flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-sky-500" />
+              Select Time
+            </label>
+            {availabilityLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
+                <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                Loading available slots...
+              </div>
+            ) : availabilityBusyError ? (
+              <p className="text-sm text-amber-600 py-2">{availabilityBusyError}</p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {(availableSlots || []).map((slot, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setBookingTimeSlot(slot)}
+                    className={`text-sm font-medium py-2 px-3 rounded-lg border transition-colors ${
+                      bookingTimeSlot === slot
+                        ? 'bg-sky-400 text-slate-900 border-sky-400'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Booking type */}
+          <div>
+            <label className="enterprise-label mb-2 block">Booking Type</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBookingType('contract')}
+                className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition-colors ${
+                  bookingType === 'contract'
+                    ? 'bg-sky-400 text-slate-900 border-sky-400'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'
+                }`}
+              >
+                Contract
+              </button>
+              <button
+                type="button"
+                onClick={() => setBookingType('ongoing')}
+                className={`flex-1 py-3 rounded-lg border text-sm font-semibold transition-colors ${
+                  bookingType === 'ongoing'
+                    ? 'bg-sky-400 text-slate-900 border-sky-400'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'
+                }`}
+              >
+                One-time
+              </button>
+            </div>
+          </div>
+
+          {/* Contract options */}
+          {bookingType === 'contract' && (
+            <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 font-medium mb-1 block">Years</label>
                   <input
-                    type="date"
-                    value={bookingDate}
-                    onChange={(e) => setBookingDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-800 outline-none"
-                    required
+                    type="number"
+                    min="0"
+                    max="5"
+                    value={contractYears}
+                    onChange={(e) => setContractYears(Number(e.target.value))}
+                    className="enterprise-input w-full text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-medium mb-1 block">Days</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={contractDays}
+                    onChange={(e) => setContractDays(Number(e.target.value))}
+                    className="enterprise-input w-full text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-medium mb-1 block">Hours</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={contractHours}
+                    onChange={(e) => setContractHours(Number(e.target.value))}
+                    className="enterprise-input w-full text-sm"
                   />
                 </div>
               </div>
-
-              <div className={bookingType === 'contract' ? 'sm:col-span-2' : 'hidden'}>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                  Contract Length <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <DurationSelect label="Years" value={contractYears} onChange={setContractYears} options={[0, 1, 2, 3, 4, 5]} />
-                  <DurationSelect label="Days" value={contractDays} onChange={setContractDays} options={[0, 1, 2, 3, 4, 5, 6, 7, 14, 21, 30]} />
-                  <DurationSelect label="Hours" value={contractHours} onChange={setContractHours} options={[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 16, 24]} />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-2">Choose the contract duration that fits your service requirement. At least one of years, days, or hours must be selected.</p>
-              </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                Appointment Window <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={bookingTimeSlot}
-                onChange={(e) => setBookingTimeSlot(e.target.value)}
-                disabled={availabilityLoading || !availableSlots.length}
-                required
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none disabled:opacity-60"
-              >
-                <option value="">{availabilityLoading ? 'Loading availability…' : 'Select an available window'}</option>
-                {availableSlots.map((slot) => <option key={slot} value={slot}>{slot}</option>)}
-              </select>
-              {!availabilityLoading && bookingDate && !availableSlots.length ? <p className="text-[11px] text-rose-600 mt-1">No appointment windows are available for this date.</p> : null}
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-                Service Location <span className="text-rose-500">*</span>
-              </label>
-              <textarea
-                placeholder="Flat No, Apartment, Street name, Landmark, Pin"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                rows={2}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-medium text-slate-800 outline-none"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Optional Access Instructions</label>
-              <input 
-                type="text"
-                placeholder="e.g. Ring secondary bell, gate PIN is 4455"
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-800 outline-none"
-              />
-            </div>
-
-            {bookingType === 'contract' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5 font-sans">Payment Method <span className="text-rose-500">*</span></label>
-                <div className="grid grid-cols-2 gap-2">
-                  <PaymentButton active={paymentMethod === 'UPI'} onClick={() => setPaymentMethod('UPI')} icon={<CreditCard className="w-4 h-4" />} label="UPI Apps" />
-                  <PaymentButton active={paymentMethod === 'Card'} onClick={() => setPaymentMethod('Card')} icon={<CreditCard className="w-4 h-4" />} label="Cards" />
-                  <PaymentButton active={paymentMethod === 'Cash'} onClick={() => setPaymentMethod('Cash')} icon={<DollarSign className="w-4 h-4" />} label="Cash After Job" />
-                </div>
-              </div>
-            )}
+          {/* Address */}
+          <div>
+            <label className="enterprise-label flex items-center gap-2 mb-2">
+              <MapPin className="w-4 h-4 text-sky-500" />
+              Service Address
+            </label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Enter your full address"
+              className="enterprise-input w-full"
+              required
+            />
           </div>
 
-          {/* Booking Summary */}
-          <div className="md:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 self-start shadow-xs">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block mb-3">Booking Summary</span>
-            <div className="space-y-2 pb-3 border-b border-slate-100 text-xs font-bold">
-              <BillRow label="Specialist" value={provider.name} />
-              <BillRow label="Plan" value={bookingType === 'contract' ? 'Contract' : 'Permanent'} />
-              <BillRow label="Duration" value={billMetrics.durationLabel} />
-              {bookingType === 'contract' && <BillRow label="Payment" value={paymentMethod} />}
-            </div>
+          {/* Instructions */}
+          <div>
+            <label className="enterprise-label flex items-center gap-2 mb-2">
+              <FileText className="w-4 h-4 text-sky-500" />
+              Special Instructions
+            </label>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="Any specific instructions for the provider..."
+              rows={3}
+              className="enterprise-input w-full resize-none"
+            />
+          </div>
 
-            {loyaltyTier?.tier && (
-              <div className="my-3 bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs font-bold text-amber-700 flex items-center gap-2">
-                <span>👑</span>
-                <span>{loyaltyTier.tier} member perks applied</span>
-              </div>
-            )}
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 font-medium leading-relaxed my-3">
-              {bookingType === 'contract'
-                ? 'Final charges are agreed directly with your specialist after the job is assessed.'
-                : 'We’ll route this request to the provider and confirm details once they verify availability.'}
-            </div>
-
-            <button
-              type="submit"
-              className="cursor-pointer w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-lg text-center text-sm transition-all shadow-md focus:outline-none mt-6"
+          {/* Payment method */}
+          <div>
+            <label className="enterprise-label flex items-center gap-2 mb-2">
+              <CreditCard className="w-4 h-4 text-sky-500" />
+              Payment Method
+            </label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="enterprise-input w-full"
             >
-              {bookingType === 'contract' ? 'Confirm Booking' : 'Request Permanent Service'}
-            </button>
+              <option value="cash">Cash on Delivery</option>
+              <option value="upi">UPI</option>
+              <option value="card">Credit/Debit Card</option>
+              <option value="wallet">Wallet</option>
+            </select>
           </div>
+
+          {/* Referral credit */}
+          {currentUser && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={applyReferralCredit}
+                onChange={(e) => setApplyReferralCredit(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-sky-500 focus:ring-sky-400"
+              />
+              <span className="text-sm text-slate-600">Apply referral credit</span>
+            </label>
+          )}
+
+          {/* Price summary */}
+          {billMetrics && (
+            <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+              <h4 className="text-sm font-bold text-slate-900 mb-2">Price Summary</h4>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Base Price</span>
+                <span className="font-medium text-slate-900">₹{billMetrics.basePrice || provider.price || 0}</span>
+              </div>
+              {billMetrics.discount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Discount</span>
+                  <span className="font-medium text-teal-600">-₹{billMetrics.discount}</span>
+                </div>
+              )}
+              {billMetrics.loyaltyDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Loyalty ({loyaltyTier})</span>
+                  <span className="font-medium text-teal-600">-₹{billMetrics.loyaltyDiscount}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-bold border-t border-slate-200 pt-2 mt-2">
+                <span className="text-slate-900">Total</span>
+                <span className="text-slate-900">₹{billMetrics.total || provider.price || 0}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading || !bookingDate || !bookingTimeSlot || !address}
+            className="enterprise-btn-primary w-full py-3 text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Check className="w-5 h-5" />
+                Confirm Booking
+              </>
+            )}
+          </button>
         </form>
       </div>
-    </div>
-  );
-}
-
-function PaymentButton({ active, onClick, icon, label }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`cursor-pointer p-2.5 rounded-xl border flex items-center gap-2 justify-center transition-all ${
-        active ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'bg-slate-50 border-slate-200 text-slate-600 text-xs hover:bg-slate-100'
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function DurationSelect({ label, value, onChange, options }) {
-  return (
-    <label className="block">
-      <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3 py-2 text-sm font-semibold text-slate-800 outline-none cursor-pointer"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function BillRow({ label, value }) {
-  return (
-    <div className="flex justify-between text-slate-600">
-      <span>{label}</span>
-      <span>{value}</span>
     </div>
   );
 }

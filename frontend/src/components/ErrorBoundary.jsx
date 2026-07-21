@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -28,35 +29,32 @@ export class ErrorBoundary extends React.Component {
         return this.props.fallback({
           error: this.state.error,
           errorInfo: this.state.errorInfo,
-          retry: this.handleRetry
+          retry: this.handleRetry,
         });
       }
 
       return (
-        <div className="min-h-[200px] flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+        <div className="min-h-[300px] flex items-center justify-center p-6">
+          <div className="max-w-md w-full enterprise-card p-8 text-center enterprise-scale-in">
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-red-50 flex items-center justify-center">
+              <AlertTriangle className="w-7 h-7 text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Something went wrong</h3>
-            <p className="text-sm text-red-600 mb-4">
-              {this.state.error?.message || 'An unexpected error occurred'}
+            <h3 className="text-[16px] font-bold text-surface-900 mb-2">Something went wrong</h3>
+            <p className="text-[13px] text-surface-500 mb-6 leading-relaxed">
+              {this.state.error?.message || 'An unexpected error occurred. Our team has been notified.'}
             </p>
-            <div className="flex gap-2 justify-center">
-              {this.props.onRetry && (
-                <button
-                  onClick={this.handleRetry}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                >
-                  Try Again
-                </button>
-              )}
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={this.handleRetry}
+                className="enterprise-btn-primary !text-[13px]"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Try Again</span>
+              </button>
               {this.props.onReport && (
                 <button
                   onClick={this.props.onReport}
-                  className="px-4 py-2 bg-white border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
+                  className="enterprise-btn-secondary !text-[13px]"
                 >
                   Report Issue
                 </button>

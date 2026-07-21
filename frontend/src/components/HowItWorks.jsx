@@ -1,31 +1,57 @@
-import React from 'react';
-
 export default function HowItWorks() {
-  return (
-    <section className="py-12 px-4 max-w-6xl mx-auto">
-      <div className="text-center max-w-2xl mx-auto mb-10">
-        <span className="text-teal-700 font-bold uppercase tracking-wider text-xs">Simple Booking Flow</span>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">Book a service in 3 simple steps</h2>
-        <p className="text-slate-500 text-xs sm:text-sm mt-1.5 font-semibold">Easy, fast, and completely stress-free booking.</p>
-      </div>
+  const steps = [
+    {
+      number: 1,
+      title: 'Book',
+      description: 'Choose your service and select a time that works for you.',
+    },
+    {
+      number: 2,
+      title: 'Match',
+      description: 'We connect you with a verified professional in your area.',
+    },
+    {
+      number: 3,
+      title: 'Done',
+      description: 'Get your service completed with our quality guarantee.',
+    },
+  ];
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-        <Step number="1" title="Select Service" desc="Choose from listed items, pick a preferred professional, and schedule a convenient time." />
-        <Step number="2" title="Secure Payment" desc="Choose secure online options like UPI and cards, or simply pay cash after completion." />
-        <Step number="3" title="Relax & Track" desc="Watch technician progress with secure link updates, and rate your expert after service." />
+  return (
+    <section className="py-16 md:py-20 bg-white">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="text-center mb-14">
+          <p className="text-sky-500 font-semibold text-sm uppercase tracking-wider mb-2">
+            Simple, Fast, Reliable
+          </p>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+            How It Works
+          </h2>
+        </div>
+
+        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-4">
+          {/* Connector lines (desktop only) */}
+          <div className="hidden md:block absolute top-16 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-sky-300 via-sky-400 to-teal-400" />
+
+          {steps.map((step) => (
+            <div
+              key={step.number}
+              className="relative flex flex-col items-center text-center z-10"
+            >
+              {/* Number badge */}
+              <div className="w-16 h-16 rounded-full bg-sky-400 flex items-center justify-center shadow-lg shadow-sky-200 mb-6">
+                <span className="text-2xl font-extrabold text-white">{step.number}</span>
+              </div>
+
+              {/* Card */}
+              <div className="enterprise-card w-full max-w-xs p-6">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">{step.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{step.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
-  );
-}
-
-function Step({ number, title, desc }) {
-  return (
-    <div className="flex flex-col items-center text-center relative z-10 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
-      <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center font-extrabold text-sm mb-3">
-        {number}
-      </div>
-      <h4 className="text-sm font-bold text-slate-900">{title}</h4>
-      <p className="text-slate-500 text-xs mt-2 leading-relaxed font-semibold">{desc}</p>
-    </div>
   );
 }

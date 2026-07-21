@@ -1,52 +1,79 @@
-import React from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle, ArrowRight, LayoutDashboard } from 'lucide-react';
 
 export default function BookingSuccess({ details, onDashboard, onBrowse }) {
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-md w-full text-center shadow-2xl animate-fade-in">
-        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="w-8 h-8" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center enterprise-slide-up">
+        {/* Checkmark */}
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-12 h-12 text-green-500" />
         </div>
-        <span className="text-[10px] bg-emerald-100 font-extrabold text-emerald-850 px-2.5 py-1 rounded uppercase tracking-widest border border-emerald-200">
-          Booking Confirmed
-        </span>
-        <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-4 font-sans tracking-tight leading-none">Service Scheduled</h3>
-        <p className="text-slate-500 text-xs mt-2 font-bold uppercase tracking-tight">
-          Booking ID: <span className="text-indigo-600">{details.id}</span>
+
+        {/* Title */}
+        <h2 className="text-2xl font-extrabold text-slate-900 mb-2">
+          Booking Confirmed!
+        </h2>
+        <p className="text-slate-500 text-sm mb-6">
+          Your service has been booked successfully
         </p>
 
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 my-6 text-left text-xs font-bold space-y-2">
-          <div className="flex justify-between text-slate-500">
-            <span>Specialist:</span>
-            <span className="text-slate-900">{details.providerName}</span>
+        {/* Details */}
+        {details && (
+          <div className="bg-slate-50 rounded-xl p-4 text-left space-y-3 mb-8">
+            {details.providerName && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Provider</span>
+                <span className="font-semibold text-slate-900">{details.providerName}</span>
+              </div>
+            )}
+            {details.service && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Service</span>
+                <span className="font-semibold text-slate-900">{details.service}</span>
+              </div>
+            )}
+            {details.date && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Date</span>
+                <span className="font-semibold text-slate-900">{details.date}</span>
+              </div>
+            )}
+            {details.time && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Time</span>
+                <span className="font-semibold text-slate-900">{details.time}</span>
+              </div>
+            )}
+            {details.total != null && (
+              <div className="flex justify-between text-sm border-t border-slate-200 pt-2">
+                <span className="text-slate-900 font-bold">Total</span>
+                <span className="font-bold text-teal-600">₹{details.total}</span>
+              </div>
+            )}
+            {details.bookingId && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Booking ID</span>
+                <span className="font-mono text-xs text-slate-600">{details.bookingId}</span>
+              </div>
+            )}
           </div>
-          <div className="flex justify-between text-slate-500">
-            <span>Scheduled For:</span>
-            <span className="text-slate-900">{details.bookingDateLabel || details.bookingDate}</span>
-          </div>
-          <div className="flex justify-between text-slate-505">
-            <span>Plan:</span>
-            <span className="text-slate-900">{details.bookingTimeSlot}</span>
-          </div>
-          <div className="flex justify-between text-slate-550 pt-2 border-t border-slate-200">
-            <span>Payment:</span>
-            <span className="text-slate-900 capitalize">{details.paymentMethod || 'On completion'}</span>
-          </div>
-        </div>
+        )}
 
-        <div className="space-y-2">
-          <button 
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
             onClick={onDashboard}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-xl text-center text-xs transition-all shadow-md focus:outline-none"
+            className="flex-1 enterprise-btn-secondary py-3 flex items-center justify-center gap-2 text-sm"
           >
-            Go to My Dashboard
+            <LayoutDashboard className="w-4 h-4" />
+            Go to Dashboard
           </button>
-          <button 
+          <button
             onClick={onBrowse}
-            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-3 rounded-xl text-center text-xs transition-all focus:outline-none"
+            className="flex-1 enterprise-btn-primary py-3 flex items-center justify-center gap-2 text-sm"
           >
-            Book Another Service
+            Book Another
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>

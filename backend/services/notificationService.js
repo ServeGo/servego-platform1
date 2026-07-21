@@ -1,16 +1,15 @@
-import prisma from '../prisma/client.js';
+import { NotificationRepository } from '../repositories/index.js';
+import logger from '../utils/logger.js';
 
 /**
  * Create a notification for a user
  */
 async function createNotification(userId, title, message, type = 'SYSTEM') {
   try {
-    const notification = await prisma.notification.create({
-      data: { userId, title, message, type, isRead: false }
-    });
+    const notification = await NotificationRepository.create({ userId, title, message, type, isRead: false });
     return notification;
   } catch (err) {
-    console.error(`[NotificationService] Failed to create notification for user ${userId}:`, err.message);
+    logger.error(`[NotificationService] Failed to create notification for user ${userId}:`, err.message);
     return null;
   }
 }
@@ -171,19 +170,19 @@ export async function notifyReviewPublished(userId) {
  */
 export async function createBulkNotifications(userIds, title, message, type = 'SYSTEM') {
   try {
-    const notifications = await prisma.notification.createMany({
-      data: userIds.map(userId => ({
+    const notifications = await NotificationRepository.createMany(
+      userIds.map(userId => ({
         userId,
         title,
         message,
         type,
         isRead: false
       })),
-      skipDuplicates: true
-    });
+      true
+    );
     return notifications;
   } catch (err) {
-    console.error('[NotificationService] Bulk notification creation failed:', err.message);
+    logger.error('[NotificationService] Bulk notification creation failed:', err.message);
     return null;
   }
 }

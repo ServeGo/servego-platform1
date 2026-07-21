@@ -1,115 +1,58 @@
-import prisma from '../prisma/client.js';
+import { TicketService } from '../services/ticket.service.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
+import { ApiError } from '../errors/ApiError.js';
 
 export const TicketController = {
   getAll: async (req, res) => {
     try {
-      if (!req.user) {
-        return sendApiError(res, 401, 'UNAUTHORIZED', 'Authentication required');
-      }
-
-      const role = req.user.role;
-
-      if (role !== 'admin') {
-        const tickets = await prisma.ticket.findMany({
-          where: { OR: [{ userId: req.user.id }, { userId: null, requesterEmail: req.user.email }] },
-          orderBy: { createdAt: 'desc' }
-        });
-        return sendApiSuccess(res, 200, tickets);
-      }
-
-      const tickets = await prisma.ticket.findMany({ orderBy: { createdAt: 'desc' } });
+      const tickets = await TicketService.getAll(req.user);
       return sendApiSuccess(res, 200, tickets);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve support tickets', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve support tickets');
     }
   },
 
-
   create: async (req, res) => {
     try {
-      const { subject, message, relatedBookingId } = req.body;
-      const account = req.user
-        ? await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true, email: true } })
-        : null;
-      const name = account?.name || req.body?.name;
-      const email = account?.email || req.body?.email;
-      if (!name || !email || !subject || !message) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing support claim parameters (name, email, subject, message)');
-      }
-      if (relatedBookingId && req.user) {
-        const booking = await prisma.booking.findUnique({ where: { id: relatedBookingId }, select: { customerId: true } });
-        if (!booking || (req.user.role === 'customer' && booking.customerId !== req.user.id)) {
-          return sendApiError(res, 403, 'FORBIDDEN', 'You can only link your own booking to a support ticket.');
-        }
-      }
-
-      const ticket = await prisma.ticket.create({
-        data: {
-          userId: req.user?.id || null,
-          requesterName: name,
-          requesterEmail: email,
-          subject,
-          message,
-          relatedBookingId: relatedBookingId || null,
-          status: 'OPEN'
-        }
-      });
       const io = req.app?.get('socketio');
-      if (io) io.to('room:admin').emit('adminAlert:newSupportTicket', { ticketId: ticket.id });
+      const ticket = await TicketService.create(req.body, req.user, io);
       return sendApiSuccess(res, 201, ticket);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to file support ticket', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to file support ticket');
     }
   },
 
   resolve: async (req, res) => {
     try {
-      if (!req.user) {
-        return sendApiError(res, 401, 'UNAUTHORIZED', 'Authentication required');
-      }
-
-      const role = req.user.role;
-      if (role !== 'admin') return sendApiError(res, 403, 'FORBIDDEN', 'Admin access required');
-
       const { id } = req.params;
       const { response } = req.body;
-
-      if (!response) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'An admin resolution comment string is required.');
-      }
-
-      const ticket = await prisma.ticket.update({
-        where: { id },
-        data: {
-          status: 'RESOLVED',
-          adminResponse: response,
-          resolvedAt: new Date()
-        }
-      });
+      const ticket = await TicketService.resolve(id, response, req.user);
       return sendApiSuccess(res, 200, ticket);
     } catch (err) {
-      if (err.code === 'P2025') {
-        return sendApiError(res, 404, 'NOT_FOUND', 'Support ticket not found');
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
       }
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to resolve support ticket', err.message);
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to resolve support ticket');
     }
-  }
-  ,
+  },
+
   setStatus: async (req, res) => {
     try {
+      const { id } = req.params;
       const { status, response } = req.body || {};
-      if (!['OPEN', 'RESOLVED', 'CLOSED'].includes(String(status).toUpperCase())) return sendApiError(res, 400, 'INVALID_STATUS', 'Status must be OPEN, RESOLVED, or CLOSED.');
-      if (response !== undefined && String(response).trim().length > 2000) return sendApiError(res, 400, 'VALIDATION_ERROR', 'Response cannot exceed 2000 characters.');
-      const data = { status: String(status).toUpperCase() };
-      if (response !== undefined) data.adminResponse = String(response).trim() || null;
-      if (data.status === 'RESOLVED') data.resolvedAt = new Date();
-      const ticket = await prisma.ticket.update({ where: { id: req.params.id }, data });
+      const ticket = await TicketService.setStatus(id, status, response);
       return sendApiSuccess(res, 200, ticket);
     } catch (err) {
-      if (err.code === 'P2025') return sendApiError(res, 404, 'NOT_FOUND', 'Support ticket not found.');
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update support ticket', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update support ticket');
     }
   }
 };
-

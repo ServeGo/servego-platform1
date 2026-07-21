@@ -1,23 +1,38 @@
-import React from 'react';
+import CategoryIcon from './CategoryIcon';
 
 export default function ServiceDetailHeader({ categoryMeta }) {
-  return (
-    <div className="bg-slate-950 rounded-2xl p-8 sm:p-10 text-white mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden border border-indigo-500/10 text-left">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_0%_0%,#1e1b4b_0%,transparent_70%)] opacity-40 pointer-events-none" />
-      <div className="relative z-10 max-w-2xl">
-        <span className="text-indigo-400 font-bold uppercase tracking-wider text-xs">Vetted Hub Specialists</span>
-        <h2 className="text-2xl sm:text-3.5xl font-extrabold font-sans mt-2 tracking-tight leading-none">
-          Licensed {categoryMeta.name}s
-        </h2>
-        <p className="text-slate-400 text-xs sm:text-sm mt-2 leading-relaxed font-medium">
-          {categoryMeta.description} Compare real profiles, read historical client reviews, and book direct with confidence.
-        </p>
-      </div>
+  if (!categoryMeta) return null;
 
-      <div className="relative z-10 flex flex-wrap gap-2 shrink-0 bg-white/5 border border-white/10 p-3 rounded-xl items-center text-xs font-bold text-slate-350">
-        <span>Starting SLA: <span className="font-extrabold text-indigo-400">Within 60 Mins</span></span>
-        <span className="text-slate-600">•</span>
-        <span className="font-mono">Starts ₹{categoryMeta.basePrice}</span>
+  return (
+    <div className="bg-white border-b border-slate-100 shadow-sm">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-start gap-5">
+          <div className="w-16 h-16 rounded-2xl bg-sky-50 flex items-center justify-center flex-shrink-0">
+            <CategoryIcon category={categoryMeta.name} size="lg" />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+              {categoryMeta.name}
+            </h1>
+            {categoryMeta.description && (
+              <p className="mt-2 text-slate-500 text-sm md:text-base leading-relaxed max-w-2xl">
+                {categoryMeta.description}
+              </p>
+            )}
+            {categoryMeta.popularIssues && categoryMeta.popularIssues.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {categoryMeta.popularIssues.map((issue, idx) => (
+                  <span
+                    key={idx}
+                    className="enterprise-badge-info text-xs"
+                  >
+                    {issue}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

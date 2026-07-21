@@ -168,9 +168,10 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await api(`${API_BASE_URL}/providers`);
       const data = await res.json();
-      setProviders(normalizeProviders(data));
+      setProviders(res.ok ? normalizeProviders(data) : []);
     } catch (err) {
       console.error('Failed to fetch providers:', err);
+      setProviders([]);
     }
   };
 
@@ -178,9 +179,10 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await api(`${API_BASE_URL}/services`);
       const data = await res.json();
-      setServices(Array.isArray(data) ? data : []);
+      setServices(res.ok && Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch services:', err);
+      setServices([]);
     }
   };
 
@@ -252,9 +254,10 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await api(`${API_BASE_URL}/notifications`);
       const data = await res.json();
-      setNotifications(normalizeNotifications(data));
+      setNotifications(res.ok ? normalizeNotifications(data) : []);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
+      setNotifications([]);
     }
   };
 
@@ -281,7 +284,7 @@ export const AppProvider = ({ children }) => {
       // Backend returns: { users, pagination }.
       // Keep state compatible with callers that expect `users` to be an array.
       const usersArray = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : [];
-      setUsers(usersArray);
+      setUsers(res.ok ? usersArray : []);
     } catch (err) {
       console.error('Failed to fetch users:', err);
       setUsers([]);

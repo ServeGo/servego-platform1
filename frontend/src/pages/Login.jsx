@@ -2,16 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Mail, Lock, ArrowRight, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
-
-
 export function Login({ onNavigate }) {
   const { login } = useApp();
-
-  // Read redirect intent from URL query param (set by booking flow when unauthenticated)
-  const redirectParam = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('redirect')
-    : null;
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -23,172 +15,148 @@ export function Login({ onNavigate }) {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
-
-    if (!email.trim()) {
-      setErrorMsg('Please enter your email address.');
-      return;
-    }
-    if (!password) {
-      setErrorMsg('Please enter your password.');
-      return;
-    }
+    if (!email.trim()) { setErrorMsg('Please enter your email address.'); return; }
+    if (!password) { setErrorMsg('Please enter your password.'); return; }
 
     setIsLoading(true);
-
     const response = await login(email, password);
     setIsLoading(false);
 
     if (!response.success) {
-      if (response.needsReview || response.blockedReason) {
-        setErrorMsg(response.error || 'Your account is currently under review.');
-      } else {
-        setErrorMsg(response.error || 'Login failed. Please check your email and password.');
-      }
-    } else { 
+      setErrorMsg(response.error || 'Login failed. Please check your credentials.');
+    } else {
       const destRole = response.role;
-      setSuccessMsg(`Welcome Back! Successfully logged in as ${
-        destRole === 'admin' ? 'System Administrator' : destRole === 'provider' ? 'Service Provider' : 'Customer'
-      }. Opening your dashboard...`);
-      
+      setSuccessMsg('Welcome back! Redirecting to your dashboard...');
       setTimeout(() => {
-        // Check for a stored booking intent (set when unauthenticated user clicked Book)
-        const bookingIntentRaw = sessionStorage.getItem('servego_booking_intent');
-        if (bookingIntentRaw && destRole === 'customer') {
-          try {
-            const intent = JSON.parse(bookingIntentRaw);
-            if (intent.catId) {
-              // Navigate back to service-details; the page will resume the modal
-              onNavigate('service-details', intent.catId);
-              return;
-            }
-          } catch {
-            sessionStorage.removeItem('servego_booking_intent');
-          }
-        }
-        // If there's a redirect intent (e.g. from booking flow), honor it
-        if (redirectParam && destRole === 'customer') {
-          // redirectParam is like "service-details/Electrician" — parse and navigate
-          const parts = redirectParam.replace(/^\//, '').split('/');
-          if (parts[0] === 'service-details' && parts[1]) {
-            onNavigate('service-details', decodeURIComponent(parts[1]));
-            return;
-          }
-        }
-        if (destRole === 'customer') {
-          onNavigate('dashboard-customer');
-        } else if (destRole === 'provider') {
-          onNavigate('dashboard-provider');
-        } else if (destRole === 'admin') {
-          onNavigate('admin');
-        }
-      }, 1200);
+        if (destRole === 'customer') onNavigate('dashboard-customer');
+        else if (destRole === 'provider') onNavigate('dashboard-provider');
+        else if (destRole === 'admin') onNavigate('admin');
+      }, 1000);
     }
   };
 
   return (
-    <div id="login-container-page" className="min-h-[85vh] bg-slate-50 py-12 px-4 sm:px-6 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-6 sm:p-10 shadow-lg relative">
-        
-        {/* Messages */}
-        {errorMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 animate-bounce" />
-            <span>{successMsg}</span>
-          </div>
-        )}
-
-        <div className="text-center mb-8">
-          <div className="inline-flex w-10 h-10 rounded-xl bg-slate-900 items-center justify-center text-white font-extrabold text-lg shadow-sm mb-3">
-            S⚙
-          </div>
-          <h2 className="text-2xl font-extrabold text-slate-950 tracking-tight font-sans">
-            Sign In to ServeGo
-          </h2>
-          <p className="text-slate-500 text-xs mt-1.5 font-medium leading-relaxed">
-            Enter your email and password to log safely into your account.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Email address</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Mail className="w-4 h-4" />
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-md enterprise-slide-up">
+        <div className="enterprise-card p-8 sm:p-10">
+          {/* Logo & Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2.5 mb-4">
+              <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center">
+                <span className="text-white font-extrabold text-sm leading-none">S</span>
               </div>
-              <input
-                type="email"
-                required
-                placeholder="anand.kumar@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
+              <span className="font-extrabold text-surface-900 text-lg tracking-tight">ServeGo</span>
             </div>
+            <h2 className="text-xl font-extrabold text-surface-900 tracking-tight">Sign In to Your Account</h2>
+            <p className="text-surface-500 text-[13px] mt-1.5 font-medium">
+              Enter your credentials to access your account.
+            </p>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-1.5 font-sans">Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Lock className="w-4 h-4" />
+          {/* Error Alert */}
+          {errorMsg && (
+            <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-100 text-red-700 text-[12px] font-semibold flex items-start gap-2.5 enterprise-fade-in">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Success Alert */}
+          {successMsg && (
+            <div className="mb-6 p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[12px] font-semibold flex items-start gap-2.5 enterprise-fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="enterprise-label">Email address</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="enterprise-input pl-10"
+                />
               </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 focus:border-teal-600 focus:bg-white rounded-lg pl-9 pr-10 py-2.5 text-xs font-semibold text-slate-800 transition-all outline-none"
-              />
+            </div>
+
+            <div>
+              <label className="enterprise-label">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-surface-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="enterprise-input pl-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-surface-400 hover:text-surface-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-3.5 h-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500" />
+                <span className="text-[12px] font-medium text-surface-600">Remember me</span>
+              </label>
               <button
                 type="button"
-                onClick={() => setShowPassword((value) => !value)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                onClick={() => onNavigate('forgot-password')}
+                className="text-[12px] font-semibold text-brand-700 hover:text-brand-800 transition-colors"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                Forgot password?
               </button>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-teal-700 hover:bg-teal-800 disabled:bg-slate-400 text-white font-bold py-3 px-4 rounded-xl text-xs tracking-wider transition-all uppercase flex items-center justify-center gap-2 shadow-xs mt-6"
-          >
-            {isLoading ? (
-              <span>Logging in...</span>
-            ) : (
-              <>
-                <span>Secure Login</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-
-          <div className="text-center mt-6 pt-5 border-t border-slate-100">
-            <span className="text-slate-500 text-xs">New to ServeGo? </span>
             <button
-              type="button"
-              onClick={() => onNavigate('signup')}
-              className="text-teal-700 font-extrabold text-xs hover:underline"
+              type="submit"
+              disabled={isLoading}
+              className="enterprise-btn-primary w-full !py-3 !text-[13px] mt-2"
             >
-              Sign Up Now
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in...
+                </span>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="text-center mt-6 pt-5 border-t border-surface-100">
+            <span className="text-surface-500 text-[12px]">Don't have an account? </span>
+            <button
+              onClick={() => onNavigate('signup')}
+              className="text-brand-700 font-bold text-[12px] hover:text-brand-800 transition-colors"
+            >
+              Sign Up
             </button>
           </div>
-
-        </form>
-
-
+        </div>
       </div>
     </div>
   );
 }
+
+export default Login;

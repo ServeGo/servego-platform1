@@ -1,12 +1,11 @@
-import prisma from '../prisma/client.js';
+import { AuditRepository } from '../repositories/index.js';
+import logger from '../utils/logger.js';
 
 export async function writeAuditLog({ actorId, actorRole, action, targetType, targetId, oldValue = null, newValue = null, ip = null }) {
   try {
-    return await prisma.auditLog.create({
-      data: { actorId, actorRole, action, targetType, targetId, oldValue, newValue, ip }
-    });
+    return await AuditRepository.create({ actorId, actorRole, action, targetType, targetId, oldValue, newValue, ip });
   } catch (err) {
-    console.error('[AuditLog] Failed to write audit log:', err.message);
+    logger.error('[AuditLog] Failed to write audit log:', err.message);
     return null;
   }
 }

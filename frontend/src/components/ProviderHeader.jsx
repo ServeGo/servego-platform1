@@ -5,7 +5,7 @@ import { api } from '../utils/apiClient';
 
 function ServiceChip({ name }) {
   return (
-    <span className="bg-emerald-500/10 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded border border-emerald-500/20">
+    <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-500/20">
       {name}
     </span>
   );
@@ -14,10 +14,8 @@ function ServiceChip({ name }) {
 export default function ProviderHeader({ provider, completedJobs = 0 }) {
   const { currentUser } = useApp();
   const providerId = provider?.id;
-
   const [approvedServices, setApprovedServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(false);
-
   const isEnabled = !!providerId && !!currentUser;
 
   useEffect(() => {
@@ -28,7 +26,7 @@ export default function ProviderHeader({ provider, completedJobs = 0 }) {
       try {
         const res = await api.get(`/providers/${providerId}/services`);
         const data = res.data;
-        if (!res.ok) throw new Error(data?.message || 'Failed to load services');
+        if (!res.ok) throw new Error(data?.message || 'Failed');
         if (!alive) return;
         const arr = Array.isArray(data) ? data : [];
         setApprovedServices(arr.filter(s => s?.approvalStatus === 'APPROVED'));
@@ -39,11 +37,8 @@ export default function ProviderHeader({ provider, completedJobs = 0 }) {
         if (alive) setLoadingServices(false);
       }
     };
-
     fetchApprovedServices();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [isEnabled, providerId]);
 
   const approvedNames = useMemo(
@@ -52,29 +47,18 @@ export default function ProviderHeader({ provider, completedJobs = 0 }) {
   );
 
   return (
-    <div className="bg-slate-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl mb-8 relative overflow-hidden text-left">
+    <div className="bg-surface-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl mb-8 relative overflow-hidden text-left border border-white/5">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_right_top,#1e293b_10%,transparent_50%)] pointer-events-none" />
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        
-        {/* Info */}
         <div className="flex gap-4 items-center">
-
           {(() => {
             const avatarSrc = provider?.avatar || provider?.photo;
             const name = provider?.name || '';
-
             return avatarSrc ? (
-              <img
-                className="w-14 h-14 rounded-2xl object-cover border-2 border-white/10"
-                src={avatarSrc}
-                alt={`${name || 'Provider'} avatar`}
-              />
+              <img className="w-14 h-14 rounded-2xl object-cover border-2 border-white/10" src={avatarSrc} alt={`${name} avatar`} />
             ) : (
               <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white">
-                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               </div>
             );
           })()}
@@ -83,21 +67,21 @@ export default function ProviderHeader({ provider, completedJobs = 0 }) {
               <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 font-bold uppercase tracking-wide">
                 Active Specialist
               </span>
-              <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase font-bold border border-indigo-500/20">
+              <span className="bg-brand-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase font-bold border border-brand-500/20">
                 {provider.category} Sector
               </span>
             </div>
 
             {loadingServices ? (
-              <div className="mt-2 text-[10px] text-slate-300 font-semibold">Loading approved services...</div>
+              <div className="mt-2 text-[10px] text-surface-300 font-semibold">Loading approved services...</div>
             ) : (
               <div className="mt-3">
-                <span className="text-[9px] uppercase font-black text-slate-500 block tracking-wider mb-1.5">Approved Services</span>
+                <span className="text-[9px] uppercase font-black text-surface-500 block tracking-wider mb-1.5">Approved Services</span>
                 <div className="flex flex-wrap gap-1.5">
                   {approvedNames.length ? (
                     approvedNames.map((n, idx) => <ServiceChip key={`${n}-${idx}`} name={n} />)
                   ) : (
-                    <span className="text-[10px] text-slate-400 font-semibold">No approved services yet.</span>
+                    <span className="text-[10px] text-surface-400 font-semibold">No approved services yet.</span>
                   )}
                 </div>
               </div>
@@ -105,34 +89,32 @@ export default function ProviderHeader({ provider, completedJobs = 0 }) {
 
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <span className="text-[9px] uppercase font-black text-slate-500 block tracking-wider mb-1.5">Trust Level</span>
+                <span className="text-[9px] uppercase font-black text-surface-500 block tracking-wider mb-1.5">Trust Level</span>
                 <VerificationLevelPill provider={provider} dark />
               </div>
               <div>
-                <span className="text-[9px] uppercase font-black text-slate-500 block tracking-wider mb-1.5">Badges</span>
+                <span className="text-[9px] uppercase font-black text-surface-500 block tracking-wider mb-1.5">Badges</span>
                 <ReputationBadgeStrip badges={provider.badges} limit={3} dark />
               </div>
             </div>
 
             <h2 className="text-2xl font-bold font-sans mt-1.5 tracking-tight">{provider.name}</h2>
-            <p className="text-slate-400 text-xs mt-1 font-medium">{provider.phone} • Hyderabad Node</p>
+            <p className="text-surface-400 text-xs mt-1 font-medium">{provider.phone} • Hyderabad Node</p>
           </div>
-
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-6 text-center bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0 text-slate-200">
+        <div className="grid grid-cols-3 gap-2 sm:gap-6 text-center bg-white/5 border border-white/10 p-4 rounded-2xl shrink-0 text-surface-200">
           <div>
-            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Rating</span>
+            <span className="text-[9px] uppercase font-bold text-surface-400 block tracking-wider mb-1">Rating</span>
             <span className="text-base sm:text-lg font-bold text-amber-400 block">⭐ {provider.rating}</span>
           </div>
           <div className="border-x border-white/10 px-2 sm:px-4">
-            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Jobs Done</span>
-            <span className="text-base sm:text-lg font-bold text-slate-100 block">{provider.jobsCompleted}</span>
+            <span className="text-[9px] uppercase font-bold text-surface-400 block tracking-wider mb-1">Jobs Done</span>
+            <span className="text-base sm:text-lg font-bold text-surface-100 block">{provider.jobsCompleted}</span>
           </div>
           <div>
-            <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Completed</span>
-            <span className="text-base sm:text-lg font-bold text-indigo-400 block">{completedJobs}</span>
+            <span className="text-[9px] uppercase font-bold text-surface-400 block tracking-wider mb-1">Completed</span>
+            <span className="text-base sm:text-lg font-bold text-brand-400 block">{completedJobs}</span>
           </div>
         </div>
       </div>

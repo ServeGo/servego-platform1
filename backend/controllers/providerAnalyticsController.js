@@ -1,4 +1,6 @@
-import prisma from '../prisma/client.js';
+import { ProviderRepository } from '../repositories/provider.repository.js';
+import { BookingRepository } from '../repositories/booking.repository.js';
+import { PaymentRepository } from '../repositories/index.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
 
 const toMonthKey = (d) => {
@@ -26,8 +28,7 @@ export const ProviderAnalyticsController = {
         return sendApiError(res, 400, 'INVALID_RANGE', 'range must be one of: 7d, 30d, 90d.');
       }
 
-      const provider = await prisma.provider.findUnique({
-        where: { id: providerId },
+      const provider = await ProviderRepository.findById(providerId, {
         select: { id: true, userId: true }
       });
       if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
@@ -53,7 +54,7 @@ export const ProviderAnalyticsController = {
       }
 
       const [bookings, payments] = await Promise.all([
-        prisma.booking.findMany({
+        BookingRepository.findMany({
           where: whereBookings,
           select: {
             id: true,
@@ -66,7 +67,7 @@ export const ProviderAnalyticsController = {
             bookingDate: true,
           },
         }),
-        prisma.payment.findMany({
+        PaymentRepository.findMany({
           where: {
             booking: {
               providerId,
@@ -197,4 +198,3 @@ export const ProviderAnalyticsController = {
     }
   },
 };
-

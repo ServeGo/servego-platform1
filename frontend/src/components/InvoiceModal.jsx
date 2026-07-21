@@ -1,104 +1,97 @@
 import React from 'react';
-import { Download } from 'lucide-react';
+import { Download, X, FileText } from 'lucide-react';
 
 export default function InvoiceModal({ booking, onClose }) {
+  const subtotal = booking.estimatedCost || 0;
+  const platformFee = 0;
+  const total = subtotal + platformFee;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 max-w-xl w-full relative shadow-2xl animate-fade-in text-slate-800 text-left">
-        
-        <div className="flex items-center justify-between pb-3 border-b border-slate-150 mb-6">
-          <div>
-            <span className="text-[10px] bg-indigo-150 text-indigo-800 px-2.5 py-0.5 rounded uppercase font-bold tracking-wide">
-              Service Summary
-            </span>
-            <h3 className="text-lg font-bold text-slate-900 mt-1">Receipt #{booking.id}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 enterprise-backdrop" onClick={onClose} />
+      <div className="bg-white rounded-xl border border-slate-100 p-6 max-w-lg w-full relative shadow-2xl enterprise-scale-in z-10">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-sky-600" />
+            </div>
+            <div>
+              <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full uppercase font-bold tracking-wide border border-sky-100">
+                Invoice
+              </span>
+              <h3 className="text-lg font-bold text-slate-900 mt-1">Receipt #{booking.id}</h3>
+            </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold"
-          >
-            Close
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
 
-        {/* Invoice Format */}
-        <div className="border border-slate-200 rounded-xl p-6 bg-white space-y-6">
+        <div className="border border-slate-100 rounded-xl p-5 space-y-5">
           <div className="flex justify-between items-start gap-4">
             <div>
-              <h4 className="text-lg font-extrabold text-indigo-600 font-sans tracking-tight">ServeGo Inc.</h4>
-              <span className="text-[10px] text-slate-400 font-semibold block uppercase">Hyderabad Operations Node</span>
+              <h4 className="text-base font-bold text-sky-600">ServeGo Inc.</h4>
+              <span className="text-[10px] text-slate-400 font-medium block uppercase">Hyderabad Operations</span>
             </div>
             <div className="text-right text-xs">
-              <span className="text-slate-500 block">Date Issued</span>
+              <span className="text-slate-400 block">Date</span>
               <span className="text-slate-900 font-bold">{booking.bookingDateLabel || booking.bookingDate}</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold bg-slate-50 p-4 rounded-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium bg-slate-50 p-4 rounded-lg">
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">To Customer</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Customer</span>
               <span className="text-slate-800 font-bold block">{booking.customerName}</span>
               <span className="text-slate-500 font-normal leading-relaxed block mt-0.5">{booking.locationAddress}</span>
-              <span className="text-slate-500 font-normal block">{booking.customerEmail}</span>
             </div>
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">From Specialist</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Provider</span>
               <span className="text-slate-800 font-bold block">{booking.providerName}</span>
               <span className="text-slate-500 font-normal block mt-0.5">Category: {booking.serviceCategory}</span>
-              <span className="text-slate-500 font-normal block">ID: {booking.id}</span>
             </div>
           </div>
 
-          <table className="w-full text-xs font-semibold text-left">
+          <table className="w-full text-xs font-medium">
             <thead>
-              <tr className="border-b border-slate-200 text-[10px] text-slate-400 uppercase tracking-wider font-bold">
-                <th className="py-2">Description</th>
-                <th className="py-2 text-right">Detail</th>
+              <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase">
+                <th className="py-2 text-left font-bold">Description</th>
+                <th className="py-2 text-right font-bold">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-50">
               <tr>
                 <td className="py-2.5">
-                  <span className="font-bold text-slate-900 block">{booking.serviceCategory} Service</span>
-                  <span className="text-[10px] text-slate-500">Completed on {booking.bookingDateLabel || booking.bookingDate}</span>
+                  <span className="font-bold text-slate-800 block">{booking.serviceCategory}</span>
+                  <span className="text-[10px] text-slate-500">{booking.bookingTimeSlot}</span>
                 </td>
-                <td className="py-2.5 text-right text-slate-800 capitalize">{booking.status}</td>
+                <td className="py-2.5 text-right font-bold text-slate-800">₹{subtotal.toLocaleString()}</td>
               </tr>
               <tr>
-                <td className="py-2.5 text-slate-500">Schedule</td>
-                <td className="py-2.5 text-right text-slate-800">{booking.bookingTimeSlot}</td>
-              </tr>
-              <tr>
-                <td className="py-2.5 text-slate-500">Payment Method</td>
-                <td className="py-2.5 text-right text-slate-800 capitalize">{booking.paymentMethod || 'On completion'}</td>
+                <td className="py-2.5 text-slate-500">Platform Fee</td>
+                <td className="py-2.5 text-right font-bold text-slate-800">₹{platformFee}</td>
               </tr>
             </tbody>
           </table>
 
-          <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs">
-            <div className="text-[11px] text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded border border-emerald-100">
+          <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+            <div className="bg-emerald-50 text-emerald-700 font-bold px-3 py-1 rounded-full border border-emerald-100 text-[10px]">
               Service Completed
             </div>
             <div className="text-right">
-              <span className="text-slate-400 text-[10px] uppercase block">Settlement</span>
-              <span className="text-sm font-extrabold text-indigo-600 block leading-none">Direct with specialist</span>
+              <span className="text-slate-400 text-[10px] uppercase block">Total</span>
+              <span className="text-lg font-bold text-slate-900 block leading-none">₹{total.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 flex gap-2">
-          <button 
-            onClick={() => window.print()} 
-            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold p-3 rounded-xl text-xs flex items-center justify-center gap-2 focus:outline-none"
-          >
+        <div className="mt-5 flex gap-3">
+          <button onClick={() => window.print()} className="enterprise-btn-primary flex-1">
             <Download className="w-4 h-4" />
-            <span>Download PDF Document</span>
+            Download PDF
           </button>
-          <button 
-            onClick={onClose}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-3 px-6 rounded-xl text-xs focus:outline-none"
-          >
-            Close Receipt
+          <button onClick={onClose} className="enterprise-btn-secondary px-6">
+            Close
           </button>
         </div>
       </div>

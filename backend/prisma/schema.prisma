@@ -13,7 +13,7 @@ model User {
   email                   String         @unique
   phone                   String
   role                    UserRole
-  password                String
+  password                String?
   avatar                  String?
   status                  AccountStatus  @default(ACTIVE)
   address                 String?
@@ -25,6 +25,8 @@ model User {
   referralBonusEarned     Float          @default(0)
   providerId              String?
   profileComplete         Boolean        @default(false)
+  authProvider            String?
+  googleId                String?
 
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
@@ -35,6 +37,7 @@ model User {
   @@index([email])
   @@index([providerId])
   @@index([createdAt])
+  @@index([googleId])
 
   authEvents              AuthEvent[]
   bookingsAsCustomer      Booking[]      @relation("CustomerBookings")
@@ -337,6 +340,7 @@ enum AuthEventType {
   SIGNUP
   LOGIN
   LOGOUT
+  GOOGLE_LOGIN
 }
 
 enum BookingStatus {

@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { CITIES } from '../data';
 import { isOpenTicket } from '../utils/normalizeAdminData';
-
 
 const normalize = (s) => (s || '').toString().trim().toLowerCase();
 
@@ -91,8 +90,6 @@ export function useAdminPanelController() {
     return (Array.isArray(tickets) ? tickets : []).filter((t) => isOpenTicket(t)).length;
   }, [tickets]);
 
-
-
   const handleTicketResolveSubmit = (tId) => {
     if (!ticketResponse.trim()) return;
     respondToTicket(tId, ticketResponse);
@@ -113,9 +110,7 @@ export function useAdminPanelController() {
   const partnerCountForService = (serviceName) => {
     const sn = normalize(serviceName);
     const svc = (Array.isArray(services) ? services : []).find(s => normalize(s.name) === sn);
-    // Prefer the derived activeSpecialistCount from the backend (correct per spec)
     if (svc && typeof svc.activeSpecialistCount === 'number') return svc.activeSpecialistCount;
-    // Fallback: count providers whose category matches
     return (providers || []).filter((p) => normalize(p.category) === sn).length;
   };
 
@@ -187,6 +182,98 @@ export function useAdminPanelController() {
     setIsAddingService(false);
     setNewServiceForm({ name: '', description: '', popularIssuesText: '' });
   };
+
+  // Enhanced filtering functions
+  const filterBookings = useCallback(({ status, search, dateFrom, dateTo, category } = {}) => {
+    let arr = Array.isArray(bookings) ? bookings : [];
+    if (status && status !== 'all') {
+      arr = arr.filter(b => (b.status || '').toLowerCase() === status.toLowerCase());
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      arr = arr.filter(b =>
+        (b.id || '').toLowerCase().includes(q) ||
+        (b.customerName || '').toLowerCase().includes(q) ||
+        (b.providerName || '').toLowerCase().includes(q)
+      );
+    }
+    if (dateFrom) {
+      arr = arr.filter(b => b.bookingDate >= dateFrom);
+    }
+    if (dateTo) {
+      arr = arr.filter(b => b.bookingDate <= dateTo);
+    }
+    if (category && category !== 'all') {
+      arr = arr.filter(b => (b.serviceCategory || '').toLowerCase() === category.toLowerCase());
+    }
+    return arr;
+  }, [bookings]);
+
+  const filterCustomers = useCallback(({ search, status } = {}) => {
+    let arr = customersList;
+    if (search) {
+      const q = search.toLowerCase();
+      arr = arr.filter(u =>
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q)
+      );
+    }
+    if (status && status !== 'all') {
+      arr = arr.filter(u => (u.status || '').toLowerCase() === status.toLowerCase());
+    }
+    return arr;
+  }, [customersList]);
+
+  const filterProviders = useCallback(({ search, verificationStatus } = {}) => {
+    let arr = providersList;
+    if (search) {
+      const q = search.toLowerCase();
+      arr = arr.filter(p =>
+        (p.name || '').toLowerCase().includes(q) ||
+        (p.email || '').toLowerCase().includes(q)
+      );
+    }
+    if (verificationStatus && verificationStatus !== 'all') {
+      arr = arr.filter(p => {
+        const v = p.isVerified ? 'verified' : 'pending';
+        return v === verificationStatus;
+      });
+    }
+    return arr;
+  }, [providersList]);
+
+  const getMetrics = useCallback(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayBookings = (Array.isArray(bookings) ? bookings : []).filter(b => b.bookingDate === todayStr);
+    const activeProviders = (Array.isArray(providers) ? providers : []).filter(p => p.isVerified).length;
+    const newCustomers = customersList.filter(u => {
+      const d = u.createdAt || u.joinDate;
+      if (!d) return false;
+      return d >= todayStr;
+    });
+    const avgRating = (() => {
+      const rated = (Array.isArray(providers) ? providers : []).filter(p => p.rating);
+      if (!rated.length) return 0;
+      return rated.reduce((s, p) => s + (p.rating || 0), 0) / rated.length;
+    })();
+    return {
+      totalBookingsToday: todayBookings.length,
+      gmv: totalVolume,
+      activeProviders,
+      newCustomers: newCustomers.length,
+      avgRating: avgRating.toFixed(1),
+      todayRevenue: todayBookings.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0),
+    };
+  }, [bookings, providers, customersList, totalVolume]);
+
+  const approveProvider = useCallback(async (serviceRequestId) => {
+    return await approveProviderServiceRequest(serviceRequestId);
+  }, [approveProviderServiceRequest]);
+
+  const rejectProvider = useCallback(async (serviceRequestId, reason) => {
+    return await denyProviderServiceRequest(serviceRequestId, reason);
+  }, [denyProviderServiceRequest]);
 
   return {
     // data
@@ -260,6 +347,13 @@ export function useAdminPanelController() {
     approveProviderServiceRequest,
     denyProviderServiceRequest,
     updateBookingStatus,
+
+    // enhanced filtering
+    filterBookings,
+    filterCustomers,
+    filterProviders,
+    getMetrics,
+    approveProvider,
+    rejectProvider,
   };
 }
-

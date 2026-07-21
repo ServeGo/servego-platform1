@@ -1,339 +1,117 @@
-import prisma from '../prisma/client.js';
-import { refreshProviderReputation } from '../services/providerReputationService.js';
-import { canPerformAction } from '../utils/permissions.js';
-import { writeAuditLog } from '../services/auditLogService.js';
+import { ProviderRepository } from '../repositories/provider.repository.js';
+import { ProviderService } from '../services/provider.service.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
+import { ApiError } from '../errors/ApiError.js';
 
 export const ProviderController = {
   registerOwnProviderService: async (req, res) => {
-    const provider = await prisma.provider.findFirst({
-      where: { userId: req.user.id },
-      select: { id: true, profileComplete: true }
-    });
-    if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
-    if (!provider.profileComplete) {
-      return sendApiError(res, 403, 'PROFILE_INCOMPLETE', 'Complete your provider profile before submitting services.');
+    try {
+      const provider = await ProviderRepository.findByUserId(req.user.id, { id: true, profileComplete: true });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
+      if (!provider.profileComplete) {
+        return sendApiError(res, 403, 'PROFILE_INCOMPLETE', 'Complete your provider profile before submitting services.');
+      }
+
+      const io = req.app?.get('socketio');
+      const created = await ProviderService.registerService(provider.id, req.body, req.user, io);
+      return sendApiSuccess(res, 201, created);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to register provider service');
     }
-    req.params.id = provider.id;
-    return ProviderController.registerProviderService(req, res);
   },
 
   getProviderServices: async (req, res) => {
     try {
       const { id } = req.params;
-
-      const provider = await prisma.provider.findUnique({ where: { id }, select: { userId: true } });
-      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
-      const canViewRequests = req.user?.role === 'admin' || req.user?.id === provider.userId;
-
-      const [approvedLinks, requests] = await Promise.all([
-        prisma.providerService.findMany({
-          where: { providerId: id },
-          include: { service: true },
-          orderBy: { createdAt: 'desc' }
-        }),
-        prisma.providerServiceRequest.findMany({
-          where: {
-            providerId: id,
-            // Pending/denied applications are private to the provider and
-            // admins. Public provider profiles expose approved services only.
-            ...(canViewRequests ? { status: { not: 'APPROVED' } } : { id: '__not_visible__' })
-          },
-          orderBy: { createdAt: 'desc' }
-        })
-      ]);
-
-      const uniqueApprovedLinks = Array.from(
-        new Map(approvedLinks.map((link) => [link.serviceId, link])).values()
-      );
-
-      const formattedApproved = uniqueApprovedLinks.map((link) => ({
-        id: link.id,
-        name: link.service.name,
-        approvalStatus: 'APPROVED',
-        description: link.description,
-        createdAt: link.createdAt
-      }));
-
-      const approvedNameSet = new Set(
-        uniqueApprovedLinks.map((link) => String(link.service.name || '').trim().toLowerCase())
-      );
-
-      const formattedRequests = requests
-        .filter((r) => {
-          const requestedNameNormalized = String(r.requestedServiceName || '').trim().toLowerCase();
-          return !approvedNameSet.has(requestedNameNormalized);
-        })
-        .map((r) => ({
-          id: r.id,
-          name: r.requestedServiceName,
-          approvalStatus: r.status,
-          description: r.description,
-          createdAt: r.createdAt
-        }));
-
-      const combined = [...formattedApproved, ...formattedRequests].sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-
-      return sendApiSuccess(res, 200, combined);
+      const result = await ProviderService.getProviderServices(id, req.user);
+      return sendApiSuccess(res, 200, result);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider services', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider services');
     }
   },
 
   getMyProviderServices: async (req, res) => {
-    const provider = await prisma.provider.findUnique({ where: { userId: req.user.id }, select: { id: true } });
-    if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
-    req.params.id = provider.id;
-    return ProviderController.getProviderServices(req, res);
+    try {
+      const provider = await ProviderRepository.findByUserId(req.user.id, { id: true });
+      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
+      const result = await ProviderService.getProviderServices(provider.id, req.user);
+      return sendApiSuccess(res, 200, result);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch provider services');
+    }
   },
 
   registerProviderService: async (req, res) => {
     try {
       const { id } = req.params;
-      const { serviceName, description, popularIssues, experienceYears } = req.body || {};
-      const role = req.user?.role || req.body?.role || 'provider';
-
-      if (!req.user?.id && role !== 'admin') {
-        return sendApiError(res, 401, 'UNAUTHORIZED', 'Authentication required.');
-      }
-
-      if (role !== 'provider' && role !== 'admin') {
-        return sendApiError(res, 403, 'FORBIDDEN', 'You are not allowed to register a provider service.');
-      }
-
-      if (!serviceName) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: serviceName');
-      }
-      if (!description || !String(description).trim()) {
-        return sendApiError(res, 400, 'MISSING_FIELDS', 'Missing required field: description');
-      }
-
-      const provider = await prisma.provider.findUnique({ where: { id } });
-      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
-      if (role !== 'admin' && provider.userId !== req.user?.id) {
-        return sendApiError(res, 403, 'FORBIDDEN', 'You can only manage your own provider profile.');
-      }
-
-      const requestedService = String(serviceName).trim();
-
-      const existingApproved = await prisma.providerService.findFirst({
-        where: {
-          providerId: provider.id,
-          service: {
-            name: { equals: requestedService, mode: 'insensitive' }
-          }
-        },
-        select: { id: true }
-      });
-      if (existingApproved) {
-        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Service already registered for this provider.');
-      }
-
-      const existingPending = await prisma.providerServiceRequest.findFirst({
-        where: {
-          providerId: provider.id,
-          requestedServiceName: { equals: requestedService, mode: 'insensitive' },
-          status: 'PENDING'
-        },
-        select: { id: true }
-      });
-      if (existingPending) {
-        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Service request already pending approval.');
-      }
-
-      const existingRequest = await prisma.providerServiceRequest.findFirst({
-        where: {
-          providerId: provider.id,
-          requestedServiceName: { equals: requestedService, mode: 'insensitive' }
-        },
-        select: { status: true }
-      });
-
-      if (existingRequest && existingRequest.status !== 'DENIED') {
-        return sendApiError(res, 409, 'DUPLICATE_ENTRY', 'Service request already submitted for this provider.');
-      }
-
-      const created = await prisma.providerServiceRequest.create({
-        data: {
-          providerId: provider.id,
-          requestedServiceName: requestedService,
-          description: String(description).trim(),
-          popularIssues: Array.isArray(popularIssues) ? popularIssues : [],
-          experienceYears:
-            experienceYears !== undefined && experienceYears !== null && experienceYears !== ''
-              ? Number(experienceYears)
-              : null,
-          status: 'PENDING'
-        }
-      });
-
-      // Notify admin room of new approval request
       const io = req.app?.get('socketio');
-      if (io) {
-        io.to('room:admin').emit('newApprovalRequest', {
-          requestId: created.id,
-          providerId: provider.id,
-          serviceName: requestedService
-        });
-      }
-      if (
-        experienceYears !== undefined &&
-        experienceYears !== null &&
-        experienceYears !== '' &&
-        !Number.isNaN(Number(experienceYears))
-      ) {
-        await prisma.provider.update({
-          where: { id },
-          data: { experienceYears: Number(experienceYears) }
-        });
-      }
-
+      const created = await ProviderService.registerService(id, req.body, req.user, io);
       return sendApiSuccess(res, 201, created);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to register provider service', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to register provider service');
     }
   },
 
-
   getAll: async (req, res) => {
     try {
-      const isAdmin = req.user?.role === 'admin';
-      const publicProviderWhere = { accountStatus: 'ACTIVE', isVerified: true, user: { status: 'ACTIVE' } };
-      const providers = await prisma.provider.findMany({
-        // Providers retain access to their own profile even while it awaits
-        // verification or an admin account-status decision.
-        where: isAdmin ? {} : req.user?.role === 'provider' ? { OR: [publicProviderWhere, { userId: req.user.id }] } : publicProviderWhere,
-          include: {
-            user: {
-              // Public provider cards do not need contact details. Admins keep
-              // those fields for account management.
-              select: isAdmin
-                ? { id: true, name: true, email: true, phone: true, avatar: true }
-                : { id: true, name: true, avatar: true }
-            },
-            reviews: true,
-            badges: true
-          }
-        });
+      const providers = await ProviderService.getAll(req.user);
       return sendApiSuccess(res, 200, providers);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch service partners', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to fetch service partners');
     }
   },
 
   getById: async (req, res) => {
     try {
       const { id } = req.params;
-      const isAdmin = req.user?.role === 'admin';
-      const provider = await prisma.provider.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, phone: true, avatar: true }
-          },
-          reviews: true,
-          badges: true,
-          availabilitySlots: true
-        }
-      });
-      if (!provider) {
-        return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
-      }
-      const isOwner = req.user?.role === 'provider' && provider.userId === req.user.id;
-      if (!isAdmin && !isOwner && (!provider.isVerified || provider.accountStatus !== 'ACTIVE' || provider.user?.status !== 'ACTIVE')) {
-        return sendApiError(res, 404, 'NOT_FOUND', 'Service provider not found');
-      }
-      if (!isAdmin && !isOwner && provider.user) {
-        delete provider.user.email;
-        delete provider.user.phone;
-      }
+      const provider = await ProviderService.getById(id, req.user);
       return sendApiSuccess(res, 200, provider);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve provider details', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to retrieve provider details');
     }
   },
 
   updateProfile: async (req, res) => {
     try {
       const { id } = req.params;
-      const { bio, specialties, serviceAreas, experienceYears, phone } = req.body;
-
-      const existing = await prisma.provider.findUnique({ where: { id } });
-      if (!existing) {
-        return sendApiError(res, 404, 'NOT_FOUND', 'Service provider profile missing');
-      }
-      if (req.user.role !== 'admin' && existing.userId !== req.user.id) {
-        return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own provider profile.');
-      }
-
-      const nextBio = bio ?? existing.bio;
-      const nextSpecialties = Array.isArray(specialties) ? specialties : existing.specialties;
-      const nextAreas = Array.isArray(serviceAreas) ? serviceAreas : existing.serviceAreas;
-      const profileComplete = Boolean(String(nextBio || '').trim() && Array.isArray(nextSpecialties) && nextSpecialties.length && Array.isArray(nextAreas) && nextAreas.length);
-      const updated = await prisma.$transaction(async (tx) => {
-        if (phone !== undefined) {
-          await tx.user.update({ where: { id: existing.userId }, data: { phone: String(phone).trim() } });
-        }
-        return tx.provider.update({
-          where: { id },
-          data: {
-            bio: nextBio,
-            specialties: nextSpecialties,
-            serviceAreas: nextAreas,
-            experienceYears: Number.isFinite(Number(experienceYears)) ? Number(experienceYears) : existing.experienceYears,
-            profileComplete
-          },
-          include: { reviews: true, user: { select: { id: true, name: true, email: true, phone: true, avatar: true } } }
-        });
-      });
-
+      const updated = await ProviderService.updateProfile(id, req.body, req.user);
       return sendApiSuccess(res, 200, updated);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update partner profile', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update partner profile');
     }
   },
-
 
   updateAvailability: async (req, res) => {
     try {
       const { id } = req.params;
-      const { availableDays, timeSlots, availabilitySlots } = req.body;
-      const provider = await prisma.provider.findUnique({ where: { id }, select: { userId: true } });
-      if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Service provider profile missing');
-      if (req.user.role !== 'admin' && provider.userId !== req.user.id) {
-        return sendApiError(res, 403, 'FORBIDDEN', 'You can only update your own availability.');
-      }
-      const slots = Array.isArray(availabilitySlots)
-        ? availabilitySlots.map((slot) => ({ dayOfWeek: String(slot?.dayOfWeek || '').trim(), startTime: String(slot?.startTime || '').trim(), endTime: String(slot?.endTime || '').trim() }))
-        : null;
-      if (slots) {
-        if (slots.some((slot) => !slot.dayOfWeek || !/^\d{2}:\d{2}$/.test(slot.startTime) || !/^\d{2}:\d{2}$/.test(slot.endTime) || slot.startTime >= slot.endTime)) {
-          return sendApiError(res, 400, 'INVALID_AVAILABILITY', 'Each slot needs a day and valid start/end times (HH:MM).');
-        }
-        const ordered = [...slots].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.startTime.localeCompare(b.startTime));
-        if (ordered.some((slot, index) => index > 0 && ordered[index - 1].dayOfWeek === slot.dayOfWeek && ordered[index - 1].endTime > slot.startTime)) {
-          return sendApiError(res, 409, 'OVERLAPPING_AVAILABILITY', 'Availability slots cannot overlap on the same day.');
-        }
-      }
-      const updated = await prisma.$transaction(async (tx) => {
-        if (slots) {
-          await tx.availabilitySlot.deleteMany({ where: { providerId: id } });
-          if (slots.length) await tx.availabilitySlot.createMany({ data: slots.map((slot) => ({ ...slot, providerId: id })) });
-        }
-        return tx.provider.update({
-          where: { id },
-          data: {
-            availableDays: Array.isArray(availableDays) ? availableDays : undefined,
-            timeSlots: Array.isArray(timeSlots) ? timeSlots : undefined
-          },
-          include: { availabilitySlots: true }
-        });
-      });
+      const updated = await ProviderService.updateAvailability(id, req.body, req.user);
       return sendApiSuccess(res, 200, updated);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update calendar availability schedule', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to update calendar availability schedule');
     }
   },
 
@@ -341,27 +119,13 @@ export const ProviderController = {
     try {
       const { id } = req.params;
       const { isVerified } = req.body;
-
-      const existing = await prisma.provider.findUnique({ where: { id }, select: { isVerified: true } });
-      if (!existing) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
-
-      await prisma.provider.update({ where: { id }, data: { isVerified: Boolean(isVerified) } });
-      const updated = await refreshProviderReputation(id);
-
-      await writeAuditLog({
-        actorId: req.user.id,
-        actorRole: req.user.role,
-        action: isVerified ? 'VERIFY_PROVIDER' : 'UNVERIFY_PROVIDER',
-        targetType: 'Provider',
-        targetId: id,
-        oldValue: { isVerified: existing.isVerified },
-        newValue: { isVerified: Boolean(isVerified) },
-        ip: req.ip
-      });
-
+      const updated = await ProviderService.verify(id, isVerified, req.user, req.ip);
       return sendApiSuccess(res, 200, updated);
     } catch (err) {
-      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to verify provider credentials', err.message);
+      if (err instanceof ApiError) {
+        return sendApiError(res, err.status, err.code, err.message, err.details);
+      }
+      return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to verify provider credentials');
     }
   }
 };

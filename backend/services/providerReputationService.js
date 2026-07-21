@@ -1,4 +1,5 @@
-import prisma from '../prisma/client.js';
+import { ProviderRepository } from '../repositories/provider.repository.js';
+import { ProviderBadgeRepository } from '../repositories/index.js';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
@@ -86,11 +87,10 @@ function calculateBadgeTypes({ provider, bookings, approvedServiceCount }) {
   return Array.from(badges);
 }
 
-export async function refreshProviderReputation(providerId, client = prisma) {
+export async function refreshProviderReputation(providerId) {
   if (!providerId) return null;
 
-  const provider = await client.provider.findUnique({
-    where: { id: providerId },
+  const provider = await ProviderRepository.findById(providerId, {
     include: {
       reviews: true,
       bookings: {
@@ -132,20 +132,17 @@ export async function refreshProviderReputation(providerId, client = prisma) {
     approvedServiceCount: new Set(provider.providerServices.map((service) => service.serviceId)).size
   });
 
-  const updatedProvider = await client.provider.update({
-    where: { id: providerId },
-    data: {
-      rating,
-      reviewCount,
-      jobsCompleted,
-      verificationLevel
-    }
+  const updatedProvider = await ProviderRepository.update(providerId, {
+    rating,
+    reviewCount,
+    jobsCompleted,
+    verificationLevel
   });
 
-  const existingBadges = await client.providerBadge.findMany({
-    where: { providerId },
-    select: { badgeType: true }
-  });
+  const existingBadges = await ProviderBadgeRepository.findMany(
+    { providerId },
+    { badgeType: true }
+  );
   const existingTypes = new Set(existingBadges.map((badge) => badge.badgeType));
   const nextTypes = new Set(badgeTypes);
 
@@ -153,32 +150,30 @@ export async function refreshProviderReputation(providerId, client = prisma) {
   const toDelete = Array.from(existingTypes).filter((badgeType) => !nextTypes.has(badgeType));
 
   if (toCreate.length) {
-    await client.providerBadge.createMany({
+    await ProviderBadgeRepository.createMany({
       data: toCreate.map((badgeType) => ({ providerId, badgeType })),
       skipDuplicates: true
     });
   }
 
   if (toDelete.length) {
-    await client.providerBadge.deleteMany({
-      where: {
-        providerId,
-        badgeType: { in: toDelete }
-      }
+    await ProviderBadgeRepository.deleteMany({
+      providerId,
+      badgeType: { in: toDelete }
     });
   }
 
   return updatedProvider;
 }
 
-export async function refreshAllProviderReputations(client = prisma) {
-  const providers = await client.provider.findMany({
+export async function refreshAllProviderReputations() {
+  const providers = await ProviderRepository.findMany({
     select: { id: true }
   });
 
   const results = [];
   for (const provider of providers) {
-    results.push(await refreshProviderReputation(provider.id, client));
+    results.push(await refreshProviderReputation(provider.id));
   }
 
   return results;

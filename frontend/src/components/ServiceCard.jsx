@@ -1,77 +1,55 @@
-import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import CategoryIcon from './CategoryIcon';
 
-export default function ServiceCard({ 
-  category, 
-  providers, 
-  onSelect, 
-  onIssueClick 
-}) {
-  const safeProviders = Array.isArray(providers) ? providers : [];
-  // Prefer server-derived count; fall back to client-side count
-  const activeCount = typeof category.activeSpecialistCount === 'number'
-    ? category.activeSpecialistCount
-    : safeProviders.filter(
-        (p) => (p.category || '').toLowerCase() === (category.name || '').toLowerCase() && p.isVerified
-      ).length;
-
-  const verifiedProviders = safeProviders.filter(
-    (p) => (p.category || '').toLowerCase() === (category.name || '').toLowerCase() && p.isVerified
-  );
-  const bestRating = verifiedProviders.length > 0
-    ? Math.max(...verifiedProviders.map(p => p.rating))
-    : 5.0;
-
+export default function ServiceCard({ category, providers, onSelect, onIssueClick }) {
+  const providerCount = (providers || []).filter(
+    (p) => p.category && p.category.toLowerCase() === (category.name || '').toLowerCase()
+  ).length;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-xs hover:border-indigo-400 transition-all flex flex-col justify-between text-left">
-      <div className="p-5 sm:p-6">
-        {/* Header line */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-            <CategoryIcon name={category.name} className="w-5 h-5" />
-          </div>
-
+    <div className="enterprise-card p-6 flex flex-col gap-4 group hover:shadow-md transition-shadow">
+      {/* Header */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center flex-shrink-0">
+          <CategoryIcon category={category.name} size="lg" />
         </div>
-
-        <h3 className="text-base sm:text-lg font-extrabold text-slate-900 uppercase tracking-tight">{category.name}</h3>
-        <p className="text-slate-505 text-xs mt-2 line-clamp-3 leading-relaxed font-semibold">{category.description}</p>
-
-        {/* Popular issues checklist */}
-        <div className="mt-4">
-          <span className="text-[11px] font-bold text-slate-650 block mb-2 uppercase tracking-wide">Most Popular Requests:</span>
-          <div className="flex flex-wrap gap-1.5">
-            {category.popularIssues.slice(0, 3).map((issue, idx) => (
-              <span 
-                key={idx}
-                onClick={() => onIssueClick(issue)}
-                className="bg-slate-50 hover:bg-indigo-55 hover:text-indigo-600 cursor-pointer text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200/60 transition-colors"
-              >
-                {issue}
-              </span>
-            ))}
-          </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-slate-900 text-lg">{category.name}</h3>
+          <p className="text-sm text-slate-500 leading-relaxed line-clamp-2 mt-1">
+            {category.description}
+          </p>
         </div>
       </div>
 
-      {/* Foot action banner */}
-      <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-bold text-slate-650">
-        <div>
-          <span className="font-bold text-slate-700 block text-[11px]">
-            {activeCount} Active Specialists
-          </span>
-          <span className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-400">
-            ⭐ {bestRating} Highest
-          </span>
+      {/* Popular issues */}
+      {category.popularIssues && category.popularIssues.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {category.popularIssues.slice(0, 4).map((issue, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => {
+                e.stopPropagation();
+                onIssueClick && onIssueClick(issue);
+              }}
+              className="rounded-full bg-slate-100 text-slate-600 text-xs font-medium px-3 py-1 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+            >
+              {issue}
+            </button>
+          ))}
         </div>
+      )}
 
-        <button 
-          onClick={() => onSelect(category.name)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2 px-3 rounded-lg text-xs transition-all flex items-center gap-1 group shadow-xs focus:outline-none"
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+        <span className="text-xs text-slate-400 font-medium">
+          {providerCount} provider{providerCount !== 1 ? 's' : ''} available
+        </span>
+        <button
+          onClick={onSelect}
+          className="flex items-center gap-1 text-sm font-semibold text-sky-500 hover:text-sky-600 transition-colors group-hover:gap-2"
         >
-          <span>Book Now</span>
-          <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          View Providers
+          <ArrowRight className="w-4 h-4" />
         </button>
       </div>
     </div>

@@ -1,21 +1,25 @@
-import React from 'react';
+import { Headphones } from 'lucide-react';
 
 export default function SupportBanner({ onContact }) {
   return (
-    <div className="mt-16 bg-slate-950 border border-indigo-500/10 text-white rounded-2xl p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden shadow-md text-left">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#1e1b4b_0%,transparent_50%)] opacity-55" />
-      <div className="relative z-10 max-w-xl">
-        <h3 className="text-xl sm:text-2xl font-bold tracking-tight">Need a custom enterprise maintenance contract?</h3>
-        <p className="text-slate-400 text-xs mt-2 leading-relaxed font-medium">
-          We provide deep sanitation, lighting layout inspections, and structural water damage proofing contracts for schools, office blocks, and residential housing societies across Hyderabad.
-        </p>
+    <div className="bg-slate-50 border-y border-slate-100">
+      <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
+            <Headphones className="w-5 h-5 text-sky-600" />
+          </div>
+          <div>
+            <span className="font-semibold text-slate-900 text-sm">Need help?</span>
+            <p className="text-xs text-slate-500">Our support team is available 24/7</p>
+          </div>
+        </div>
+        <button
+          onClick={onContact}
+          className="enterprise-btn-secondary px-5 py-2 text-sm"
+        >
+          Contact Support
+        </button>
       </div>
-      <button 
-        onClick={onContact}
-        className="relative z-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-lg text-xs transition-colors shadow-sm whitespace-nowrap self-stretch md:self-auto text-center"
-      >
-        Contact Premium Support
-      </button>
     </div>
   );
 }

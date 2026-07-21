@@ -1,4 +1,4 @@
-import prisma from '../prisma/client.js';
+import { ProviderRepository } from '../repositories/provider.repository.js';
 import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
 import { sendApiError, sendApiSuccess } from '../utils/response.js';
 import { parseCalendarDate } from '../utils/availability.js';
@@ -39,8 +39,7 @@ export const ProviderAvailabilityController = {
       const providerId = req.params.id;
       // Schedules are public booking-flow data; mutations remain provider/admin-only.
       if (req.query.date) return ProviderAvailabilityController.getAvailabilityForDate(req, res);
-      const provider = await prisma.provider.findUnique({
-        where: { id: providerId },
+      const provider = await ProviderRepository.findById(providerId, {
         select: { userId: true, availableDays: true, timeSlots: true, availabilitySlots: true, accountStatus: true, isVerified: true, user: { select: { status: true } } }
       });
       if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider not found.');
@@ -71,8 +70,7 @@ export const ProviderAvailabilityController = {
       const dayStart = new Date(parsed);
       dayStart.setHours(0, 0, 0, 0);
 
-      const provider = await prisma.provider.findUnique({
-        where: { id: providerId },
+      const provider = await ProviderRepository.findById(providerId, {
         select: { availableDays: true, timeSlots: true, availabilitySlots: true, accountStatus: true, isVerified: true, user: { select: { status: true } } },
       });
 

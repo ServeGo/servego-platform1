@@ -1,61 +1,49 @@
-import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 import CategoryIcon from './CategoryIcon';
 
-export default function CategoryGrid({ categories, providers, onCategoryClick, onSeeAll }) {
-  // `categories` may come from static data.js (home page) or live API services.
-  // Live API services include `activeSpecialistCount` derived server-side.
-  // Static entries fall back to counting from the providers list.
-  const safeProviders = Array.isArray(providers) ? providers : [];
-  const safeCategories = Array.isArray(categories) ? categories : [];
+const CATEGORIES = [
+  { id: 'cleaning', name: 'Cleaning', color: 'bg-sky-50 hover:bg-sky-100 border-sky-200' },
+  { id: 'plumbing', name: 'Plumbing', color: 'bg-blue-50 hover:bg-blue-100 border-blue-200' },
+  { id: 'electrical', name: 'Electrical', color: 'bg-amber-50 hover:bg-amber-100 border-amber-200' },
+  { id: 'painting', name: 'Painting', color: 'bg-purple-50 hover:bg-purple-100 border-purple-200' },
+  { id: 'ac-repair', name: 'AC Repair', color: 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200' },
+  { id: 'carpentry', name: 'Carpentry', color: 'bg-orange-50 hover:bg-orange-100 border-orange-200' },
+  { id: 'pest-control', name: 'Pest Control', color: 'bg-red-50 hover:bg-red-100 border-red-200' },
+  { id: 'appliance-repair', name: 'Appliance Repair', color: 'bg-teal-50 hover:bg-teal-100 border-teal-200' },
+];
+
+export default function CategoryGrid({ onNavigate }) {
   return (
-
-    <section className="py-12 px-4 max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
-        <div>
-          <span className="text-teal-700 font-bold uppercase tracking-wider text-xs">Categories</span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold font-sans text-slate-900 mt-1 leading-none">What can we help you solve?</h2>
-          <p className="text-slate-500 text-xs sm:text-sm mt-1.5 font-medium">Pick from our list of high-quality home services</p>
+    <section className="py-16 md:py-20 bg-[#f4f8fb]">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+            Browse Services
+          </h2>
+          <p className="mt-3 text-slate-500 text-lg">
+            Find the right professional for every home need
+          </p>
         </div>
-        <button 
-          onClick={onSeeAll}
-          className="mt-4 md:mt-0 inline-flex items-center gap-1 text-teal-700 hover:text-teal-900 font-bold group transition-all text-xs focus:outline-none"
-        >
-          <span>See All Services</span>
-          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-        </button>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {safeCategories.map((cat) => {
-          // Prefer server-derived count; fall back to client-side count for static entries
-          const activeCount = typeof cat.activeSpecialistCount === 'number'
-            ? cat.activeSpecialistCount
-            : safeProviders.filter(
-                (p) => (p.category || '').toLowerCase() === (cat.name || '').toLowerCase() && p.isVerified
-              ).length;
-          
-          return (
-            <div 
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {CATEGORIES.map((cat) => (
+            <button
               key={cat.id}
-              onClick={() => onCategoryClick(cat.name || cat.id)}
-              className="bg-white p-6 rounded-2xl border border-slate-200 hover:border-teal-300 hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between"
+              onClick={() => onNavigate && onNavigate('services')}
+              className={`enterprise-card group flex flex-col items-center gap-3 p-6 border ${cat.color} cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02]`}
             >
-              <div>
-                <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center mb-4 group-hover:bg-teal-700 group-hover:text-white transition-all border border-teal-500/10">
-                  <CategoryIcon name={cat.name} className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-teal-700 transition-colors uppercase tracking-tight">{cat.name}</h3>
-                <p className="text-slate-500 text-sm mt-2 line-clamp-2">{cat.description}</p>
+              <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                <CategoryIcon category={cat.name} size="lg" />
               </div>
-              
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs mt-4">
-                <span className="text-slate-500 font-medium">{activeCount} Active Specialists</span>
-                {cat.basePrice && <span className="text-teal-700 font-extrabold">Starts from ₹{cat.basePrice}</span>}
-              </div>
-            </div>
-          );
-        })}
+              <span className="font-semibold text-slate-900 text-sm md:text-base">
+                {cat.name}
+              </span>
+              <span className="text-xs text-sky-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                View Services →
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );

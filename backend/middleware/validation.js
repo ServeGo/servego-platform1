@@ -79,6 +79,29 @@ export const loginValidation = [
     .notEmpty().withMessage('Please enter your password')
 ];
 
+export const forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Please enter your email address')
+    .isEmail().withMessage('Please enter a valid email address')
+    .normalizeEmail()
+];
+
+export const resetPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Please enter your email address')
+    .isEmail().withMessage('Please enter a valid email address')
+    .normalizeEmail(),
+  body('token')
+    .trim()
+    .notEmpty().withMessage('Reset code is required'),
+  body('newPassword')
+    .notEmpty().withMessage('Please enter a new password')
+    .isLength({ min: 8, max: 128 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*\d)/).withMessage('Password must contain a lowercase letter and a number')
+];
+
 // ==================== Booking Validations ====================
 
 export const createBookingValidation = [

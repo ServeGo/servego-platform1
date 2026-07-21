@@ -1,45 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import './cursor.css';
-
-import { Home } from './pages/Home';
-import { About } from './pages/About';
-import { Services } from './pages/Services';
-import { ServiceDetails } from './pages/ServiceDetails';
-import { BecomePartner } from './pages/BecomePartner';
-import { Contact } from './pages/Contact';
-import { FAQ } from './pages/FAQ';
-import { CustomerDashboard } from './pages/CustomerDashboard';
-import { ProviderDashboard } from './pages/ProviderDashboard';
-import { AdminPanel } from './pages/AdminPanel';
-import { Login } from './pages/Login';
-import { Signup } from './pages/Signup';
 
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import CustomerBottomNav from './components/CustomerBottomNav';
 import ActionSpinnerOverlay from './components/ActionSpinnerOverlay';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
-
-import {
-  LayoutDashboard,
-  History,
-  Settings,
-  Star,
-  BarChart3,
-  FileText,
-  MessageSquare,
-  CreditCard,
-  Users,
-  Activity,
-  LogOut,
-  Briefcase,
-  ShieldCheck,
-  Menu,
-} from 'lucide-react';
-
+const Home = React.lazy(() => import('./pages/Home'));
+const About = React.lazy(() => import('./pages/About'));
+const Services = React.lazy(() => import('./pages/Services'));
+const ServiceDetails = React.lazy(() => import('./pages/ServiceDetails'));
+const BecomePartner = React.lazy(() => import('./pages/BecomePartner'));
+const Contact = React.lazy(() => import('./pages/Contact'));
+const FAQ = React.lazy(() => import('./pages/FAQ'));
+const Login = React.lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
+const Signup = React.lazy(() => import('./pages/Signup').then(m => ({ default: m.Signup })));
+const CustomerDashboard = React.lazy(() => import('./pages/CustomerDashboard').then(m => ({ default: m.CustomerDashboard })));
+const ProviderDashboard = React.lazy(() => import('./pages/ProviderDashboard').then(m => ({ default: m.ProviderDashboard })));
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel').then(m => ({ default: m.AdminPanel })));
 
 const RESTRICTED_ROUTES = ['dashboard-customer', 'dashboard-provider', 'admin'];
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <div className="text-center">
+        <div className="w-10 h-10 border-3 border-slate-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
+        <span className="text-sm text-slate-500 font-semibold">Loading...</span>
+      </div>
+    </div>
+  );
+}
 
 const getAdminTabFromRoute = (routeValue) => {
   const tab = routeValue || 'dashboard';
@@ -60,32 +53,20 @@ const getAdminTabFromRoute = (routeValue) => {
 
 const getRoutePath = (page, categoryId = null, tab = null) => {
   switch (page) {
-    case 'home':
-      return '/';
-    case 'about':
-      return '/about';
-    case 'services':
-      return '/services';
-    case 'service-details':
-      return categoryId ? `/service-details/${encodeURIComponent(categoryId)}` : '/services';
-    case 'partner':
-      return '/partner';
-    case 'contact':
-      return '/contact';
-    case 'faq':
-      return '/faq';
-    case 'login':
-      return '/login';
-    case 'signup':
-      return '/signup';
-    case 'dashboard-customer':
-      return '/dashboard-customer';
-    case 'dashboard-provider':
-      return '/dashboard-provider';
-    case 'admin':
-      return tab && tab !== 'dashboard' ? `/admin/${tab}` : '/admin/dashboard';
-    default:
-      return '/';
+    case 'home': return '/';
+    case 'about': return '/about';
+    case 'services': return '/services';
+    case 'service-details': return categoryId ? `/service-details/${encodeURIComponent(categoryId)}` : '/services';
+    case 'partner': return '/partner';
+    case 'contact': return '/contact';
+    case 'faq': return '/faq';
+    case 'login': return '/login';
+    case 'forgot-password': return '/forgot-password';
+    case 'signup': return '/signup';
+    case 'dashboard-customer': return '/dashboard-customer';
+    case 'dashboard-provider': return '/dashboard-provider';
+    case 'admin': return tab && tab !== 'dashboard' ? `/admin/${tab}` : '/admin/dashboard';
+    default: return '/';
   }
 };
 
@@ -105,7 +86,6 @@ export function MainLayout() {
 
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedCategoryDetail, setSelectedCategoryDetail] = useState('electrician');
-
   const [customerActiveTabExternal, setCustomerActiveTabExternal] = useState('bookings');
   const [providerActiveTabExternal, setProviderActiveTabExternal] = useState('leads');
   const [adminActiveTabExternal, setAdminActiveTabExternal] = useState('dashboard');
@@ -116,6 +96,7 @@ export function MainLayout() {
     if (user.role === 'provider') return 'dashboard-provider';
     return 'dashboard-customer';
   };
+
   const isAllowedForCurrentUser = (page, user) => {
     if (!RESTRICTED_ROUTES.includes(page)) return true;
     if (!user) return false;
@@ -148,8 +129,7 @@ export function MainLayout() {
         return;
       }
 
-      const nextPage = segments[0];
-      setCurrentPage(nextPage);
+      setCurrentPage(segments[0]);
     };
 
     if (!currentUser) {
@@ -162,25 +142,18 @@ export function MainLayout() {
     return () => window.removeEventListener('popstate', handleRouteChange);
   }, [currentUser]);
 
-
-  // Ensure we don't render anything based on a previous restricted hash.
-  // (hash parsing remains supported after login via hashchange listener)
-
-
   useEffect(() => {
     if (!currentUser && RESTRICTED_ROUTES.includes(currentPage)) {
       setCurrentPage('login');
       updateBrowserRoute('login');
       return;
     }
-
     if (currentUser && !isAllowedForCurrentUser(currentPage, currentUser)) {
       const redirectPage = getDefaultDashboardForRole(currentUser);
       setCurrentPage(redirectPage);
       updateBrowserRoute(redirectPage);
       return;
     }
-
     if (currentUser && currentPage === 'login') {
       const redirectPage = getDefaultDashboardForRole(currentUser);
       setCurrentPage(redirectPage);
@@ -195,7 +168,6 @@ export function MainLayout() {
       window.scrollTo(0, 0);
       return;
     }
-
     if (RESTRICTED_ROUTES.includes(page) && currentUser && !isAllowedForCurrentUser(page, currentUser)) {
       const redirectPage = getDefaultDashboardForRole(currentUser);
       setCurrentPage(redirectPage);
@@ -203,7 +175,6 @@ export function MainLayout() {
       window.scrollTo(0, 0);
       return;
     }
-
     if (categoryId) {
       setSelectedCategoryDetail(categoryId);
       updateBrowserRoute('service-details', categoryId);
@@ -234,17 +205,17 @@ export function MainLayout() {
       case 'services':
         return <Services onNavigate={handlePageTransition} />;
       case 'service-details':
-        return (
-          <ServiceDetails catId={selectedCategoryDetail} onNavigate={handlePageTransition} />
-        );
+        return <ServiceDetails catId={selectedCategoryDetail} onNavigate={handlePageTransition} />;
       case 'partner':
-        return <BecomePartner />;
+        return <BecomePartner onNavigate={handlePageTransition} />;
       case 'contact':
-        return <Contact />;
+        return <Contact onNavigate={handlePageTransition} />;
       case 'faq':
-        return <FAQ />;
+        return <FAQ onNavigate={handlePageTransition} />;
       case 'login':
         return <Login onNavigate={handlePageTransition} />;
+      case 'forgot-password':
+        return <ForgotPassword onNavigate={handlePageTransition} />;
       case 'signup':
         return <Signup onNavigate={handlePageTransition} />;
       case 'dashboard-customer':
@@ -258,6 +229,7 @@ export function MainLayout() {
       case 'dashboard-provider':
         return (
           <ProviderDashboard
+            onNavigate={handlePageTransition}
             activeTab={providerActiveTabExternal}
             setActiveTabExternal={setProviderActiveTabExternal}
           />
@@ -274,300 +246,17 @@ export function MainLayout() {
     }
   };
 
-  // Admin layout has a sidebar, others don't
+  // Admin layout - AdminPanel owns its own full layout (sidebar + topbar)
   if (currentUser?.role === 'admin' && currentPage === 'admin') {
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50">
-        <Navbar
-          onNavigate={handlePageTransition}
-          currentPage={currentPage}
-          adminActiveTab={adminActiveTabExternal}
-          setAdminActiveTab={setAdminActiveTabExternal}
-        />
-
-        <div className="flex-1 flex flex-col md:flex-row">
-          <aside className="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 text-slate-300 py-3 md:py-6 px-3 md:px-4 flex flex-col md:justify-between shrink-0 gap-4 md:gap-0 md:space-y-6 md:min-h-0">
-            <div className="hidden md:block space-y-1.5">
-              <span className="hidden md:block text-[9px] uppercase font-bold text-slate-500 tracking-wider px-2 mb-2">
-                Operations ledger
-              </span>
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('dashboard');
-                  updateBrowserRoute('admin', null, 'dashboard');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'dashboard'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <LayoutDashboard className="w-4 h-4 shrink-0" />
-                <span>Dashboard</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('customers');
-                  updateBrowserRoute('admin', null, 'customers');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'customers'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <Users className="w-4 h-4 shrink-0" />
-                <span>Customers</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('providers');
-                  updateBrowserRoute('admin', null, 'providers');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'providers'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <Briefcase className="w-4 h-4 shrink-0" />
-                <span>Providers</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('services');
-                  updateBrowserRoute('admin', null, 'services');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'services'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <Activity className="w-4 h-4 shrink-0" />
-                <span>Services</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('providerServiceRequests');
-                  updateBrowserRoute('admin', null, 'providerServiceRequests');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'providerServiceRequests'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <ShieldCheck className="w-4 h-4 shrink-0" />
-                <span>Service Requests</span>
-              </button>
-
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('bookings');
-                  updateBrowserRoute('admin', null, 'bookings');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'bookings'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <History className="w-4 h-4 shrink-0" />
-                <span>Bookings</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('payments');
-                  updateBrowserRoute('admin', null, 'payments');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'payments'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <CreditCard className="w-4 h-4 shrink-0" />
-                <span>Payments</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('reviews');
-                  updateBrowserRoute('admin', null, 'reviews');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'reviews'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <Star className="w-4 h-4 shrink-0" />
-                <span>Reviews</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('tickets');
-                  updateBrowserRoute('admin', null, 'tickets');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'tickets'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <MessageSquare className="w-4 h-4 shrink-0" />
-                <span>Support Tickets</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('analytics');
-                  updateBrowserRoute('admin', null, 'analytics');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'analytics'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <BarChart3 className="w-4 h-4 shrink-0" />
-                <span>Analytics</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('reports');
-                  updateBrowserRoute('admin', null, 'reports');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'reports'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <FileText className="w-4 h-4 shrink-0" />
-                <span>Reports</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setAdminActiveTabExternal('settings');
-                  updateBrowserRoute('admin', null, 'settings');
-                }}
-                className={`shrink-0 md:w-full py-2 px-3 rounded-lg text-xs font-extrabold flex items-center gap-2.5 transition-all text-left whitespace-nowrap ${
-                  adminActiveTabExternal === 'settings'
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'hover:bg-white/5 text-slate-305'
-                }`}
-              >
-
-                <Settings className="w-4 h-4 shrink-0" />
-                <span>Settings</span>
-              </button>
-            </div>
-
-            <button
-              onClick={handleSignOutAction}
-              className="hidden md:flex w-full py-2.5 px-3 rounded-xl text-xs font-bold hover:bg-rose-950 text-rose-500 bg-rose-500/5 transition-all items-center gap-2"
-            >
-              <LogOut className="w-4.5 h-4.5" />
-              <span>Logout Admin Console</span>
-            </button>
-          </aside>
-
-          <main className="flex-grow min-w-0 pb-24 md:pb-0">{renderContent()}</main>
-
-          <div className="md:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.10)]">
-            <div className="flex items-center justify-between gap-1">
-              {[
-                { key: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-                { key: 'services', label: 'Services', icon: Activity },
-                { key: 'providerServiceRequests', label: 'Requests', icon: ShieldCheck },
-                { key: 'bookings', label: 'Bookings', icon: History },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = adminActiveTabExternal === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => {
-                      setAdminActiveTabExternal(item.key);
-                      updateBrowserRoute('admin', null, item.key);
-                    }}
-                    className={`flex-1 flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[10px] font-black transition-all ${
-                      isActive ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 mb-1" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-
-              <button
-                onClick={() => {
-                  const menu = document.getElementById('admin-mobile-more-menu');
-                  if (menu) {
-                    menu.classList.toggle('hidden');
-                  }
-                }}
-                className="flex-1 flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-[10px] font-black text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              >
-                <Menu className="w-4 h-4 mb-1" />
-                <span>More</span>
-              </button>
-            </div>
-          </div>
-
-          <div id="admin-mobile-more-menu" className="md:hidden fixed inset-x-0 bottom-20 z-40 mx-2 hidden">
-            <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-              {[
-                { key: 'customers', label: 'Customers', icon: Users },
-                { key: 'providers', label: 'Providers', icon: Briefcase },
-                { key: 'tickets', label: 'Tickets', icon: MessageSquare },
-                { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-                { key: 'reports', label: 'Reports', icon: FileText },
-                { key: 'settings', label: 'Settings', icon: Settings },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => {
-                      setAdminActiveTabExternal(item.key);
-                      updateBrowserRoute('admin', null, item.key);
-                      document.getElementById('admin-mobile-more-menu')?.classList.add('hidden');
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <AdminPanel
+            activeTab={adminActiveTabExternal}
+            setActiveTabExternal={setAdminActiveTabExternal}
+          />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
@@ -575,7 +264,6 @@ export function MainLayout() {
     <div className="flex flex-col min-h-screen">
       <ActionSpinnerOverlay isOpen={!!actionSpinner?.isOpen} message={actionSpinner?.message} />
       <Navbar
-
         onNavigate={handlePageTransition}
         currentPage={currentPage}
         setSelectedCategoryDetail={setSelectedCategoryDetail}
@@ -584,17 +272,18 @@ export function MainLayout() {
         providerActiveTab={providerActiveTabExternal}
         setProviderActiveTab={setProviderActiveTabExternal}
       />
-
-      <main className="flex-1">{renderContent()}</main>
-
-      {/* Footer only for public pages and customer dashboard (usually) */}
+      <main className="flex-1 enterprise-fade-in">
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            {renderContent()}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
       {(!currentUser || currentUser.role === 'customer') && (
-        <div className={currentUser?.role === 'customer' ? 'pb-16 md:pb-0' : ''}>
+        <div className={currentUser?.role === 'customer' ? 'pb-20 md:pb-0' : ''}>
           <Footer onNavigate={handlePageTransition} />
         </div>
       )}
-
-      {/* Mobile sticky bottom navigation for the customer role (native-app feel) */}
       {currentUser?.role === 'customer' && (
         <CustomerBottomNav
           currentPage={currentPage}
@@ -615,4 +304,3 @@ export default function App() {
     </AppProvider>
   );
 }
-

@@ -1,28 +1,20 @@
 /**
- * Production-grade API client with retry logic, error handling, and token refresh
+ * Enterprise-grade API client with retry logic, error handling, and token refresh
  */
 
-// Localhost-only configuration (no Render fallback)
 const API_BASE_URL = 'http://localhost:4000/api';
 const SOCKET_URL = 'http://localhost:4000';
 const API_BASES = [API_BASE_URL];
 
-
-
-// Retry configuration
 const DEFAULT_RETRY_CONFIG = {
   maxRetries: 3,
   retryDelay: 1000,
   retryableStatuses: [408, 500, 502, 503, 504]
 };
 
-// Token storage
 let accessToken = null;
 let refreshToken = null;
 
-/**
- * Set tokens from authentication response
- */
 export function setTokens(access, refresh) {
   accessToken = access;
   refreshToken = refresh;
@@ -32,21 +24,14 @@ export function setTokens(access, refresh) {
   }
 }
 
-/**
- * Get stored tokens
- */
 export function getStoredTokens() {
   if (typeof window === 'undefined') return { access: null, refresh: null };
-  
   return {
     access: localStorage.getItem('servego_token'),
     refresh: localStorage.getItem('servego_refresh_token')
   };
 }
 
-/**
- * Clear tokens on logout
- */
 export function clearTokens() {
   accessToken = null;
   refreshToken = null;
@@ -56,23 +41,14 @@ export function clearTokens() {
   }
 }
 
-/**
- * Sleep utility for retry delays
- */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Check if should retry based on status code
- */
 function shouldRetry(status, config) {
   return config.retryableStatuses.includes(status);
 }
 
-/**
- * Refresh access token using refresh token
- */
 async function refreshAccessToken() {
   const { refresh } = getStoredTokens();
   if (!refresh) return null;
@@ -95,7 +71,7 @@ async function refreshAccessToken() {
         }
         break;
       } catch {
-        // Try localhost only after the deployed backend cannot be reached.
+        // Network error, try next base URL
       }
     }
     clearTokens();
@@ -107,29 +83,18 @@ async function refreshAccessToken() {
   }
 }
 
-/**
- * Create request headers
- */
 function createHeaders(additionalHeaders = {}) {
   const headers = new Headers(additionalHeaders);
-  
-  // Add auth token if available
   const token = accessToken || getStoredTokens().access;
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  
-  // Default content type
   if (!headers.has('Content-Type') && !(additionalHeaders instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
-  
   return headers;
 }
 
-/**
- * Main API request function with retry logic
- */
 async function apiRequest(endpoint, options = {}) {
   const config = { ...DEFAULT_RETRY_CONFIG, ...options.retryConfig };
   let lastError = null;
@@ -147,8 +112,7 @@ async function apiRequest(endpoint, options = {}) {
           signal: options.timeout ? AbortSignal.timeout(options.timeout) : undefined
         };
         const response = await fetch(url, fetchOptions);
-      
-      // Handle 401 Unauthorized with token refresh
+
         if (response.status === 401 && !tokenRefreshed) {
           const newToken = await refreshAccessToken();
           if (newToken) {
@@ -156,12 +120,11 @@ async function apiRequest(endpoint, options = {}) {
             continue;
           }
         }
-      
-      // A retry here would multiply traffic while the limiter window is still
-      // active. Return the structured response so the caller can surface it.
-        if (response.status === 429) lastError = new Error('Request rate limited');
-      
-      // Retry on server errors if attempts remaining
+
+        if (response.status === 429) {
+          lastError = new Error('Request rate limited');
+        }
+
         if (shouldRetry(response.status, config)) {
           if (attempt < config.maxRetries) {
             await sleep(config.retryDelay * Math.pow(2, attempt));
@@ -170,19 +133,19 @@ async function apiRequest(endpoint, options = {}) {
           lastResponse = response;
           break;
         }
-      
-      // Parse response
+
         const contentType = response.headers.get('content-type');
         let data;
-        if (contentType && contentType.includes('application/json')) data = await response.json();
-        else data = await response.text();
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          data = await response.text();
+        }
 
-      // Successful backend responses use { success: true, data }. Consumers
-      // receive the resource itself; failed responses remain intact so their
-      // error code and message can be displayed.
-        if (response.ok && data?.success === true && Object.hasOwn(data, 'data')) data = data.data;
-      
-      // Return structured response
+        if (response.ok && data?.success === true && Object.hasOwn(data, 'data')) {
+          data = data.data;
+        }
+
         return { ok: response.ok, status: response.status, data, headers: response.headers };
       } catch (err) {
         lastError = err;
@@ -195,7 +158,7 @@ async function apiRequest(endpoint, options = {}) {
   }
 
   if (lastResponse) {
-    return { ok: false, status: lastResponse.status, data: { error: 'Both Render and localhost backends are unavailable.' }, headers: lastResponse.headers };
+    return { ok: false, status: lastResponse.status, data: { error: 'Backend service is temporarily unavailable.' }, headers: lastResponse.headers };
   }
   return {
     ok: false,
@@ -205,43 +168,37 @@ async function apiRequest(endpoint, options = {}) {
   };
 }
 
-/**
- * API client methods
- */
 export const api = {
-  get: (endpoint, options = {}) => 
+  get: (endpoint, options = {}) =>
     apiRequest(endpoint, { ...options, method: 'GET' }),
-  
-  post: (endpoint, body, options = {}) => 
-    apiRequest(endpoint, { 
-      ...options, 
+
+  post: (endpoint, body, options = {}) =>
+    apiRequest(endpoint, {
+      ...options,
       method: 'POST',
       body: typeof body === 'string' ? body : JSON.stringify(body)
     }),
-  
-  put: (endpoint, body, options = {}) => 
-    apiRequest(endpoint, { 
-      ...options, 
+
+  put: (endpoint, body, options = {}) =>
+    apiRequest(endpoint, {
+      ...options,
       method: 'PUT',
       body: typeof body === 'string' ? body : JSON.stringify(body)
     }),
-  
-  patch: (endpoint, body, options = {}) => 
-    apiRequest(endpoint, { 
-      ...options, 
+
+  patch: (endpoint, body, options = {}) =>
+    apiRequest(endpoint, {
+      ...options,
       method: 'PATCH',
       body: typeof body === 'string' ? body : JSON.stringify(body)
     }),
-  
-  delete: (endpoint, options = {}) => 
+
+  delete: (endpoint, options = {}) =>
     apiRequest(endpoint, { ...options, method: 'DELETE' })
 };
 
 export { API_BASE_URL, SOCKET_URL };
 
-/**
- * Initialize tokens from storage on app load
- */
 export function initializeTokens() {
   const { access, refresh } = getStoredTokens();
   accessToken = access;

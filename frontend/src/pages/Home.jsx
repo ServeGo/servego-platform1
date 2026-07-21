@@ -1,75 +1,19 @@
-import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
-
-// Components
 import Hero from '../components/Hero';
 import CategoryGrid from '../components/CategoryGrid';
-import TrustBanner from '../components/TrustBanner';
 import HowItWorks from '../components/HowItWorks';
+import TrustBanner from '../components/TrustBanner';
 import AppPromo from '../components/AppPromo';
 import PartnerCTA from '../components/PartnerCTA';
 
-export const Home = ({ onNavigate }) => {
-  const { 
-    selectedArea, setArea, 
-    searchQuery, setSearchQuery, setCategory, providers, services
-  } = useApp();
-
-  const [inputQuery, setInputQuery] = useState(searchQuery);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    setSearchQuery(inputQuery);
-    setCategory(null);
-    // Encode query params into the URL so the Services page can read them on mount
-    const params = new URLSearchParams();
-    if (inputQuery.trim()) params.set('query', inputQuery.trim());
-    if (selectedArea) params.set('location', selectedArea);
-    const qs = params.toString();
-    window.history.pushState({}, '', `/services${qs ? `?${qs}` : ''}`);
-    onNavigate('services');
-  };
-
-  const handleCategoryClick = (catNameOrId) => {
-    setCategory(catNameOrId);
-    onNavigate('service-details', catNameOrId);
-  };
-
-  const handleQuickSearch = (term) => {
-    setInputQuery(term);
-    setSearchQuery(term);
-    onNavigate('services');
-  };
-
-  // Use live services from API (includes activeSpecialistCount); fall back to empty while loading
-  const displayCategories = Array.isArray(services) && services.length > 0 ? services : [];
-
+export default function Home({ onNavigate }) {
   return (
-    <div id="home-page" className="bg-slate-50 min-h-screen">
-      <Hero 
-        onSearch={handleSearchSubmit}
-        selectedArea={selectedArea}
-        setArea={setArea}
-        inputQuery={inputQuery}
-        setInputQuery={setInputQuery}
-        onQuickSearch={handleQuickSearch}
-      />
-
-      <CategoryGrid 
-        categories={displayCategories}
-        providers={providers}
-        onCategoryClick={handleCategoryClick}
-        onSeeAll={() => { setCategory(null); onNavigate('services'); }}
-      />
-
-      <TrustBanner onBookAC={() => handleCategoryClick('AC Repair')} />
-
+    <div className="accent-glow">
+      <Hero onNavigate={onNavigate} />
+      <CategoryGrid onNavigate={onNavigate} />
       <HowItWorks />
-
+      <TrustBanner />
       <AppPromo />
-
-      <PartnerCTA onApply={() => onNavigate('partner')} />
+      <PartnerCTA onNavigate={onNavigate} />
     </div>
   );
-};
-
+}

@@ -1,20 +1,64 @@
-/* Cursor consistency for clickable elements */
+/* Enterprise cursor consistency - wrapped in @layer base so Tailwind utilities can override */
+@layer base {
 
 button,
 [role='button'],
-a,
+a:not([role]),
 select,
 textarea,
 input[type='button'],
 input[type='submit'],
-input[type='reset'] {
+input[type='reset'],
+[onclick] {
   cursor: pointer;
 }
 
 /* Only for truly disabled controls */
 button:disabled,
 [aria-disabled='true'],
-input:disabled {
+input:disabled,
+select:disabled,
+textarea:disabled {
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
+/* Smooth transitions for interactive elements */
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove default button styling - @layer base so Tailwind bg-* utilities override */
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+} /* end @layer base */

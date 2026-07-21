@@ -1,6 +1,7 @@
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
+import { config } from '../config/index.js';
 
 /**
  * Production-grade security middleware configuration
@@ -28,8 +29,8 @@ export const helmetConfig = helmet({
 
 // Rate limiter for general API requests
 export const generalRateLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes default
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+  windowMs: config.rateLimitWindowMs,
+  max: config.rateLimitMaxRequests,
   message: {
     success: false,
     code: 'RATE_LIMIT_EXCEEDED',
@@ -49,7 +50,7 @@ export const generalRateLimiter = rateLimit({
 // Stricter rate limiter for authentication endpoints
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '10', 10),
+  max: config.authRateLimitMax,
   message: {
     success: false,
     code: 'AUTH_RATE_LIMIT_EXCEEDED',
@@ -66,7 +67,7 @@ export const authRateLimiter = rateLimit({
 // Rate limiter for booking creation to prevent spam
 export const bookingRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: parseInt(process.env.BOOKING_RATE_LIMIT_MAX || '5', 10),
+  max: config.bookingRateLimitMax,
   message: {
     success: false,
     code: 'BOOKING_RATE_LIMIT_EXCEEDED',
@@ -100,7 +101,7 @@ export const reviewRateLimiter = rateLimit({
 // dedicated abuse budget separate from authenticated API traffic.
 export const supportTicketRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: parseInt(process.env.SUPPORT_TICKET_RATE_LIMIT_MAX || '5', 10),
+  max: config.supportTicketRateLimitMax,
   message: { success: false, code: 'SUPPORT_TICKET_RATE_LIMIT_EXCEEDED', message: 'Too many support requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -118,7 +119,7 @@ export const hppConfig = hpp({
 // Request size limiting configuration
 export const requestSizeLimit = (req, res, next) => {
   const contentLength = parseInt(req.headers['content-length'] || '0', 10);
-  const maxSize = parseInt(process.env.MAX_REQUEST_SIZE || '1048576', 10); // 1MB default
+  const maxSize = config.maxRequestSize;
   
   if (contentLength > maxSize) {
     return res.status(413).json({

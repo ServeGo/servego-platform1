@@ -1,231 +1,188 @@
-import React, { useState } from 'react';
-import { CheckCircle2, MapPin, Mail, Phone, Landmark, Send } from 'lucide-react';
+import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { Phone, Mail, MapPin, Clock, Send, MessageSquare } from 'lucide-react';
 
-export const Contact = () => {
-  const { submitSupportTicket, currentUser } = useApp();
+export default function Contact({ onNavigate }) {
+  const { currentUser, submitSupportTicket } = useApp();
 
-  // Logged-in ticket form state
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [subject, setSubject] = useState('Booking Settle Issues');
-  const [message, setMessage] = useState('');
+  const [formData, setFormData] = useState({
+    name: currentUser?.name || '',
+    email: currentUser?.email || '',
+    subject: '',
+    message: '',
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [errorText, setErrorText] = useState('');
+  const handleChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorText('');
-
     if (!currentUser) {
-      window.location.hash = 'login';
+      onNavigate && onNavigate('login');
       return;
     }
-
-    if (!name.trim() || !email.trim() || !message.trim()) {
-      setErrorText('Please fill out all mandatory fields.');
-      return;
+    setLoading(true);
+    try {
+      await submitSupportTicket(formData);
+      setSubmitted(true);
+    } catch {
+      // error handled silently
+    } finally {
+      setLoading(false);
     }
-
-    submitSupportTicket({
-      name,
-      email,
-      subject,
-      message,
-    });
-
-    setIsSuccess(true);
-    setName('');
-    setEmail('');
-    setMessage('');
   };
 
   return (
-    <div id="contact-page" className="bg-slate-50 min-h-screen py-12 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="text-teal-700 font-extrabold uppercase tracking-wider text-xs">
-            Customer Support Hub
-          </span>
-          <h1 className="text-3xl md:text-5xl font-bold font-sans text-slate-900 mt-2 tracking-tight">
-            Get in touch
-          </h1>
-          <p className="text-slate-500 text-sm sm:text-base mt-2">
-            Bookings, refunds, and partner registration queries—our Hyderabad support team is available 24/7.
-          </p>
-        </div>
+    <div className="bg-[#f4f8fb] min-h-screen py-12 md:py-16">
+      <div className="max-w-6xl mx-auto px-4">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight text-center mb-10">
+          Get in touch
+        </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
-          {/* Left: Public contact details */}
-          <div className="lg:col-span-5 space-y-6 flex flex-col justify-between">
-            <div className="bg-slate-900 text-white rounded-3xl p-8 border border-slate-800 space-y-8 h-full shadow-sm">
-              <div>
-                <h3 className="text-xl font-bold tracking-tight">Direct Hotlines</h3>
-                <p className="text-slate-400 text-xs mt-1">Fast help for customers and service partners</p>
-              </div>
-
-              <div className="space-y-4 text-xs font-semibold">
-                <div className="flex gap-4 items-center">
-                  <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-teal-400 shrink-0">
-                    <Phone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-normal text-[10px] uppercase tracking-wide">Customer Toll-Free</span>
-                    <span className="text-sm font-bold text-slate-100">1800-410-2026</span>
-                  </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left panel - dark */}
+          <div className="bg-slate-900 rounded-2xl p-8 text-white">
+            <h2 className="text-xl font-bold mb-6">Contact Information</h2>
+            <div className="space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-5 h-5 text-sky-400" />
                 </div>
-
-                <div className="flex gap-4 items-center">
-                  <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-teal-400 shrink-0">
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-normal text-[10px] uppercase tracking-wide">Official Email</span>
-                    <span className="text-sm font-bold text-slate-100">support@servego.com</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 items-center">
-                  <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-emerald-400 shrink-0">
-                    <MapPin className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-normal text-[10px] uppercase tracking-wide">Main Hyderabad HQ</span>
-                    <span className="text-sm font-bold text-slate-100 leading-tight block">Mindspace, Hyderabad - 500081</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-white/10 flex items-start gap-3">
-                <Landmark className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-slate-200 text-sm">Support Timings</h4>
-                  <p className="text-slate-400 text-xs mt-1 leading-relaxed">Mon-Sat: 10:00 AM to 6:00 PM (Identity verification)</p>
+                  <p className="text-sm text-slate-400">Phone</p>
+                  <p className="font-semibold">+91 1800-123-4567</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-5 h-5 text-sky-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Email</p>
+                  <p className="font-semibold">support@servego.com</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-sky-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Address</p>
+                  <p className="font-semibold">123 Business Park, Sector 5<br />Mumbai, Maharashtra 400001</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-5 h-5 text-sky-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-400">Support Hours</p>
+                  <p className="font-semibold">24/7 Customer Support</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right: Ticket area (logged-in only) */}
-          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 flex flex-col justify-between shadow-sm">
-            <div>
-              {!currentUser ? (
-                <div className="flex flex-col items-center text-center">
-                  <h3 className="text-2xl font-bold text-slate-900">Contact Support</h3>
-                  <p className="text-slate-500 text-sm mt-2 max-w-md">
-                    To open and track support tickets, please login first. For quick help, use the hotlines on this page.
-                  </p>
+          {/* Right panel - form */}
+          <div className="enterprise-card p-8">
+            {!currentUser && (
+              <div className="bg-amber-50 text-amber-700 text-sm rounded-lg px-4 py-3 mb-6 border border-amber-100 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                Please login to submit a support ticket.
+              </div>
+            )}
 
-                  <div className="mt-6 bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-2xl text-xs w-full max-w-md">
-                    <div className="font-bold">Support SLA</div>
-                    <div className="text-slate-700 mt-1">Within 4 hours</div>
-                  </div>
+            {submitted ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                  <Send className="w-8 h-8 text-green-500" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Message Sent!</h3>
+                <p className="text-sm text-slate-500">
+                  We&apos;ll get back to you within 24 hours.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="enterprise-label mb-1.5 block">Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    placeholder="Your name"
+                    className="enterprise-input w-full"
+                    required
+                  />
+                </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.hash = 'login';
-                    }}
-                    className="mt-6 w-full max-w-md bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-2 border border-slate-750/30"
+                <div>
+                  <label className="enterprise-label mb-1.5 block">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                    placeholder="you@example.com"
+                    className="enterprise-input w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="enterprise-label mb-1.5 block">Subject</label>
+                  <select
+                    value={formData.subject}
+                    onChange={(e) => handleChange('subject', e.target.value)}
+                    className="enterprise-input w-full"
+                    required
                   >
-                    <span>Login to Open a Support Ticket</span>
-                  </button>
+                    <option value="">Select a subject</option>
+                    <option value="general">General Inquiry</option>
+                    <option value="booking">Booking Issue</option>
+                    <option value="payment">Payment Problem</option>
+                    <option value="feedback">Feedback</option>
+                    <option value="partner">Partner Inquiry</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
-              ) : (
-                <div className="w-full">
-                  <h3 className="text-2xl font-bold text-slate-900">Open a Support Ticket</h3>
-                  <p className="text-slate-500 text-sm mt-2">Provide your details and we will respond shortly.</p>
 
-                  {isSuccess && (
-                    <div className="my-6 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <div>
-                        <span className="font-bold block">Support Ticket Logged</span>
-                        <span className="text-slate-600">Check your Customer Dashboard for admin updates.</span>
-                      </div>
-                    </div>
-                  )}
+                <div>
+                  <label className="enterprise-label mb-1.5 block">Message</label>
+                  <textarea
+                    value={formData.message}
+                    onChange={(e) => handleChange('message', e.target.value)}
+                    placeholder="Describe your issue or question..."
+                    rows={5}
+                    className="enterprise-input w-full resize-none"
+                    required
+                  />
+                </div>
 
-                  {errorText && (
-                    <div className="my-4 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs">{errorText}</div>
-                  )}
-
-                  <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Your Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Anand Kumar"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Your Email *</label>
-                        <input
-                          type="email"
-                          required
-                          placeholder="anand@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Inquiry Topic</label>
-                      <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                      >
-                        <option value="Booking Issues">Booking Issues</option>
-                        <option value="Partner Verification">Partner Verification</option>
-                        <option value="Payments & Refunds">Payments & Refunds</option>
-                        <option value="Service Quality Details">Service Quality Details</option>
-                        <option value="Business Inquiries">Business Inquiries</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Your detailed message *</label>
-                      <textarea
-                        required
-                        rows={4}
-                        placeholder="We ask for booking ID or specific details if requesting cancellations and refunds..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-2 border border-slate-750/30"
-                    >
+                <button
+                  type="submit"
+                  disabled={loading || !currentUser}
+                  className="enterprise-btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
                       <Send className="w-4 h-4" />
-                      <span>Send Ticket Message</span>
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
-              <span>🔒 Secure support feedback</span>
-              <span>SLA Response: Within 4 Hours</span>
-            </div>
+                      Send Message
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
-};
-
+}
