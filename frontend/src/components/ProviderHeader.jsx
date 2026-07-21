@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { ReputationBadgeStrip, VerificationLevelPill } from './ProviderReputation';
-import { api } from '../utils/apiClient';
 
 function ServiceChip({ name }) {
   return (
@@ -11,40 +10,8 @@ function ServiceChip({ name }) {
   );
 }
 
-export default function ProviderHeader({ provider, completedJobs = 0 }) {
+export default function ProviderHeader({ provider, completedJobs = 0, approvedServices = [], loadingServices = false }) {
   const { currentUser } = useApp();
-  const providerId = provider?.id;
-
-  const [approvedServices, setApprovedServices] = useState([]);
-  const [loadingServices, setLoadingServices] = useState(false);
-
-  const isEnabled = !!providerId && !!currentUser;
-
-  useEffect(() => {
-    let alive = true;
-    const fetchApprovedServices = async () => {
-      if (!isEnabled) return;
-      setLoadingServices(true);
-      try {
-        const res = await api.get(`/providers/${providerId}/services`);
-        const data = res.data;
-        if (!res.ok) throw new Error(data?.message || 'Failed to load services');
-        if (!alive) return;
-        const arr = Array.isArray(data) ? data : [];
-        setApprovedServices(arr.filter(s => s?.approvalStatus === 'APPROVED'));
-      } catch {
-        if (!alive) return;
-        setApprovedServices([]);
-      } finally {
-        if (alive) setLoadingServices(false);
-      }
-    };
-
-    fetchApprovedServices();
-    return () => {
-      alive = false;
-    };
-  }, [isEnabled, providerId]);
 
   const approvedNames = useMemo(
     () => approvedServices.map(s => s.name).filter(Boolean),

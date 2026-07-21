@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 import apiRouter from './routes/api.js';
 import { seedServicesIfEmpty } from './seeders/servicesSeed.js';
 import { getCorsConfig, resolvePort } from './utils/runtimeConfig.js';
-import { helmetConfig, hppConfig, generalRateLimiter, requestSizeLimit } from './middleware/security.js';
+import { helmetConfig, hppConfig, generalRateLimiter } from './middleware/security.js';
 import { requestLogger, errorHandler, requestTimeout } from './middleware/logging.js';
 import { sendApiSuccess } from './utils/response.js';
 
@@ -39,7 +39,6 @@ async function bootstrap() {
   // Request parsing
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-  app.use(requestSizeLimit);
 
   // Logging & timeout
   app.use(requestLogger);

@@ -1,6 +1,6 @@
 import prisma from '../prisma/client.js';
 import { refreshProviderReputation } from '../services/providerReputationService.js';
-import { notifyBookingCreated, notifyBookingStatusChanged } from '../services/notificationService.js';
+import { notifyBookingStatusChanged } from '../services/notificationService.js';
 import { isProviderSlotTaken } from '../services/bookingAvailabilityService.js';
 import { buildStatusHistory, isValidBookingTransition, normalizeBookingStatus, normalizePaymentStatus } from '../utils/workflow.js';
 import { canPerformAction } from '../utils/permissions.js';

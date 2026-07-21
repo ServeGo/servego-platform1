@@ -113,10 +113,6 @@ export const errorHandler = (err, req, res, next) => {
   });
 };
 
-export const asyncHandler = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
-
 export const requestTimeout = (timeoutMs = 30000) => (req, res, next) => {
   const timeout = setTimeout(() => {
     if (!res.headersSent) {

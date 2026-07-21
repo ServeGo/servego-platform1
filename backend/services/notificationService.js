@@ -26,46 +26,6 @@ function emitToUserRoom(io, userId, event, data) {
 }
 
 /**
- * Notify about a new booking creation
- */
-export async function notifyBookingCreated(io, booking, customer, providerUserId) {
-  const notifications = [];
-
-  if (providerUserId) {
-    const providerNotif = await createNotification(
-      providerUserId,
-      'New Service Request',
-      `You have a new ${booking.serviceCategory} request from ${customer?.name || 'a customer'}.`,
-      'BOOKING'
-    );
-    notifications.push(providerNotif);
-  }
-
-  const customerNotif = await createNotification(
-    customer?.id,
-    'Booking Received',
-    `Your ${booking.serviceCategory} booking is pending confirmation.`,
-    'BOOKING'
-  );
-  notifications.push(customerNotif);
-
-  // Emit real-time events
-  if (io) {
-    // Emit to provider's room if they have one
-    if (providerUserId) {
-      emitToUserRoom(io, providerUserId, 'newJobLead', booking);
-      if (notifications[0]) {
-        emitToUserRoom(io, providerUserId, 'notification', notifications[0]);
-      }
-    }
-    // Emit to customer's room
-    if (notifications[1]) {
-      emitToUserRoom(io, customer?.id, 'notification', notifications[1]);
-    }
-  }
-}
-
-/**
  * Notify about booking status change
  */
 export async function notifyBookingStatusChanged(io, booking, updatedStatus, providerUserId) {
@@ -164,26 +124,4 @@ export async function notifyReviewPublished(userId) {
     'REVIEW'
   );
   return notification;
-}
-
-/**
- * Bulk create notifications for multiple users
- */
-export async function createBulkNotifications(userIds, title, message, type = 'SYSTEM') {
-  try {
-    const notifications = await prisma.notification.createMany({
-      data: userIds.map(userId => ({
-        userId,
-        title,
-        message,
-        type,
-        isRead: false
-      })),
-      skipDuplicates: true
-    });
-    return notifications;
-  } catch (err) {
-    console.error('[NotificationService] Bulk notification creation failed:', err.message);
-    return null;
-  }
 }

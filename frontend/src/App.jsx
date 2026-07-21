@@ -97,7 +97,7 @@ const updateBrowserRoute = (page, categoryId = null, tab = null) => {
 };
 
 export function MainLayout() {
-  const { currentUser, logout, notifications, actionSpinner } = useApp();
+  const { currentUser, logout, notifications, actionSpinner, isInitializing } = useApp();
 
   const unreadNotifications = (notifications || []).filter(
     (n) => n.userId === currentUser?.id && !n.read
@@ -220,6 +220,15 @@ export function MainLayout() {
     logout();
     handlePageTransition('login');
   };
+
+  if (isInitializing) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 rounded-full border-4 border-slate-700 border-t-teal-500 animate-spin" />
+        <span className="text-sm font-bold text-slate-400 tracking-wide">Loading ServeGo...</span>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     if (!isAllowedForCurrentUser(currentPage, currentUser)) {

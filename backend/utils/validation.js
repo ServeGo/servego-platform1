@@ -57,44 +57,6 @@ export function isValidPincode(pincode) {
 }
 
 /**
- * Sanitize string input
- * @param {string} input - The input to sanitize
- * @returns {string} Sanitized string
- */
-export function sanitizeString(input) {
-  if (!input) return '';
-  return String(input).trim().replace(/[<>]/g, '');
-}
-
-/**
- * Validate URL format
- * @param {string} url - The URL to validate
- * @returns {boolean} True if valid
- */
-export function isValidUrl(url) {
-  if (!url) return false;
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Validate date is not in the past
- * @param {string|Date} date - The date to validate
- * @returns {boolean} True if valid (not in past)
- */
-export function isValidFutureDate(date) {
-  if (!date) return false;
-  const inputDate = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return inputDate >= today;
-}
-
-/**
  * Validate rating value (1-5)
  * @param {number} rating - The rating to validate
  * @returns {boolean} True if valid
@@ -102,16 +64,4 @@ export function isValidFutureDate(date) {
 export function isValidRating(rating) {
   const parsed = Number(rating);
   return !isNaN(parsed) && parsed >= 1 && parsed <= 5;
-}
-
-/**
- * Truncate string to max length
- * @param {string} input - The input to truncate
- * @param {number} maxLength - Maximum length
- * @returns {string} Truncated string
- */
-export function truncate(input, maxLength = 100) {
-  if (!input) return '';
-  const str = String(input);
-  return str.length > maxLength ? str.substring(0, maxLength) : str;
 }
