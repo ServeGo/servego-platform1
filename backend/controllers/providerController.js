@@ -296,6 +296,13 @@ export const ProviderController = {
   },
 
 
+  updateMyAvailability: async (req, res) => {
+    const provider = await prisma.provider.findUnique({ where: { userId: req.user.id }, select: { id: true } });
+    if (!provider) return sendApiError(res, 404, 'NOT_FOUND', 'Provider profile not found.');
+    req.params.id = provider.id;
+    return ProviderController.updateAvailability(req, res);
+  },
+
   updateAvailability: async (req, res) => {
     try {
       const { id } = req.params;

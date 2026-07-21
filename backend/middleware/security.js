@@ -114,19 +114,3 @@ export const hppConfig = hpp({
     'categoryIds'
   ]
 });
-
-// Request size limiting configuration
-export const requestSizeLimit = (req, res, next) => {
-  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
-  const maxSize = parseInt(process.env.MAX_REQUEST_SIZE || '1048576', 10); // 1MB default
-  
-  if (contentLength > maxSize) {
-    return res.status(413).json({
-      success: false,
-      code: 'PAYLOAD_TOO_LARGE',
-      message: 'Request payload too large. Maximum size is 1MB.',
-      maxSize: maxSize
-    });
-  }
-  next();
-};

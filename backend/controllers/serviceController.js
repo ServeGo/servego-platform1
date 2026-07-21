@@ -14,7 +14,7 @@ export const ServiceController = {
       if (!category) return sendApiError(res, 404, 'NOT_FOUND', 'Service category not found.');
       const location = String(req.query.zone || '').trim();
       const providers = await prisma.providerService.findMany({
-        where: { serviceId: category.id, provider: { accountStatus: 'ACTIVE', isVerified: true, user: { status: 'ACTIVE' }, ...(location ? { serviceAreas: { array_contains: location } } : {}) } },
+        where: { serviceId: category.id, provider: { accountStatus: 'ACTIVE', isVerified: true, user: { status: 'ACTIVE' }, ...(location ? { serviceAreas: { string_contains: location } } : {}) } },
         include: { provider: { include: { user: { select: { id: true, name: true, avatar: true } }, badges: true } } },
         orderBy: { provider: String(req.query.sort) === 'experience' ? { experienceYears: 'desc' } : { rating: 'desc' } }
       });
@@ -103,7 +103,7 @@ export const ServiceController = {
             accountStatus: 'ACTIVE',
             isVerified: true,
             user: { status: 'ACTIVE' },
-            ...(location ? { serviceAreas: { array_contains: location } } : {})
+            ...(location ? { serviceAreas: { string_contains: location } } : {})
           }
         }
       });

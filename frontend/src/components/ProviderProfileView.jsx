@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AchievementList, VerificationLevelPill } from './ProviderReputation';
-import { api } from '../utils/apiClient';
 
 export default function ProviderProfileView() {
   const { currentUser, providers, logout, updateProviderAvailability, updateProviderProfile } = useApp();
 
-  // Resolve active provider from context users/providers.
+  // Resolve active provider from context — no separate API call needed
   const activeProvider = useMemo(() => {
     const providerIdCandidate = currentUser?.providerId;
     const providerUserIdCandidate = currentUser?.id;
@@ -17,8 +16,8 @@ export default function ProviderProfileView() {
     return byProviderId || byUserId || null;
   }, [currentUser, providers]);
 
-  const [provider, setProvider] = useState(activeProvider);
-  const [loading, setLoading] = useState(!activeProvider);
+  const provider = activeProvider;
+  const loading = !provider;
 
   // Edit mode
   const [editMode, setEditMode] = useState(false);
@@ -26,7 +25,7 @@ export default function ProviderProfileView() {
   const [saveMsg, setSaveMsg] = useState('');
   const [saveErr, setSaveErr] = useState('');
 
-  // Form fields
+  // Form fields — initialized from provider context data
   const [bio, setBio] = useState('');
   const [phone, setPhone] = useState('');
   const [experienceYears, setExperienceYears] = useState('');
@@ -35,33 +34,6 @@ export default function ProviderProfileView() {
 
   const [availableDaysText, setAvailableDaysText] = useState('');
   const [timeSlotsText, setTimeSlotsText] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-    setProvider(activeProvider);
-    setLoading(!activeProvider);
-    setSaveMsg('');
-    setSaveErr('');
-
-    const fetchLatest = async () => {
-      if (!activeProvider?.id) return;
-      try {
-        const res = await api.get(`/providers/${activeProvider.id}`);
-        const data = res.data;
-        if (alive && res.ok) setProvider(data);
-      } catch {
-        // keep cached
-      } finally {
-        if (alive) setLoading(false);
-      }
-    };
-
-    fetchLatest();
-
-    return () => {
-      alive = false;
-    };
-  }, [activeProvider]);
 
   // When provider loads/changes, populate form state
   useEffect(() => {

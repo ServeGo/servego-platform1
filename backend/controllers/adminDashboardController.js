@@ -151,10 +151,14 @@ export const AdminDashboardController = {
       };
 
       // Aggregate booking amount for escrow volume (Prisma aggregate supports _sum).
-      const [escrowAgg, disputedTickets] = await Promise.all([
+      const [escrowAgg, paidAgg, disputedTickets] = await Promise.all([
         prisma.booking.aggregate({
           _sum: { amount: true },
           where: { paymentStatus: { in: ['PENDING', 'PAID'] } }
+        }),
+        prisma.booking.aggregate({
+          _sum: { amount: true },
+          where: { paymentStatus: 'PAID' }
         }),
         prisma.ticket.count({
           where: { status: 'OPEN', subject: { contains: 'dispute', mode: 'insensitive' } }
@@ -162,13 +166,11 @@ export const AdminDashboardController = {
       ]);
 
       const sumAmount = escrowAgg?._sum?.amount ?? 0;
+      const paidAmount = paidAgg?._sum?.amount ?? 0;
 
-
-      // No payout/commission model exists yet, so net payout is deliberately
-      // reported as the gateway-settled gross amount rather than invented.
       summary.aggregates = {
         grossEscrowVolume: Number(sumAmount),
-        adminNetPayout: Number(sumAmount),
+        adminNetPayout: Number(paidAmount),
         vettingBacklogCount: pendingApprovals,
         disputeTicketsCount: disputedTickets
       };

@@ -169,7 +169,7 @@ export const ProviderAnalyticsController = {
       const bookingTrends = Array.from(bookingTrendsByMonth.values()).sort((a, b) => (a.month < b.month ? -1 : 1));
       const revenueSeries = Array.from(revenueSeriesByMonth.values()).sort((a, b) => (a.month < b.month ? -1 : 1));
 
-      const paidCount = paidBookingIds.size || bookings.filter((b) => b.paymentStatus === 'PAID').length;
+      const paidCount = paidBookingIds.size;
       const totalEarnings = bookings
         .filter((b) => paidBookingIds.has(b.id) || b.paymentStatus === 'PAID')
         .reduce((sum, booking) => sum + (Number(booking.amount) || 0), 0);
@@ -190,7 +190,6 @@ export const ProviderAnalyticsController = {
         },
         monthlyEarnings: revenueSeries,
         bookingTrendsByMonth: bookingTrends,
-        revenueSeriesByMonth: revenueSeries,
       });
     } catch (err) {
       return sendApiError(res, 500, 'INTERNAL_ERROR', 'Failed to load provider analytics', err.message);

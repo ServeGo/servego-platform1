@@ -9,7 +9,7 @@ import {
   normalizeNotification,
   normalizeNotifications,
 } from '../utils/normalizeCustomerData';
-import { api as apiClient, API_BASE_URL, SOCKET_URL, setTokens, clearTokens, initializeTokens } from '../utils/apiClient';
+import { api as apiClient, API_BASE_URL, SOCKET_URL, setTokens, clearTokens, initializeTokens, getStoredTokens } from '../utils/apiClient';
 
 const AppContext = createContext(undefined);
 
@@ -74,7 +74,7 @@ const api = async (url, options = {}) => {
 
 
 export const AppProvider = ({ children }) => {
-  const fetchProviderAvailability = async (providerId, dateYYYYMMDD) => {
+  const fetchProviderAvailability = useCallback(async (providerId, dateYYYYMMDD) => {
     try {
       const res = await api(`${API_BASE_URL}/providers/${providerId}/availability?date=${encodeURIComponent(dateYYYYMMDD)}`);
       const data = await res.json();
@@ -83,13 +83,50 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       return { error: 'Network error' };
     }
-  };
+  }, []);
 
   // Database of users - purely for local dev fallback or admin view if needed
   const [users, setUsers] = useState([]);
 
   // Restore a previously authenticated session on refresh, but clear it on explicit logout.
   const [currentUser, setCurrentUser] = useState(getStoredUser);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Validate stored session on mount - prevents stale/expired auto-login
+  useEffect(() => {
+    let cancelled = false;
+    const storedUser = getStoredUser();
+    const { access } = getStoredTokens();
+
+    if (!storedUser || !access) {
+      setCurrentUser(null);
+      setIsInitializing(false);
+      return;
+    }
+
+    apiClient.get('/auth/me')
+      .then(res => {
+        if (cancelled) return;
+        if (res.ok && res.data?.user) {
+          setCurrentUser(res.data.user);
+        } else {
+          setCurrentUser(null);
+          localStorage.removeItem('servego_user');
+          clearTokens();
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCurrentUser(null);
+        localStorage.removeItem('servego_user');
+        clearTokens();
+      })
+      .finally(() => {
+        if (!cancelled) setIsInitializing(false);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (currentUser) {
@@ -122,6 +159,7 @@ export const AppProvider = ({ children }) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
 
   const socketRef = useRef(null);
+  const providersRef = useRef([]);
 
   const fetchProvidersByApprovedServiceName = useCallback(async (serviceName, { location = '', sort = 'rating' } = {}) => {
     if (!serviceName) return [];
@@ -164,7 +202,7 @@ export const AppProvider = ({ children }) => {
     }
   }, [currentUser?.id, currentUser?.role]);
 
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
       const res = await api(`${API_BASE_URL}/providers`);
       const data = await res.json();
@@ -172,9 +210,14 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch providers:', err);
     }
-  };
+  }, []);
 
-  const fetchServices = async () => {
+  // Keep providersRef in sync so fetchBookings always reads latest providers
+  useEffect(() => {
+    providersRef.current = providers;
+  }, [providers]);
+
+  const fetchServices = useCallback(async () => {
     try {
       const res = await api(`${API_BASE_URL}/services`);
       const data = await res.json();
@@ -182,7 +225,7 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch services:', err);
     }
-  };
+  }, []);
 
   const searchServices = useCallback(async (query = '', location = '') => {
     try {
@@ -207,14 +250,12 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      // Use customer-scoped endpoint to avoid any frontend/customerId normalization mismatch
-      const res = await api(`${API_BASE_URL}/bookings/mine`);
+      // Backend GET /bookings already scopes by role (admin=all, customer=own, provider=own)
+      const limit = currentUser?.role === 'admin' ? 500 : 100;
+      const res = await api(`${API_BASE_URL}/bookings?limit=${limit}`);
       const data = await res.json();
 
-
-
       const bookingsArray = normalizeBookings(data);
-
 
       if (currentUser?.role === 'admin') {
         setBookings(bookingsArray);
@@ -223,7 +264,9 @@ export const AppProvider = ({ children }) => {
 
       if (currentUser?.role === 'provider') {
         const providerIds = [currentUser?.providerId, currentUser?.id].filter(Boolean);
-        const providerMatch = providers.find((p) => providerIds.includes(p.id) || providerIds.includes(p.userId));
+        // Use ref to always read latest providers — avoids stale closure in socket/poll handlers
+        const currentProviders = providersRef.current;
+        const providerMatch = currentProviders.find((p) => providerIds.includes(p.id) || providerIds.includes(p.userId));
         const providerId = providerMatch?.id || currentUser?.providerId || currentUser?.id;
         const matchedIds = [providerId, currentUser?.providerId, currentUser?.id].filter(Boolean);
 
@@ -237,18 +280,14 @@ export const AppProvider = ({ children }) => {
       }
 
       const filtered = bookingsArray.filter((b) => b.customerId === currentUser.id);
-      // eslint-disable-next-line no-console
-      console.log('[AppContext.fetchBookings] customer filtered count:', filtered.length);
-
       setBookings(filtered);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('Failed to fetch bookings:', err);
       setBookings([]);
     }
-  }, [currentUser?.id, currentUser?.providerId, currentUser?.role, providers]);
+  }, [currentUser?.id, currentUser?.providerId, currentUser?.role]);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const res = await api(`${API_BASE_URL}/notifications`);
       const data = await res.json();
@@ -256,14 +295,12 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
     }
-  };
+  }, []);
 
   const fetchTickets = useCallback(async () => {
     try {
-      const url = currentUser?.role === 'admin'
-        ? `${API_BASE_URL}/admin/tickets`
-        : `${API_BASE_URL}/tickets`;
-      const res = await api(url);
+      // Backend GET /tickets already scopes by role (admin=all, user=own)
+      const res = await api(`${API_BASE_URL}/tickets`);
       const data = await res.json();
       setTickets(normalizeTickets(data));
     } catch (err) {
@@ -550,13 +587,10 @@ export const AppProvider = ({ children }) => {
 
     connectSocket(SOCKET_URL);
 
-    // Poll bookings every 30s (reduced from 10s), no notification polling
-    fetchBookings();
+    // Poll bookings every 30s — initial fetch already handled by the data-fetch useEffect above
     const intervalId = window.setInterval(() => {
       if (currentUser?.id) fetchBookings();
     }, 30000);
-
-    if (currentUser?.role === 'admin') fetchUsers();
 
     return () => {
       window.clearInterval(intervalId);
@@ -587,7 +621,6 @@ export const AppProvider = ({ children }) => {
       if (data.id) {
         const normalized = normalizeBooking(data);
         setBookings(prev => [normalized, ...prev]);
-        fetchBookings();
         return normalized;
       }
       return { error: 'Booking failed.' };
@@ -912,7 +945,7 @@ export const AppProvider = ({ children }) => {
   };
 
 
-  const fetchProviderAnalytics = async (providerId, range = '90d') => {
+  const fetchProviderAnalytics = useCallback(async (providerId, range = '90d') => {
     if (!providerId) return null;
     try {
       const res = await api(`${API_BASE_URL}/providers/${providerId}/analytics?range=${encodeURIComponent(range)}`);
@@ -922,7 +955,7 @@ export const AppProvider = ({ children }) => {
     } catch {
       return null;
     }
-  };
+  }, []);
 
 
   const fetchProviderServiceRequests = async () => {
@@ -1076,7 +1109,8 @@ export const AppProvider = ({ children }) => {
       // global async action spinner
       actionSpinner,
       runWithActionSpinner,
-      connectionStatus
+      connectionStatus,
+      isInitializing
     }}>
 
 

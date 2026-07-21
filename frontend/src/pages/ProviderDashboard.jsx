@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 
 import { ShieldAlert, ListOrdered } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { api } from '../utils/apiClient';
 
 // Components
 import ProviderHeader from '../components/ProviderHeader';
@@ -20,14 +21,12 @@ import ProviderAnalyticsDashboard from '../components/ProviderAnalyticsDashboard
 export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setActiveTabExternal }) => {
 
   const { 
-    currentUser, providers, bookings, 
+    currentUser, providers, bookings, services,
     updateBookingStatus, submitSupportTicket, tickets,
     applyReferralCode, sendChatMessage
   } = useApp();
 
   const activeProvider = useMemo(() => {
-    // currentUser.providerId (from backend) might represent either User.id or Provider.id
-    // Prefer matching by Provider.id; if missing, fall back to matching by userId.
     const providerIdCandidate = currentUser?.providerId;
     const providerUserIdCandidate = currentUser?.id;
 
@@ -36,6 +35,30 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
 
     return byProviderId || byUserId || null;
   }, [providers, currentUser]);
+
+  // Single fetch for provider's approved services — shared by ProviderHeader + ProviderServicesPanel
+  const [approvedServices, setApprovedServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+
+  const fetchProviderApprovedServices = useCallback(async () => {
+    if (!activeProvider?.id) return;
+    setLoadingServices(true);
+    try {
+      const res = await api.get(`/providers/${activeProvider.id}/services`);
+      const data = res.data;
+      if (res.ok && Array.isArray(data)) {
+        setApprovedServices(data.filter(s => s?.approvalStatus === 'APPROVED'));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingServices(false);
+    }
+  }, [activeProvider?.id]);
+
+  useEffect(() => {
+    fetchProviderApprovedServices();
+  }, [fetchProviderApprovedServices]);
 
   const [internalActiveTab, setInternalActiveTab] = useState('leads');
   const activeTab = activeTabProp || internalActiveTab;
@@ -101,7 +124,7 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         {isPending && <PendingBanner />}
 
         {!isPending && activeProvider && (
-          <ProviderHeader provider={activeProvider} completedJobs={completedCount} />
+          <ProviderHeader provider={activeProvider} completedJobs={completedCount} approvedServices={approvedServices} loadingServices={loadingServices} />
         )}
 
         <TabList activeTab={activeTab} setActiveTab={setActiveTab} leadsCount={activeLeads.length} reviewsCount={activeProvider?.reviews?.length || 0} />
@@ -129,6 +152,9 @@ export const ProviderDashboard = ({ onNavigate, activeTab: activeTabProp, setAct
         {activeTab === 'services' && activeProvider && (
           <ProviderServicesPanel
             provider={activeProvider}
+            initialServices={approvedServices}
+            allServices={services}
+            onRefresh={fetchProviderApprovedServices}
           />
         )}
 

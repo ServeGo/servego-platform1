@@ -48,7 +48,7 @@ export const ProviderServiceDiscoveryController = {
             accountStatus: 'ACTIVE',
             isVerified: true,
             user: { status: 'ACTIVE' },
-            ...(location ? { serviceAreas: { array_contains: location } } : {})
+            ...(location ? { serviceAreas: { string_contains: location } } : {})
           }
         },
         orderBy: { provider: orderBy },

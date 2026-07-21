@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, Save } from 'lucide-react';
 import { api } from '../utils/apiClient';
 
@@ -19,8 +19,8 @@ function FilterButton({ label, active, onClick }) {
   );
 }
 
-export default function ProviderServicesPanel({ provider }) {
-  const [myServices, setMyServices] = useState([]);
+export default function ProviderServicesPanel({ provider, initialServices = [], allServices: globalServices = [], onRefresh }) {
+  const [myServices, setMyServices] = useState(initialServices);
   const [servicesError, setServicesError] = useState('');
   const [loadingMyServices, setLoadingMyServices] = useState(false);
 
@@ -51,10 +51,6 @@ export default function ProviderServicesPanel({ provider }) {
     if (servicesFilter === 'PENDING') arr = arr.filter(sv => sv.approvalStatus === 'PENDING');
     if (servicesFilter === 'DENIED') arr = arr.filter(sv => sv.approvalStatus === 'DENIED');
 
-    if (servicesFilter !== 'ALL') {
-      // no-op (filter already applied above)
-    }
-
     const q = query.trim().toLowerCase();
     if (q) {
       arr = arr.filter(sv => {
@@ -69,20 +65,6 @@ export default function ProviderServicesPanel({ provider }) {
     return arr;
   }, [myServices, servicesFilter, query]);
 
-
-  const [allServices, setAllServices] = useState([]);
-  
-
-  const fetchAllServices = async () => {
-    try {
-      const res = await api.get('/services');
-      setAllServices(res.ok && Array.isArray(res.data) ? res.data : []);
-    } catch (e) {
-      setAllServices([]);
-    }
-  };
-
-
   const fetchProviderServices = async () => {
     if (!providerId) return;
     try {
@@ -91,27 +73,20 @@ export default function ProviderServicesPanel({ provider }) {
       const data = res.data;
 
       if (!res.ok) {
-        console.log('[ProviderServicesPanel] GET failed', res.status, data);
         setServicesError(data?.message || `Failed to load your services. (${res.status})`);
         setMyServices([]);
         return;
       }
 
       setMyServices(Array.isArray(data) ? data : []);
+      if (onRefresh) onRefresh();
     } catch (e) {
-      console.log('[ProviderServicesPanel] GET exception', e);
       setServicesError('Failed to load your services.');
       setMyServices([]);
     } finally {
       setLoadingMyServices(false);
     }
   };
-
-  useEffect(() => {
-    fetchProviderServices();
-    fetchAllServices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerId]);
 
   const openRegister = () => {
     setServicesError('');
@@ -316,7 +291,7 @@ Requested: {new Date(sv.createdAt).toLocaleString()}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 outline-none"
                 >
                   <option value="">Select service</option>
-                  {allServices
+                  {globalServices
                     .filter((s) => !s.isHidden)
                     .map((s) => (
                       <option key={s.id} value={s.name}>

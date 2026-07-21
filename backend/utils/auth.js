@@ -104,16 +104,6 @@ export function decodeToken(token) {
 }
 
 /**
- * Check if token is about to expire (within 5 minutes)
- */
-export function isTokenExpiringSoon(token) {
-  const decoded = decodeToken(token);
-  if (!decoded || !decoded.exp) return false;
-  const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
-  return decoded.exp * 1000 < fiveMinutesFromNow;
-}
-
-/**
  * Basic authentication middleware - requires valid token
  */
 export function requireAuth(req, res, next) {
